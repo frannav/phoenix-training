@@ -17,6 +17,7 @@ export function AccountPage() {
     try {
       await signOut();
       queryClient.setQueryData(sessionQueryKey, null);
+      queryClient.invalidateQueries({ queryKey: sessionQueryKey });
       navigate("/entrar", { replace: true });
     } catch {
       setError("No se pudo cerrar la sesión. Inténtalo de nuevo.");

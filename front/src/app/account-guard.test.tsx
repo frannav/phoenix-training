@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { App } from "./App";
@@ -133,8 +133,10 @@ describe("guard de rutas privadas", () => {
 
   test("cerrar sesión deniega de nuevo las rutas privadas sin reutilizar la sesión cacheada", async () => {
     let session: Session = verifiedSession;
+    let sessionChecks = 0;
     stubFetch((url) => {
       if (url === "/api/auth/get-session") {
+        sessionChecks += 1;
         return { status: 200, body: session };
       }
       if (url === "/api/auth/sign-out") {
@@ -155,9 +157,11 @@ describe("guard de rutas privadas", () => {
 
     await user.click(screen.getByRole("link", { name: "Phoenix Training" }));
 
-    expect(
-      await screen.findByRole("heading", { name: "Iniciar sesión" }),
-    ).toBeInTheDocument();
+    // El guard vuelve a comprobar la sesión con el servidor antes de decidir.
+    await waitFor(() => expect(sessionChecks).toBe(2));
     expect(window.location.pathname).toBe("/entrar");
+    expect(
+      screen.getByRole("heading", { name: "Iniciar sesión" }),
+    ).toBeInTheDocument();
   });
 });
