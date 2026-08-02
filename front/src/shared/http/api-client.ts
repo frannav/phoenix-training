@@ -20,14 +20,14 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function apiFetch<T>(path: string, init: RequestInit): Promise<T> {
+async function apiFetch<T>(path: string, { headers, ...init }: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
+    ...init,
     credentials: "include",
     headers: {
       Accept: "application/json",
-      ...init.headers,
+      ...headers,
     },
-    ...init,
   });
 
   if (!response.ok) {

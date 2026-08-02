@@ -232,6 +232,7 @@ describe("verificación del correo", () => {
     const denied = await signIn(context!, "deportista@example.com", "contraseña-segura", []);
     expect(denied.status).toBe(200);
     expect(denied.body.user).toMatchObject({ email: "deportista@example.com", emailVerified: true });
+    expect(denied.setCookies).toHaveLength(1);
 
     const cookie = sessionCookieFrom(denied.setCookies);
     const session = await getSession(context!, cookie);
