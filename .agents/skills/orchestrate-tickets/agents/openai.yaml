@@ -1,0 +1,7 @@
+interface:
+  display_name: "Orchestrate Tickets"
+  short_description: "Supervise ticket implementation and repair loops"
+  default_prompt: "Use $orchestrate-tickets to implement the selected tickets with supervised Pi workers and review every result."
+
+policy:
+  allow_implicit_invocation: false
