@@ -1,4 +1,4 @@
-export type ApiErrorCode = "INVALID_REQUEST" | "NOT_FOUND";
+export type ApiErrorCode = string;
 
 export type ApiError = {
   error: {
