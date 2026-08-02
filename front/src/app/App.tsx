@@ -3,6 +3,9 @@ import { useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AccountPage } from "../features/account/pages/AccountPage";
 import { AuthPage } from "../features/auth/pages/AuthPage";
+import { LoginPage } from "../features/auth/pages/LoginPage";
+import { RegisterPage } from "../features/auth/pages/RegisterPage";
+import { VerifyPage } from "../features/auth/pages/VerifyPage";
 import { HomePage } from "../features/dashboard/pages/HomePage";
 import { ExercisesPage } from "../features/exercises/pages/ExercisesPage";
 import { HistoryDetailPage, HistoryPage } from "../features/history/pages/HistoryPage";
@@ -30,36 +33,9 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route
-            path="entrar"
-            element={
-              <AuthPage
-                eyebrow="Cuenta"
-                title="Iniciar sesión"
-                description="Accede a tu entrenamiento desde este dispositivo."
-              />
-            }
-          />
-          <Route
-            path="registro"
-            element={
-              <AuthPage
-                eyebrow="Cuenta"
-                title="Crear cuenta"
-                description="Crea una Cuenta privada para guardar tu entrenamiento."
-              />
-            }
-          />
-          <Route
-            path="verificar"
-            element={
-              <AuthPage
-                eyebrow="Cuenta pendiente de verificación"
-                title="Verificar correo"
-                description="Confirma tu dirección para acceder a tus datos de entrenamiento."
-              />
-            }
-          />
+          <Route path="entrar" element={<LoginPage />} />
+          <Route path="registro" element={<RegisterPage />} />
+          <Route path="verificar" element={<VerifyPage />} />
           <Route
             path="recuperar"
             element={
