@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiRequestError } from "../../../shared/http/api-client";
 import { FormField } from "../../../shared/ui/FormField";
 import { PageIntro } from "../../../shared/ui/PageIntro";
@@ -12,6 +12,7 @@ import styles from "./AuthPage.module.css";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -64,6 +65,30 @@ export function LoginPage() {
           title="Iniciar sesión"
           description="Accede a tu entrenamiento desde este dispositivo."
         />
+        {searchParams.get("estado") === "contraseña-cambiada" && (
+          <div className={styles.result} role="status">
+            <span className={styles.resultIcon} aria-hidden="true">
+              ✓
+            </span>
+            <p>Contraseña cambiada. Inicia sesión de nuevo para continuar.</p>
+          </div>
+        )}
+        {searchParams.get("estado") === "sesiones-cerradas" && (
+          <div className={styles.result} role="status">
+            <span className={styles.resultIcon} aria-hidden="true">
+              ✓
+            </span>
+            <p>Se han cerrado todas las sesiones de tu Cuenta.</p>
+          </div>
+        )}
+        {searchParams.get("estado") === "sesion-cerrada" && (
+          <div className={styles.result} role="status">
+            <span className={styles.resultIcon} aria-hidden="true">
+              ✓
+            </span>
+            <p>Sesión cerrada correctamente.</p>
+          </div>
+        )}
         {pendingVerification && (
           <div className={styles.alert} role="alert">
             <span aria-hidden="true">✉</span>
@@ -118,6 +143,11 @@ export function LoginPage() {
           ¿Todavía sin Cuenta?{" "}
           <Link className={styles.textLink} to="/registro">
             Crear cuenta
+          </Link>
+        </p>
+        <p className={styles.switchLink}>
+          <Link className={styles.textLink} to="/recuperar">
+            ¿Has olvidado tu contraseña?
           </Link>
         </p>
         {pendingVerification && (

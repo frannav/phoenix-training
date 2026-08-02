@@ -37,6 +37,7 @@ Una especificación funcional, de experiencia y técnica del MVP lista para conv
 - [Definir el ciclo de vida y la propiedad de una Cuenta](issues/12-definir-ciclo-cuenta.md) — La Cuenta pasa de pendiente de verificación a verificada, usa sesiones de Better Auth y permite recuperación, cierre y eliminación definitiva de todos sus datos privados mediante reglas pequeñas y explícitas.
 - [Definir el contrato API y la estrategia de guardado](issues/13-definir-contrato-api.md) — La API REST intercambia agregados completos con revisión optimista; cada escritura es transaccional, las entradas parciales viven en el navegador y las métricas se calculan al leer sin procesos derivados.
 - [Elegir la arquitectura del frontend React](issues/14-elegir-arquitectura-frontend.md) — El frontend Vite se organiza por funcionalidad y usa React Router, TanStack Query, React Hook Form, Zod, Recharts y CSS Modules sin store global, SSR, PWA ni capas genéricas.
+- [Recuperar credenciales y controlar sesiones](issues/17-recuperar-credenciales-controlar-sesiones.md) — La recuperación usa respuesta indistinguible, tokens de un solo uso y reenvío de verificación para Cuentas pendientes; los cambios de contraseña y el cierre total revocan todas las sesiones.
 
 ## Deferred to implementation planning
 

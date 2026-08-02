@@ -3,6 +3,11 @@ export type VerificationEmail = {
   url: string;
 };
 
+export type PasswordResetEmail = {
+  to: string;
+  url: string;
+};
+
 /**
  * Adaptador de correo transaccional. El dominio entrega la dirección y el
  * enlace ya construido; el proveedor concreto se elige durante el despliegue.
@@ -10,4 +15,5 @@ export type VerificationEmail = {
  */
 export type MailAdapter = {
   sendVerificationEmail: (email: VerificationEmail) => Promise<void>;
+  sendPasswordResetEmail?: (email: PasswordResetEmail) => Promise<void>;
 };

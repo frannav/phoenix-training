@@ -44,6 +44,28 @@ export function requestVerificationLink(email: string): Promise<{ status: boolea
   return apiPost<{ status: boolean }>("/api/auth/send-verification-email", { email });
 }
 
+export function requestPasswordReset(email: string): Promise<{ status: boolean }> {
+  return apiPost<{ status: boolean }>("/api/auth/request-password-reset", { email });
+}
+
+export function resetPassword(token: string, newPassword: string): Promise<{ status: boolean }> {
+  return apiPost<{ status: boolean }>("/api/auth/reset-password", { token, newPassword });
+}
+
+export function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ status: boolean }> {
+  return apiPost<{ status: boolean }>("/api/auth/change-password", {
+    currentPassword,
+    newPassword,
+  });
+}
+
+export function revokeAllSessions(): Promise<{ status: boolean }> {
+  return apiPost<{ status: boolean }>("/api/auth/revoke-sessions", {});
+}
+
 export function signIn(values: { email: string; password: string }): Promise<SignInResult> {
   return apiPost<SignInResult>("/api/auth/sign-in/email", values);
 }

@@ -21,6 +21,17 @@ export const requestLinkSchema = z.object({
   email: emailSchema,
 });
 
+export const resetPasswordSchema = z.object({
+  password: passwordSchema,
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Escribe tu contraseña actual."),
+  password: passwordSchema,
+});
+
 export type RegisterValues = z.infer<typeof registerSchema>;
 export type LoginValues = z.infer<typeof loginSchema>;
 export type RequestLinkValues = z.infer<typeof requestLinkSchema>;
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;

@@ -55,4 +55,36 @@ describe("pantalla de Cuenta", () => {
       await screen.findByRole("heading", { name: "Iniciar sesión" }),
     ).toBeInTheDocument();
   });
+
+  test("permite cambiar la contraseña y obliga a iniciar sesión de nuevo", async () => {
+    const user = userEvent.setup();
+    stubFetch((url) => {
+      expect(url).toBe("/api/auth/change-password");
+      return { status: 200, body: { status: true } };
+    });
+
+    renderPage();
+
+    await user.type(screen.getByLabelText("Contraseña actual"), "contraseña-segura");
+    await user.type(screen.getByLabelText("Contraseña nueva"), "nueva-contraseña");
+    await user.click(screen.getByRole("button", { name: "Cambiar contraseña" }));
+
+    expect(await screen.findByRole("heading", { name: "Iniciar sesión" })).toBeInTheDocument();
+  });
+
+  test("confirma y cierra todas las sesiones", async () => {
+    const user = userEvent.setup();
+    stubFetch((url) => {
+      expect(url).toBe("/api/auth/revoke-sessions");
+      return { status: 200, body: { status: true } };
+    });
+
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Cerrar todas las sesiones" }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent(/todos tus dispositivos/i);
+    await user.click(screen.getByRole("button", { name: "Confirmar cierre de todas las sesiones" }));
+
+    expect(await screen.findByRole("heading", { name: "Iniciar sesión" })).toBeInTheDocument();
+  });
 });

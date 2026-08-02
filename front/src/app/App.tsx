@@ -2,9 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AccountPage } from "../features/account/pages/AccountPage";
-import { AuthPage } from "../features/auth/pages/AuthPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
+import { RecoverPage } from "../features/auth/pages/RecoverPage";
 import { RegisterPage } from "../features/auth/pages/RegisterPage";
+import { ResetPasswordPage } from "../features/auth/pages/ResetPasswordPage";
 import { VerifyPage } from "../features/auth/pages/VerifyPage";
 import { HomePage } from "../features/dashboard/pages/HomePage";
 import { ExercisesPage } from "../features/exercises/pages/ExercisesPage";
@@ -37,26 +38,8 @@ export function App() {
           <Route path="entrar" element={<LoginPage />} />
           <Route path="registro" element={<RegisterPage />} />
           <Route path="verificar" element={<VerifyPage />} />
-          <Route
-            path="recuperar"
-            element={
-              <AuthPage
-                eyebrow="Cuenta"
-                title="Recuperar contraseña"
-                description="Solicita un enlace seguro para volver a entrar."
-              />
-            }
-          />
-          <Route
-            path="restablecer"
-            element={
-              <AuthPage
-                eyebrow="Cuenta"
-                title="Restablecer contraseña"
-                description="Elige una contraseña nueva para tu Cuenta."
-              />
-            }
-          />
+          <Route path="recuperar" element={<RecoverPage />} />
+          <Route path="restablecer" element={<ResetPasswordPage />} />
           <Route element={<RequireAccount />}>
             <Route path="sesion/:sesionId" element={<ActiveSessionPage />} />
             <Route element={<AppShell />}>

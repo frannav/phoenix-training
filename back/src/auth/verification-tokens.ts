@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
-import { user, verificationToken } from "../db/schema";
+import { passwordResetToken, user, verificationToken } from "../db/schema";
 import type { AppDatabase } from "../db/open-database";
 
 export type VerificationTokenOutcome = "success" | "invalid" | "expired";
@@ -109,4 +109,38 @@ export async function consumeVerificationToken(
   });
 
   return outcome;
+}
+
+export type IssuePasswordResetTokenInput = {
+  userId: string;
+  now: Date;
+  lifetimeMs: number;
+};
+
+/**
+ * Emite un token de recuperación y sustituye cualquier token anterior de la
+ * misma Cuenta. Solo se persiste el resumen del token; el token original se
+ * entrega únicamente por correo.
+ */
+export async function issuePasswordResetToken(
+  database: AppDatabase,
+  { userId, now, lifetimeMs }: IssuePasswordResetTokenInput,
+): Promise<string> {
+  const rawToken = createVerificationToken();
+  const expiresAt = new Date(now.getTime() + lifetimeMs);
+
+  await database.transaction(async (tx) => {
+    await tx
+      .delete(passwordResetToken)
+      .where(eq(passwordResetToken.userId, userId));
+    await tx.insert(passwordResetToken).values({
+      tokenHash: hashVerificationToken(rawToken),
+      userId,
+      expiresAt,
+      createdAt: now,
+      usedAt: null,
+    });
+  });
+
+  return rawToken;
 }

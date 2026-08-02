@@ -15,6 +15,13 @@
       "when": 1785706223308,
       "tag": "0001_known_the_initiative",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785710763258,
+      "tag": "0002_nosy_hannibal_king",
+      "breakpoints": true
     }
   ]
 }

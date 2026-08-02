@@ -7,11 +7,11 @@ import { HomePage } from "../../dashboard/pages/HomePage";
 import { LoginPage } from "./LoginPage";
 import { stubFetch } from "../../../test/mock-fetch";
 
-function renderPage() {
+function renderPage(initialEntries = ["/entrar"]) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/entrar"]}>
+      <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route path="/entrar" element={<LoginPage />} />
           <Route path="/" element={<HomePage />} />
@@ -40,6 +40,18 @@ describe("pantalla de entrada", () => {
     expect(screen.getByLabelText("Correo electrónico")).toBeInTheDocument();
     expect(screen.getByLabelText("Contraseña")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
+  });
+
+  test("muestra confirmación al volver después de cambiar la contraseña", () => {
+    renderPage(["/entrar?estado=contraseña-cambiada"]);
+
+    expect(screen.getByRole("status")).toHaveTextContent(/Contraseña cambiada/i);
+  });
+
+  test("muestra confirmación al cerrar la sesión", () => {
+    renderPage(["/entrar?estado=sesion-cerrada"]);
+
+    expect(screen.getByRole("status")).toHaveTextContent(/Sesión cerrada/i);
   });
 
   test("muestra errores junto a los campos sin enviar la petición", async () => {

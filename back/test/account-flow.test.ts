@@ -11,11 +11,13 @@ const baseUrl = "http://127.0.0.1:3000";
 const origin = baseUrl;
 
 type SentVerificationEmail = { to: string; url: string };
+type SentPasswordResetEmail = { to: string; url: string };
 
 type TestContext = {
   connection: DatabaseConnection;
   app: ReturnType<typeof createApp>;
   sentEmails: SentVerificationEmail[];
+  sentPasswordResetEmails: SentPasswordResetEmail[];
   mailAdapter: MailAdapter;
   currentTime: Date;
   advanceTime: (milliseconds: number) => void;
@@ -25,12 +27,19 @@ function tokenFromUrl(url: string): string {
   return new URL(url).searchParams.get("token") ?? "";
 }
 
-function createTestContext(secureCookies = false): TestContext {
-  let currentTime = new Date("2026-08-02T12:00:00.000Z");
+function createTestContext(
+  secureCookies = false,
+  passwordResetTokenLifetimeMs = 60 * 60 * 1000,
+): TestContext {
+  let currentTime = new Date();
   const sentEmails: SentVerificationEmail[] = [];
+  const sentPasswordResetEmails: SentPasswordResetEmail[] = [];
   const mailAdapter: MailAdapter = {
     sendVerificationEmail: async ({ to, url }) => {
       sentEmails.push({ to, url });
+    },
+    sendPasswordResetEmail: async ({ to, url }) => {
+      sentPasswordResetEmails.push({ to, url });
     },
   };
   const connection = openDatabase(":memory:");
@@ -42,8 +51,10 @@ function createTestContext(secureCookies = false): TestContext {
       mailAdapter,
       now: () => currentTime,
       verificationTokenLifetimeMs: 60 * 60 * 1000,
+      passwordResetTokenLifetimeMs,
     }),
     sentEmails,
+    sentPasswordResetEmails,
     mailAdapter,
     currentTime,
     advanceTime: (milliseconds) => {
@@ -206,6 +217,50 @@ async function getSession(context: TestContext, cookie: string) {
   return { status: response.status, body: (await response.json()) as JsonBody | null };
 }
 
+async function requestPasswordReset(context: TestContext, email: string) {
+  const response = await context.app.request("/api/auth/request-password-reset", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: origin },
+    body: JSON.stringify({ email }),
+  });
+  return { status: response.status, body: (await response.json()) as JsonBody };
+}
+
+async function resetPassword(context: TestContext, token: string, newPassword: string) {
+  const response = await context.app.request("/api/auth/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: origin },
+    body: JSON.stringify({ token, newPassword }),
+  });
+  return { status: response.status, body: (await response.json()) as JsonBody };
+}
+
+async function changePassword(
+  context: TestContext,
+  cookie: string,
+  currentPassword: string,
+  newPassword: string,
+) {
+  const response = await context.app.request("/api/auth/change-password", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: origin,
+      Cookie: cookie,
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  return { status: response.status, body: (await response.json()) as JsonBody };
+}
+
+async function revokeAllSessions(context: TestContext, cookie: string) {
+  const response = await context.app.request("/api/auth/revoke-sessions", {
+    method: "POST",
+    headers: { Origin: origin, Cookie: cookie },
+  });
+  return { status: response.status, body: (await response.json()) as JsonBody };
+}
+
 describe("verificación del correo", () => {
   let context: TestContext | undefined;
 
@@ -295,6 +350,103 @@ describe("verificación del correo", () => {
     expect(response.status).toBe(200);
     expect((await response.json()) as JsonBody).toEqual({ status: true });
     expect(context!.sentEmails).toHaveLength(0);
+  });
+});
+
+describe("recuperación de credenciales", () => {
+  let context: TestContext | undefined;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrate(context);
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  test("una Cuenta pendiente recibe verificación y no un enlace de recuperación", async () => {
+    await registerPending(context!, "pendiente@example.com");
+
+    const response = await requestPasswordReset(context!, "pendiente@example.com");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ status: true });
+    expect(context!.sentPasswordResetEmails).toHaveLength(0);
+    expect(context!.sentEmails).toHaveLength(2);
+    expect(context!.sentEmails.at(-1)!.url).toContain("/api/auth/verify-email?token=");
+  });
+
+  test("una Cuenta verificada recibe un enlace de un solo uso y el anterior queda invalidado", async () => {
+    const verificationToken = await registerPending(context!, "deportista@example.com");
+    await verifyLink(context!, verificationToken);
+
+    const first = await requestPasswordReset(context!, "deportista@example.com");
+    const firstToken = tokenFromUrl(context!.sentPasswordResetEmails.at(-1)!.url);
+    const second = await requestPasswordReset(context!, "deportista@example.com");
+    const secondToken = tokenFromUrl(context!.sentPasswordResetEmails.at(-1)!.url);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(first.status);
+    expect(firstToken).not.toBe(secondToken);
+    expect(context!.sentPasswordResetEmails).toHaveLength(2);
+
+    const replaced = await resetPassword(context!, firstToken, "nueva-contraseña");
+    expect(replaced.status).toBe(400);
+
+    const valid = await resetPassword(context!, secondToken, "nueva-contraseña");
+    expect(valid.status).toBe(200);
+    expect(valid.body).toEqual({ status: true });
+    expect((await resetPassword(context!, secondToken, "otra-contraseña")).status).toBe(400);
+
+    const oldPassword = await signIn(context!, "deportista@example.com", "contraseña-segura", []);
+    expect(oldPassword.status).toBe(401);
+    const newPassword = await signIn(context!, "deportista@example.com", "nueva-contraseña", []);
+    expect(newPassword.status).toBe(200);
+  });
+
+  test("una solicitud para un correo desconocido conserva la misma respuesta pública", async () => {
+    const response = await requestPasswordReset(context!, "nadie@example.com");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ status: true });
+    expect(context!.sentEmails).toHaveLength(0);
+    expect(context!.sentPasswordResetEmails).toHaveLength(0);
+  });
+
+  test("un enlace de recuperación vencido no cambia la contraseña", async () => {
+    const expiredContext = createTestContext(false, 0);
+    await migrate(expiredContext);
+    try {
+      const verificationToken = await registerPending(expiredContext);
+      await verifyLink(expiredContext, verificationToken);
+      await requestPasswordReset(expiredContext, "deportista@example.com");
+      const resetToken = tokenFromUrl(expiredContext.sentPasswordResetEmails.at(-1)!.url);
+
+      const expired = await resetPassword(expiredContext, resetToken, "nueva-contraseña");
+
+      expect(expired.status).toBe(400);
+      expect(
+        (await signIn(expiredContext, "deportista@example.com", "contraseña-segura", [])).status,
+      ).toBe(200);
+    } finally {
+      expiredContext.connection.close();
+    }
+  });
+
+  test("el restablecimiento respeta los límites de contraseña", async () => {
+    const verificationToken = await registerPending(context!);
+    await verifyLink(context!, verificationToken);
+
+    await requestPasswordReset(context!, "deportista@example.com");
+    const shortToken = tokenFromUrl(context!.sentPasswordResetEmails.at(-1)!.url);
+    expect((await resetPassword(context!, shortToken, "1234567")).status).toBe(400);
+    expect((await resetPassword(context!, shortToken, "12345678")).status).toBe(200);
+
+    await requestPasswordReset(context!, "deportista@example.com");
+    const longToken = tokenFromUrl(context!.sentPasswordResetEmails.at(-1)!.url);
+    expect((await resetPassword(context!, longToken, "x".repeat(129))).status).toBe(400);
+    expect((await resetPassword(context!, longToken, "x".repeat(128))).status).toBe(200);
   });
 });
 
@@ -415,5 +567,74 @@ describe("sesiones de Cuenta", () => {
     expect(other.body).toMatchObject({
       user: { email: "deportista@example.com", emailVerified: true },
     });
+  });
+
+  test("cambiar la contraseña exige la actual y revoca todas las sesiones", async () => {
+    const token = await registerPending(context!);
+    await verifyLink(context!, token);
+
+    const deviceA = await signIn(context!, "deportista@example.com", "contraseña-segura", []);
+    const deviceB = await signIn(context!, "deportista@example.com", "contraseña-segura", []);
+    const cookieA = sessionCookieFrom(deviceA.setCookies);
+    const cookieB = sessionCookieFrom(deviceB.setCookies);
+
+    const wrong = await changePassword(
+      context!,
+      cookieA,
+      "contraseña-equivocada",
+      "nueva-contraseña",
+    );
+    expect(wrong.status).toBe(400);
+
+    const changed = await changePassword(
+      context!,
+      cookieA,
+      "contraseña-segura",
+      "nueva-contraseña",
+    );
+    expect(changed.status).toBe(200);
+    expect(changed.body).toEqual({ status: true });
+    expect((await getSession(context!, cookieA)).body).toBeNull();
+    expect((await getSession(context!, cookieB)).body).toBeNull();
+
+    expect((await signIn(context!, "deportista@example.com", "contraseña-segura", [])).status).toBe(401);
+    expect((await signIn(context!, "deportista@example.com", "nueva-contraseña", [])).status).toBe(200);
+  });
+
+  test("cerrar todas las sesiones revoca también la sesión actual", async () => {
+    const token = await registerPending(context!);
+    await verifyLink(context!, token);
+    const deviceA = await signIn(context!, "deportista@example.com", "contraseña-segura", []);
+    const deviceB = await signIn(context!, "deportista@example.com", "contraseña-segura", []);
+    const cookieA = sessionCookieFrom(deviceA.setCookies);
+    const cookieB = sessionCookieFrom(deviceB.setCookies);
+
+    const revoked = await revokeAllSessions(context!, cookieA);
+
+    expect(revoked.status).toBe(200);
+    expect(revoked.body).toEqual({ status: true });
+    expect((await getSession(context!, cookieA)).body).toBeNull();
+    expect((await getSession(context!, cookieB)).body).toBeNull();
+    expect(revoked.status).toBe(200);
+  });
+
+  test("las credenciales y sesiones de otra Cuenta permanecen aisladas", async () => {
+    const accountAToken = await registerPending(context!, "a@example.com");
+    const accountBToken = await registerPending(context!, "b@example.com");
+    await verifyLink(context!, accountAToken);
+    await verifyLink(context!, accountBToken);
+
+    const accountA = await signIn(context!, "a@example.com", "contraseña-segura", []);
+    const accountB = await signIn(context!, "b@example.com", "contraseña-segura", []);
+    const cookieA = sessionCookieFrom(accountA.setCookies);
+    const cookieB = sessionCookieFrom(accountB.setCookies);
+
+    await changePassword(context!, cookieA, "contraseña-segura", "nueva-contraseña");
+
+    expect((await getSession(context!, cookieB)).body).toMatchObject({
+      user: { email: "b@example.com" },
+    });
+    expect((await signIn(context!, "b@example.com", "contraseña-segura", [])).status).toBe(200);
+    expect((await signIn(context!, "a@example.com", "contraseña-segura", [])).status).toBe(401);
   });
 });

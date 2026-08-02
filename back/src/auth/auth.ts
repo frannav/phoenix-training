@@ -42,6 +42,10 @@ export function createAuth({
       requireEmailVerification: true,
       minPasswordLength: 8,
       maxPasswordLength: 128,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user: resetUser, url }) => {
+        await mailAdapter.sendPasswordResetEmail?.({ to: resetUser.email, url });
+      },
     },
     emailVerification: {
       expiresIn: 60 * 60,
