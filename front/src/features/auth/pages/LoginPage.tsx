@@ -31,7 +31,9 @@ export function LoginPage() {
         const currentSession = await getSession();
         queryClient.setQueryData(sessionQueryKey, currentSession);
       } catch {
-        // La sesión se vuelve a comprobar al entrar en la aplicación.
+        // Sin datos frescos: se descarta la caché para que el guard vuelva a
+        // comprobar la sesión con el servidor al entrar, sin rebote.
+        queryClient.removeQueries({ queryKey: sessionQueryKey });
       }
       navigate("/", { replace: true });
     } catch (error) {

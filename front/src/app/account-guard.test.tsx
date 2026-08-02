@@ -131,6 +131,42 @@ describe("guard de rutas privadas", () => {
     expect(window.location.pathname).toBe("/");
   });
 
+  test("si la primera lectura de sesión tras entrar falla, el guard reintenta y permite la Cuenta", async () => {
+    let session: Session = null;
+    let sessionReads = 0;
+    stubFetch((url) => {
+      if (url === "/api/auth/get-session") {
+        sessionReads += 1;
+        if (sessionReads === 2) {
+          return {
+            status: 500,
+            body: { error: { code: "SERVER_ERROR", message: "Fallo transitorio." } },
+          };
+        }
+        return { status: 200, body: session };
+      }
+      if (url === "/api/auth/sign-in/email") {
+        session = verifiedSession;
+        return { status: 200, body: { user: verifiedSession.user } };
+      }
+      return { status: 200, body: { status: "ok", database: "ready" } };
+    });
+
+    renderAppAt("/");
+    expect(
+      await screen.findByRole("heading", { name: "Iniciar sesión" }),
+    ).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Correo electrónico"), "deportista@example.com");
+    await user.type(screen.getByLabelText("Contraseña"), "contraseña-segura");
+    await user.click(screen.getByRole("button", { name: "Entrar" }));
+
+    expect(await screen.findByRole("heading", { name: "Inicio" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+    expect(sessionReads).toBe(3);
+  });
+
   test("cerrar sesión deniega de nuevo las rutas privadas sin reutilizar la sesión cacheada", async () => {
     let session: Session = verifiedSession;
     let sessionChecks = 0;
