@@ -35,6 +35,7 @@ const app = createApp({
     appBaseUrl,
     secret: process.env.BETTER_AUTH_SECRET,
     trustedOrigins,
+    secureCookies: process.env.NODE_ENV === "production",
   },
 });
 

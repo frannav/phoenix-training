@@ -11,6 +11,7 @@ export type AuthDependencies = {
   appBaseUrl?: string;
   secret?: string;
   trustedOrigins?: string[];
+  secureCookies?: boolean;
   mailAdapter: MailAdapter;
   verificationTokenLifetimeMs: number;
   now: () => Date;
@@ -22,6 +23,7 @@ export function createAuth({
   appBaseUrl = baseUrl,
   secret,
   trustedOrigins,
+  secureCookies = false,
   mailAdapter,
   verificationTokenLifetimeMs,
   now,
@@ -58,6 +60,9 @@ export function createAuth({
     },
     session: {
       expiresIn: 60 * 60 * 24 * 7,
+    },
+    advanced: {
+      useSecureCookies: secureCookies,
     },
   });
 }

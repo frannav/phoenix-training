@@ -13,6 +13,7 @@ export type AuthDependencies = {
   appBaseUrl?: string;
   secret?: string;
   trustedOrigins?: string[];
+  secureCookies?: boolean;
 };
 
 export type AppDependencies = {
@@ -31,6 +32,29 @@ const noOpMailAdapter: MailAdapter = {
 };
 
 const verificationTokenLifetimeMsDefault = 60 * 60 * 1000;
+
+/**
+ * Endpoints de autenticación cuyas respuestas JSON no deben revelar el token
+ * de sesión: la sesión se entrega únicamente en su cookie.
+ */
+const sessionTokenEndpoints = new Set(["/api/auth/sign-in/email", "/api/auth/get-session"]);
+
+function stripSessionToken(body: unknown): unknown {
+  if (typeof body !== "object" || body === null) {
+    return body;
+  }
+
+  const cleaned = { ...(body as Record<string, unknown>) };
+  delete cleaned.token;
+
+  if (typeof cleaned.session === "object" && cleaned.session !== null) {
+    const session = { ...(cleaned.session as Record<string, unknown>) };
+    delete session.token;
+    cleaned.session = session;
+  }
+
+  return cleaned;
+}
 
 function normalizeAuthError(body: unknown): ApiError | null {
   if (typeof body !== "object" || body === null) {
@@ -91,6 +115,7 @@ export function createApp({
       appBaseUrl,
       secret: authConfig.secret,
       trustedOrigins: authConfig.trustedOrigins,
+      secureCookies: authConfig.secureCookies,
       mailAdapter,
       verificationTokenLifetimeMs,
       now,
@@ -109,6 +134,19 @@ export function createApp({
 
     app.all("/api/auth/*", async (context) => {
       const response = await auth.handler(context.req.raw);
+      const pathname = new URL(context.req.url).pathname;
+
+      if (response.ok && sessionTokenEndpoints.has(pathname)) {
+        const contentType = response.headers.get("content-type") ?? "";
+        if (contentType.includes("application/json")) {
+          const body = (await response.json().catch(() => null)) as unknown;
+          const cleaned = stripSessionToken(body);
+          return new Response(JSON.stringify(cleaned), {
+            status: response.status,
+            headers: new Headers(response.headers),
+          });
+        }
+      }
 
       if (response.ok) {
         return response;

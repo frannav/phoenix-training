@@ -25,7 +25,7 @@ function tokenFromUrl(url: string): string {
   return new URL(url).searchParams.get("token") ?? "";
 }
 
-function createTestContext(): TestContext {
+function createTestContext(secureCookies = false): TestContext {
   let currentTime = new Date("2026-08-02T12:00:00.000Z");
   const sentEmails: SentVerificationEmail[] = [];
   const mailAdapter: MailAdapter = {
@@ -38,7 +38,7 @@ function createTestContext(): TestContext {
     connection,
     app: createApp({
       database: connection.db,
-      auth: { baseUrl, trustedOrigins: [origin] },
+      auth: { baseUrl, trustedOrigins: [origin], secureCookies },
       mailAdapter,
       now: () => currentTime,
       verificationTokenLifetimeMs: 60 * 60 * 1000,
@@ -323,6 +323,44 @@ describe("sesiones de Cuenta", () => {
     const session = await getSession(context!, "");
     expect(session.status).toBe(200);
     expect(session.body).toBeNull();
+  });
+
+  test("la entrada no expone el token de sesión en el cuerpo JSON", async () => {
+    const token = await registerPending(context!);
+    await verifyLink(context!, token);
+
+    const session = await signIn(context!, "deportista@example.com", "contraseña-segura", []);
+    expect(session.status).toBe(200);
+    expect(session.body).not.toHaveProperty("token");
+    expect(session.setCookies).toHaveLength(1);
+
+    const cookie = sessionCookieFrom(session.setCookies);
+    const current = await getSession(context!, cookie);
+    const sessionObject = current.body as { session: Record<string, unknown>; user: Record<string, unknown> };
+    expect(sessionObject.session).not.toHaveProperty("token");
+    expect(sessionObject.user).toMatchObject({ emailVerified: true });
+  });
+
+  test("en producción la sesión se entrega en una única cookie Secure, HttpOnly y SameSite", async () => {
+    const secureContext = createTestContext(true);
+    await migrate(secureContext);
+    try {
+      await registerPending(secureContext, "seguro@example.com");
+      const link = secureContext.sentEmails.at(-1)!;
+      await verifyLink(secureContext, tokenFromUrl(link.url));
+
+      const session = await signIn(secureContext, "seguro@example.com", "contraseña-segura", []);
+      expect(session.status).toBe(200);
+      expect(session.setCookies).toHaveLength(1);
+
+      const cookieHeader = session.setCookies[0]!;
+      expect(cookieHeader).toContain("__Secure-better-auth.session_token=");
+      expect(cookieHeader).toContain("Secure");
+      expect(cookieHeader).toContain("HttpOnly");
+      expect(cookieHeader.toLowerCase()).toContain("samesite=lax");
+    } finally {
+      secureContext.connection.close();
+    }
   });
 
   test("cerrar la sesión actual no afecta a otras sesiones de la Cuenta", async () => {

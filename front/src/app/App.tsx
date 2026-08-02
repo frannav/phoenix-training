@@ -17,6 +17,7 @@ import {
 } from "../features/routines/pages/RoutinesPage";
 import { ActiveSessionPage } from "../features/sessions/pages/ActiveSessionPage";
 import { AppShell } from "./AppShell";
+import { RequireAccount } from "./RequireAccount";
 import "../shared/styles/global.css";
 
 export function App() {
@@ -56,19 +57,21 @@ export function App() {
               />
             }
           />
-          <Route path="sesion/:sesionId" element={<ActiveSessionPage />} />
-          <Route element={<AppShell />}>
-            <Route index element={<HomePage />} />
-            <Route path="planes" element={<PlansPage />} />
-            <Route path="planes/nuevo" element={<NewPlanPage />} />
-            <Route path="planes/:planId" element={<PlanDetailPage />} />
-            <Route path="rutinas" element={<RoutinesPage />} />
-            <Route path="rutinas/nueva" element={<NewRoutinePage />} />
-            <Route path="rutinas/:rutinaId" element={<RoutineDetailPage />} />
-            <Route path="historial" element={<HistoryPage />} />
-            <Route path="historial/:sesionId" element={<HistoryDetailPage />} />
-            <Route path="ejercicios" element={<ExercisesPage />} />
-            <Route path="cuenta" element={<AccountPage />} />
+          <Route element={<RequireAccount />}>
+            <Route path="sesion/:sesionId" element={<ActiveSessionPage />} />
+            <Route element={<AppShell />}>
+              <Route index element={<HomePage />} />
+              <Route path="planes" element={<PlansPage />} />
+              <Route path="planes/nuevo" element={<NewPlanPage />} />
+              <Route path="planes/:planId" element={<PlanDetailPage />} />
+              <Route path="rutinas" element={<RoutinesPage />} />
+              <Route path="rutinas/nueva" element={<NewRoutinePage />} />
+              <Route path="rutinas/:rutinaId" element={<RoutineDetailPage />} />
+              <Route path="historial" element={<HistoryPage />} />
+              <Route path="historial/:sesionId" element={<HistoryDetailPage />} />
+              <Route path="ejercicios" element={<ExercisesPage />} />
+              <Route path="cuenta" element={<AccountPage />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

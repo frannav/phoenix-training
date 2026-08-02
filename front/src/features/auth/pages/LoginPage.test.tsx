@@ -112,7 +112,6 @@ describe("pantalla de entrada", () => {
         return {
           status: 200,
           body: {
-            token: "token-de-sesion",
             user: {
               id: "cuenta-opaca",
               email: "deportista@example.com",

@@ -3,6 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { App } from "./App";
 
+const verifiedSession = {
+  session: { id: "sesion-opaca", expiresAt: "2026-08-09T00:00:00.000Z", userId: "cuenta-opaca" },
+  user: {
+    id: "cuenta-opaca",
+    email: "deportista@example.com",
+    name: "deportista",
+    emailVerified: true,
+  },
+};
+
 describe("application navigation", () => {
   const agreedDestinations = [
     ["/registro", "Crear cuenta"],
@@ -25,12 +35,15 @@ describe("application navigation", () => {
     window.history.replaceState({}, "", "/");
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        Response.json({
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input) === "/api/auth/get-session") {
+          return Response.json(verifiedSession);
+        }
+        return Response.json({
           status: "ok",
           database: "ready",
-        }),
-      ),
+        });
+      }),
     );
   });
 
@@ -43,7 +56,7 @@ describe("application navigation", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const mobileNavigation = screen.getByRole("navigation", {
+    const mobileNavigation = await screen.findByRole("navigation", {
       name: "Navegación móvil",
     });
     await user.click(within(mobileNavigation).getByRole("link", { name: "Planes" }));
@@ -56,7 +69,7 @@ describe("application navigation", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const mobileNavigation = screen.getByRole("navigation", {
+    const mobileNavigation = await screen.findByRole("navigation", {
       name: "Navegación móvil",
     });
     await user.click(within(mobileNavigation).getByRole("button", { name: "Más" }));
@@ -70,10 +83,10 @@ describe("application navigation", () => {
     ).toBeInTheDocument();
   });
 
-  test("desktop navigation exposes every main area", () => {
+  test("desktop navigation exposes every main area", async () => {
     render(<App />);
 
-    const desktopNavigation = screen.getByRole("navigation", {
+    const desktopNavigation = await screen.findByRole("navigation", {
       name: "Navegación de escritorio",
     });
 
@@ -102,11 +115,11 @@ describe("application navigation", () => {
     ).not.toBeInTheDocument();
   });
 
-  test.each(agreedDestinations)("%s has an agreed destination", (path, heading) => {
+  test.each(agreedDestinations)("%s has an agreed destination", async (path, heading) => {
     window.history.replaceState({}, "", path);
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
   });
 });

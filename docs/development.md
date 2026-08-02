@@ -34,7 +34,7 @@ bun run db:generate
 bun run db:migrate
 ```
 
-La autenticación sirve bajo `/api/auth` con Better Auth. `BETTER_AUTH_SECRET` fija la clave de firma de sesiones y enlaces (sin ella se genera una nueva en cada arranque y las sesiones no sobreviven al reinicio). `APP_BASE_URL` define el origen público de la aplicación —origen de los enlaces de verificación y de la redirección tras verificar— y `API_BASE_URL` el origen directo de la API cuando difiere del de la aplicación; en desarrollo los enlaces apuntan al frontend, que redirige `/api` al backend.
+La autenticación sirve bajo `/api/auth` con Better Auth. `BETTER_AUTH_SECRET` fija la clave de firma de sesiones y enlaces (sin ella se genera una nueva en cada arranque y las sesiones no sobreviven al reinicio). `APP_BASE_URL` define el origen público de la aplicación —origen de los enlaces de verificación y de la redirección tras verificar— y `API_BASE_URL` el origen directo de la API cuando difiere del de la aplicación; en desarrollo los enlaces apuntan al frontend, que redirige `/api` al backend. En producción `BETTER_AUTH_SECRET` es obligatorio y `APP_BASE_URL` debe ser HTTPS: la sesión se entrega entonces en una única cookie con Secure, HttpOnly y SameSite=Lax, y el token de sesión nunca aparece en el JSON de las respuestas.
 
 ## Verificación
 

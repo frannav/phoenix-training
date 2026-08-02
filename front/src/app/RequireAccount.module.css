@@ -1,0 +1,7 @@
+.loading {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  padding: 2rem;
+  color: var(--color-ink-muted);
+}
