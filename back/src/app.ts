@@ -56,17 +56,19 @@ function stripSessionToken(body: unknown): unknown {
   return cleaned;
 }
 
-function normalizeAuthError(body: unknown): ApiError | null {
+export function normalizeAuthError(body: unknown): ApiError | null {
   if (typeof body !== "object" || body === null) {
     return null;
   }
 
   const candidate = body as Record<string, unknown>;
+  const error = candidate.error;
 
   if (
-    typeof candidate.error === "object" &&
-    candidate.error !== null &&
-    typeof (candidate.error as Record<string, unknown>).code === "string"
+    typeof error === "object" &&
+    error !== null &&
+    typeof (error as Record<string, unknown>).code === "string" &&
+    typeof (error as Record<string, unknown>).message === "string"
   ) {
     return body as ApiError;
   }
@@ -152,22 +154,20 @@ export function createApp({
         return response;
       }
 
+      let errorBody: unknown = null;
       const contentType = response.headers.get("content-type") ?? "";
-      if (!contentType.includes("application/json")) {
-        return response;
+      if (contentType.includes("application/json")) {
+        errorBody = (await response.json().catch(() => null)) as unknown;
       }
 
-      const body = (await response.json().catch(() => null)) as unknown;
-      const normalized = normalizeAuthError(body);
+      const normalized =
+        normalizeAuthError(errorBody) ??
+        apiError("AUTH_ERROR", "La petición de autenticación ha fallado.");
 
-      if (normalized) {
-        return new Response(JSON.stringify(normalized), {
-          status: response.status,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
-      return response;
+      return new Response(JSON.stringify(normalized), {
+        status: response.status,
+        headers: { "Content-Type": "application/json" },
+      });
     });
   }
 

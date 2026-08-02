@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createApp } from "../src/app";
+import { createApp, normalizeAuthError } from "../src/app";
 import { migrateDatabase } from "../src/db/migrate";
 import { openDatabase, type DatabaseConnection } from "../src/db/open-database";
 import type { MailAdapter } from "../src/mail/mail-adapter";
@@ -323,6 +323,31 @@ describe("sesiones de Cuenta", () => {
     const session = await getSession(context!, "");
     expect(session.status).toBe(200);
     expect(session.body).toBeNull();
+  });
+
+  test("un error de autenticación no normalizable sale en el formato canónico conservando el estado", async () => {
+    const response = await context!.app.request("/api/auth/ruta-desconocida", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: "{}",
+    });
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect((await response.json()) as JsonBody).toEqual({
+      error: { code: "AUTH_ERROR", message: "La petición de autenticación ha fallado." },
+    });
+  });
+
+  test("el normalizador solo acepta error.code cuando también hay message", () => {
+    expect(normalizeAuthError({ error: { code: "SOLO_CODIGO" } })).toBeNull();
+    expect(normalizeAuthError({ error: { code: "OK", message: "mensaje" } })).toEqual({
+      error: { code: "OK", message: "mensaje" },
+    });
+    expect(normalizeAuthError({ code: "OK", message: "mensaje" })).toEqual({
+      error: { code: "OK", message: "mensaje" },
+    });
+    expect(normalizeAuthError("texto-plano")).toBeNull();
   });
 
   test("la entrada no expone el token de sesión en el cuerpo JSON", async () => {

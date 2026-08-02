@@ -1,16 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiRequestError } from "../../../shared/http/api-client";
 import { FormField } from "../../../shared/ui/FormField";
 import { PageIntro } from "../../../shared/ui/PageIntro";
-import { signIn } from "../api/auth-api";
+import { getSession, sessionQueryKey, signIn } from "../api/auth-api";
 import { loginSchema, type LoginValues } from "../validation";
 import styles from "./AuthPage.module.css";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [pendingVerification, setPendingVerification] = useState(false);
   const {
@@ -25,6 +27,12 @@ export function LoginPage() {
     setPendingVerification(false);
     try {
       await signIn(values);
+      try {
+        const currentSession = await getSession();
+        queryClient.setQueryData(sessionQueryKey, currentSession);
+      } catch {
+        // La sesión se vuelve a comprobar al entrar en la aplicación.
+      }
       navigate("/", { replace: true });
     } catch (error) {
       if (error instanceof ApiRequestError) {

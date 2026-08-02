@@ -48,12 +48,15 @@ Los tests del backend crean una SQLite temporal y aplican las migraciones de pro
 
 ## Producción bajo el mismo sitio
 
-Primero se construye el frontend y se migran los datos; después se inicia una única instancia del backend:
+Primero se construye el frontend y se migran los datos; después se inicia una única instancia del backend. `BETTER_AUTH_SECRET` y `APP_BASE_URL` (HTTPS) son obligatorios en producción:
 
 ```sh
 bun run build
 DATABASE_PATH=/var/lib/phoenix-training/app.sqlite bun run db:migrate
-NODE_ENV=production DATABASE_PATH=/var/lib/phoenix-training/app.sqlite bun run start
+NODE_ENV=production DATABASE_PATH=/var/lib/phoenix-training/app.sqlite \
+  BETTER_AUTH_SECRET=<clave-de-firma-larga-y-secreta> \
+  APP_BASE_URL=https://entrenamiento.ejemplo.com \
+  bun run start
 ```
 
 En producción, Hono sirve los archivos de `front/dist`, conserva el fallback de React Router y responde la API bajo `/api` desde el mismo sitio. Se puede cambiar el directorio estático mediante `FRONTEND_ROOT` y el puerto mediante `PORT`.

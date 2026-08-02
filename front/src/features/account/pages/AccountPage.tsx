@@ -1,11 +1,13 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageIntro } from "../../../shared/ui/PageIntro";
-import { signOut } from "../../auth/api/auth-api";
+import { sessionQueryKey, signOut } from "../../auth/api/auth-api";
 import styles from "./AccountPage.module.css";
 
 export function AccountPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -14,6 +16,7 @@ export function AccountPage() {
     setSigningOut(true);
     try {
       await signOut();
+      queryClient.setQueryData(sessionQueryKey, null);
       navigate("/entrar", { replace: true });
     } catch {
       setError("No se pudo cerrar la sesión. Inténtalo de nuevo.");

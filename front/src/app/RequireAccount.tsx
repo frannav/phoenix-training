@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, Outlet } from "react-router-dom";
-import { getSession } from "../features/auth/api/auth-api";
+import { getSession, sessionQueryKey } from "../features/auth/api/auth-api";
 import styles from "./RequireAccount.module.css";
 
 /**
@@ -9,7 +9,7 @@ import styles from "./RequireAccount.module.css";
  */
 export function RequireAccount() {
   const session = useQuery({
-    queryKey: ["account", "session"],
+    queryKey: sessionQueryKey,
     queryFn: getSession,
     retry: false,
   });

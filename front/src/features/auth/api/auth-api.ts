@@ -22,6 +22,12 @@ export type CurrentSession = {
 } | null;
 
 /**
+ * Clave de consulta compartida de la sesión de Cuenta: el guard, la entrada y
+ * Cuenta leen y actualizan el mismo valor en la caché de TanStack Query.
+ */
+export const sessionQueryKey = ["account", "session"] as const;
+
+/**
  * El registro público solicita únicamente correo y contraseña; Better Auth
  * exige un nombre, así que se deriva de la parte local del correo sin
  * mostrarlo en la interfaz.

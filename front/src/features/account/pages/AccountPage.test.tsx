@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -7,13 +8,16 @@ import { AccountPage } from "./AccountPage";
 import { stubFetch } from "../../../test/mock-fetch";
 
 function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={["/cuenta"]}>
-      <Routes>
-        <Route path="/cuenta" element={<AccountPage />} />
-        <Route path="/entrar" element={<AuthPage eyebrow="Cuenta" title="Iniciar sesión" description="" />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/cuenta"]}>
+        <Routes>
+          <Route path="/cuenta" element={<AccountPage />} />
+          <Route path="/entrar" element={<AuthPage eyebrow="Cuenta" title="Iniciar sesión" description="" />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
