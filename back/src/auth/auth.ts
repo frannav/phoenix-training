@@ -8,6 +8,7 @@ import { issueVerificationToken } from "./verification-tokens";
 export type AuthDependencies = {
   database: AppDatabase;
   baseUrl: string;
+  appBaseUrl?: string;
   secret?: string;
   trustedOrigins?: string[];
   mailAdapter: MailAdapter;
@@ -18,6 +19,7 @@ export type AuthDependencies = {
 export function createAuth({
   database,
   baseUrl,
+  appBaseUrl = baseUrl,
   secret,
   trustedOrigins,
   mailAdapter,
@@ -50,7 +52,7 @@ export function createAuth({
         });
         await mailAdapter.sendVerificationEmail({
           to: pendingUser.email,
-          url: `${baseUrl}/api/auth/verify-email?token=${token}`,
+          url: `${appBaseUrl}/api/auth/verify-email?token=${token}`,
         });
       },
     },

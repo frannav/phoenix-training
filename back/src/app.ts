@@ -10,6 +10,7 @@ import type { MailAdapter } from "./mail/mail-adapter";
 
 export type AuthDependencies = {
   baseUrl: string;
+  appBaseUrl?: string;
   secret?: string;
   trustedOrigins?: string[];
 };
@@ -83,9 +84,11 @@ export function createApp({
   });
 
   if (authConfig) {
+    const appBaseUrl = authConfig.appBaseUrl ?? authConfig.baseUrl;
     const auth = createAuth({
       database,
       baseUrl: authConfig.baseUrl,
+      appBaseUrl,
       secret: authConfig.secret,
       trustedOrigins: authConfig.trustedOrigins,
       mailAdapter,
@@ -101,7 +104,7 @@ export function createApp({
           : "invalid";
 
       const estado = outcome === "success" ? "verificado" : "invalido";
-      return context.redirect(`/verificar?estado=${estado}`);
+      return context.redirect(`${appBaseUrl}/verificar?estado=${estado}`);
     });
 
     app.all("/api/auth/*", async (context) => {
