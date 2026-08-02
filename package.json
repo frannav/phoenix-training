@@ -1,0 +1,21 @@
+{
+  "name": "phoenix-training",
+  "private": true,
+  "packageManager": "bun@1.3.11",
+  "workspaces": [
+    "back",
+    "front"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "dev:back": "bun run --cwd back dev",
+    "dev:front": "bun run --cwd front dev",
+    "build": "bun run --cwd front build",
+    "start": "bun run --cwd back start",
+    "db:generate": "bun run --cwd back db:generate",
+    "db:migrate": "bun run --cwd back db:migrate",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun run --filter '*' test"
+  }
+}
+

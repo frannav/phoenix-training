@@ -1,0 +1,11 @@
+.status {
+  width: fit-content;
+  border-radius: 999px;
+  margin: 1.5rem 0 0;
+  padding: 0.55rem 0.8rem;
+  background: var(--color-success-soft);
+  color: var(--color-success-dark);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
