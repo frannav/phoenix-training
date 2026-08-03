@@ -1,49 +1,67 @@
 ---
 name: orchestrate-tickets
-description: Supervise implementation of an ordered ready-for-agent ticket queue through Orca with Pi workers pinned to DeepSeek, a GPT-5.6-sol xhigh two-axis review gate, and bounded repair loops. Use only when explicitly invoked as $orchestrate-tickets and the coordinating Codex session must retain final approval.
+description: Supervise implementation of an ordered ready-for-agent ticket queue through Orca with Pi workers pinned to DeepSeek, a coordinator-owned two-axis review gate, and bounded repair loops. Use only when explicitly invoked as $orchestrate-tickets; the invoking session is the coordinator and retains final approval.
 ---
 
 # Orchestrate Tickets
 
-Implement tickets one at a time on the current branch. Delegate edits to fresh Pi
-workers, retain review authority in the invoking Codex session, and advance the
-queue only after the current ticket passes both review axes.
+Run the selected tickets in dependency order, one editing worker at a time. The
+invoking session is the coordinator: workers edit and commit, but the
+coordinator owns validation, review, queue advancement, and final approval.
 
-## 1. Establish the contract
+## Operating invariants
 
-Require the invoking coordinator to run as `gpt-5.6-sol`.
-This skill cannot change its own model or effort. When runtime metadata cannot
-prove both values, stop before creating Orca state and ask the user to restart
-with the required runtime or explicitly relax the requirement for this run.
+- Work in the current worktree. Preserve unrelated changes and pause when an
+  existing change overlaps the ticket's expected surface.
+- Create one Orca Run, one coordinator-owned parent Task per ticket, and one
+  child Task per worker attempt. Never dispatch a parent Task.
+- Capture a ticket's fixed point before its first child. Review every attempt
+  against that fixed point and keep ticket commits separate.
+- Use the exact worker runtime in [runtime-contract.md](references/runtime-contract.md).
+- Workers stage and commit only what they own, including their attempt report.
+  The coordinator independently inspects the commit and working tree.
+- A ticket passes only when coordinator validation and both review axes pass.
+- Allow at most three review-rejected repairs after the initial implementation.
+  Operational dispatch failures use Orca's circuit breaker and do not consume
+  the repair budget.
 
-Accept explicit ticket paths or an ordered queue. When given a feature directory,
-discover implementation tickets under `.scratch/<feature>/issues/`, then order
-them by their `Blocked by` relationships. Select only tickets marked
-`ready-for-agent`; consider a blocker satisfied only when its implementation is
-already present on the branch or it passed this workflow earlier in the same run.
+## 1. Select the queue
 
-Read these before planning the queue:
+Accept one of these inputs:
 
-- `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md`
-- the feature `spec.md` and every selected ticket
-- `CONTEXT.md` or the relevant entries from `CONTEXT-MAP.md`
-- relevant ADRs under `docs/adr/` and context-local `docs/adr/` directories
+- **Explicit ticket:** select that ticket plus the transitive unresolved
+  `Blocked by` closure. Read the ticket, its feature `spec.md`, direct
+  dependency issues, and only the relevant domain/ADR sections.
+- **Feature directory:** discover implementation tickets under
+  `.scratch/<feature>/issues/`, select `ready-for-agent` tickets, and order them
+  topologically by `Blocked by`.
+- **Ordered queue:** validate the supplied order against `Blocked by`; reject an
+  unresolved dependency or use the dependency order when the supplied order is
+  incomplete.
 
-Record the queue, dependency graph, and one or more public test seams per ticket.
-Present the seams as a single approval gate before dispatching the first worker.
-Treat seams already stated by the user or ticket as pre-approved. Ask again only
-when a review finding requires a new seam.
+For a feature or queue input, also read the issue-tracker and triage-label docs,
+the selected tickets and spec, relevant context docs, and relevant ADRs. Do not
+scan unrelated tickets, history, or the whole repository. Follow ticket links
+to research or domain documents only when an acceptance criterion needs them.
 
-Completion criterion: every queued ticket has a resolved dependency graph and an
-approved public seam.
+Record, for every selected ticket:
 
-## 2. Preflight the runtime and branch
+- dependency parents and the queue position;
+- one or more public test seams;
+- the repository typecheck and full-suite commands.
 
-Use the `orchestration` skill to resolve the Orca executable once. Load the full,
-version-matched guide with `<resolved-executable> skills get orchestration --full`
-before any other Orca command. Apply the repository's `rtk` rule and reuse that
-exact resolved executable for every later call; never fall back to bare `orca`.
-Confirm `status --json` succeeds and exposes the current orchestration capability.
+Seams already stated by the user or ticket are accepted without another approval
+round. Ask only when a seam is missing or ambiguous, or when a review finding
+requires a new seam. Do not dispatch until the queue, dependencies, seams, and
+validation commands are resolved.
+
+## 2. Preflight once
+
+Use the `orchestration` skill to resolve the Orca executable and load the
+version-matched guide exactly once. Use the guide's documented `skills get`
+command (normally `<resolved-executable> skills get orchestration`); do not
+guess flags or fall back to a different executable. Confirm
+`<resolved-executable> status --json` succeeds before creating Orca state.
 
 Confirm the worker model resolves exactly:
 
@@ -51,158 +69,103 @@ Confirm the worker model resolves exactly:
 rtk pi --list-models deepseek-v4-flash-0731
 ```
 
-Require the row `nan / deepseek-v4-flash-0731`. Pass this exact command as the
-`--command` payload when creating every implementation and repair terminal:
+Require the row `nan / deepseek-v4-flash-0731`. The terminal command is fixed;
+the terminal and dispatch details are in [runtime-contract.md](references/runtime-contract.md).
 
-```bash
-rtk proxy script -q /dev/null pi --approve --model nan/deepseek-v4-flash-0731 \
-  --skill .agents/skills/implement \
-  --skill .agents/skills/tdd \
-  --skill .agents/skills/code-review
+In one preflight pass:
+
+- verify the `implement`, `tdd`, and `code-review` skill directories;
+- capture `git status --short` and `git rev-parse HEAD`;
+- read the root `package.json` to locate validation scripts, inspecting deeper
+  manifests only when those scripts are absent or insufficient.
+
+Before a ticket's first attempt, capture its fixed point and run typecheck plus
+the full suite there. A failing baseline blocks dispatch; isolate unrelated
+work or ask the user for a scope decision. When the preceding ticket was just
+approved and no external change occurred, its coordinator validation may serve
+as the next baseline instead of being rerun.
+
+After preflight succeeds, create the single Run and the parent Task DAG in
+dependency order. Record each ticket's fixed point immediately before its
+first child is dispatched. Stop preflight at this point; extra confidence scans
+are outside the contract.
+
+## 3. Process each ticket
+
+Use this state machine for every parent Task:
+
+```text
+READY -> IMPLEMENTING -> REVIEWING -> APPROVED
+                           |    ^
+                           v    |
+                         REPAIR
+                           |
+                  (third rejection) -> BLOCKED
 ```
 
-Keep the `script -q /dev/null` pseudo-TTY wrapper. A bare `rtk proxy pi ...`
-leaves Pi's stdout as a pipe under `terminal create`; Pi then detects
-non-interactive mode, exits successfully, and leaves a normal shell. Redirecting
-to `/dev/tty` is not a substitute for the wrapper.
+### Attempt
 
-Verify that all three skill directories exist. Capture `git status --short`, the
-current `HEAD`, and the repository validation commands. Preserve unrelated changes
-and require workers to stage only paths and hunks they own. When an existing change
-overlaps a ticket's expected surface, pause that ticket and ask the user how to
-separate ownership.
+Immediately before the first dispatch, read
+[worker-prompts.md](references/worker-prompts.md). Fill the implementation or
+repair template with the ticket, spec, fixed point, approved seams, repository
+commands, and a durable report path:
 
-Before each ticket, run the coordinator typecheck and full test suite at its fixed
-point and record the results as the baseline. Do not dispatch against a failing
-baseline: determine whether unrelated work caused it, then isolate the work or ask
-the user for a scope decision. Never ask a ticket worker to repair baseline failures.
+```text
+.scratch/<feature>/orchestration/<ticket-number>/attempt-<n>.md
+```
 
-Use the current worktree and process tickets sequentially. Create another worktree
-only when the user requests it or a concrete checkout/filesystem conflict makes
-sharing unsafe. Require independent dependency, file, migration, and generated-
-artifact surfaces before running workers in parallel.
+Create a fresh terminal and child Task as described by the runtime contract.
+Run only one editing worker in the current worktree. Process every Orca
+Delivery batch, acknowledge each Delivery, and continue until `worker_done`,
+`escalation`, or `question` is handled.
 
-Create one Orca Run for the queue with `run-create` and retain its ID. In dependency
-order, create one coordinator-owned parent Task per ticket and encode `Blocked by`
-with `--deps` pointing to the corresponding parent Task IDs. Never dispatch a parent
-Task: its status is the ticket's approval state. Child Tasks represent worker
-attempts and may complete before the parent does.
+Accept a succeeded attempt only when its report and message identify the commit,
+authored paths, seam-by-seam TDD evidence or an exception, focused checks, final
+full-suite result, self-review, and runtime limitations. Inspect the commit and
+working tree; reject unrelated changes or uncommitted ticket-owned edits.
 
-Before dispatching a ticket's first child Task, capture its fixed point with
-`git rev-parse HEAD`; retain that SHA through every implementation and repair
-attempt for that ticket.
+Treat a failed outcome as an operational failure, not a review rejection. Inspect
+partial work before retrying. Retry with a fresh terminal on the same child Task
+when the runtime contract permits it; escalate when its circuit breaker fires.
 
-Completion criterion: Orca is ready, the exact Pi model and skills resolve, the
-baseline is recorded, file ownership is safe, and the Run, ticket DAG, and fixed
-point exist.
+### Review
 
-## 3. Dispatch an implementation worker
+From the coordinator session:
 
-Read [worker-prompts.md](references/worker-prompts.md) completely before the first
-dispatch. Fill the implementation template with the ticket, spec, fixed point,
-approved seams, attempt report path, and repository commands. Use a durable path
-under `.scratch/<feature>/orchestration/<ticket-number>/attempt-<n>.md`; treat the
-report as worker-authored evidence, commit it with the attempt, and exclude that
-workflow-only path from product-scope findings in the Spec review axis.
+1. Run typecheck and the full suite.
+2. Run `code-review` with the ticket fixed point and feature spec explicitly
+   supplied as its spec source. Keep its Standards and Spec axes separate.
+3. Emit one gate with `APPROVED` or `REPAIR REQUIRED`. Every blocking finding
+   must cite an exact file/hunk, requirement or rule, and command evidence.
 
-Confirm the ticket parent Task is ready, then create a child Task beneath it with
-the filled brief. Because `worker-start --agent pi` does not express custom Pi
-model arguments, create a fresh Pi terminal in the current worktree with the exact
-command from preflight. Require `terminal wait --for tui-idle` to report
-`satisfied` before attaching the child Task with the version-matched
-`orchestration dispatch --inject` command. Retain the child Task and Dispatch IDs.
-If the wait times out, Pi exits with code 0, or the terminal shows a shell prompt,
-do not dispatch: inspect the terminal output, verify the pseudo-TTY wrapper and
-exact model and skill arguments, then recreate a fresh terminal.
+Approve only when all three conditions hold:
 
-Start only one editing worker in the current worktree. Wait through Orca Delivery
-batches for `worker_done`, `escalation`, or `question`; process every message and
-acknowledge each Delivery before waiting again. A timeout is a liveness checkpoint.
-
-Require `worker_done` exactly once with an explicit succeeded or failed outcome.
-Accept a succeeded attempt for review only when its concise message and referenced
-attempt report account for:
-
-- the commit SHA and the paths it authored;
-- the red/green cycles used at every approved seam, or why TDD was inapplicable;
-- focused tests and typechecks run during implementation;
-- the final full-suite result;
-- the self-review result and any limitation of Pi's review runtime.
-
-Inspect the commit and working tree. Reject completion evidence that includes
-unrelated user changes or leaves ticket-owned edits uncommitted.
-
-Treat a failed outcome as an operational attempt failure, not a review rejection.
-Inspect its Dispatch and account for any partial commit or owned working-tree
-changes before transferring ownership. When retry is appropriate, create a fresh
-custom Pi terminal and use the version-matched `worker-start --retry-of <dispatch>`
-flow with that terminal so the retry remains on the same child Task and Orca's
-per-Task circuit breaker remains meaningful. Escalate when the circuit breaker
-fires.
-
-Completion criterion: one succeeded implementation child Task and commit exist,
-and their evidence accounts for every approved seam, validation command, and
-authored path.
-
-## 4. Run the coordinator review gate
-
-Run the repository's typecheck and full test suite from the coordinator session.
-Then use the `code-review` skill against the ticket fixed point, with the ticket
-and feature spec as the spec source. Run its Standards and Spec sub-agents in
-parallel and aggregate them in this `gpt-5.6-sol`  coordinator.
-
-Approve only when both axes pass:
-
-- **Standards:** no documented-standard violation and no material baseline smell;
+- **Standards:** no documented-standard violation or material baseline smell;
 - **Spec:** no missing, partial, incorrect, or out-of-scope behavior;
 - **Validation:** coordinator typecheck and full suite pass.
 
-Treat a baseline smell as material when it increases defect risk or makes the
-ticket materially harder to change; record minor judgement calls as non-blocking
-notes. State the gate as `APPROVED` or `REPAIR REQUIRED` with exact file/hunk,
-requirement or rule, and failing command evidence.
+Minor smell judgements are non-blocking notes. Workflow-only attempt reports do
+not count as product-scope behavior in the Spec axis.
 
-On `APPROVED`, update only the coordinator-owned parent Task to `completed` and
-store a structured result containing the fixed point, accepted child Task and
-Dispatch IDs, implementation and repair commits, validation commands, both review
-verdicts, and repair count. Do not manually complete the child Task; its valid
-`worker_done` already did that.
+### Approval or repair
 
-Completion criterion: both review axes and coordinator validation have an explicit
-verdict with actionable evidence.
+On `APPROVED`, update only the parent Task to `completed`. Store a structured
+result containing the fixed point, accepted child and Dispatch IDs, all
+implementation/repair commits, validation commands, both review verdicts, and
+the repair count. Do not manually complete a child Task after a valid
+`worker_done`.
 
-## 5. Repair until approved
+On `REPAIR REQUIRED`, create a fresh repair child Task and terminal. Keep the
+original fixed point and seams, include every blocking finding and failed
+command, and rerun the complete coordinator review after the repair.
 
-On `REPAIR REQUIRED`, increment the ticket's review-rejection count, then create a
-new repair child Task and fresh Pi terminal using the same pinned model and skills.
-Fill the repair template with all blocking findings, failed commands, the original
-ticket fixed point, the same approved seams, and a fresh attempt report path.
-Dispatch it as a new supervised worker; do not edit the repair in the coordinator.
+After the third review-rejected repair, preserve all commits and evidence,
+mark the parent `blocked`, create a decision gate, and ask the user how to
+proceed. Advance only to a parent made ready by completed dependency parents;
+use the version-matched `task-list --ready` flow as queue state.
 
-Require the repair worker to commit only its fixes, run focused checks while
-working, run the full suite once at the end, and report `worker_done`. Re-run the
-entire coordinator review gate against the original ticket fixed point.
+## 4. Finish
 
-Launch up to three repair child Tasks after the initial implementation. After the
-third repair is rejected by review, preserve all commits and evidence, update the
-ticket parent Task to `blocked` with a structured result, create a decision gate on
-that parent, and ask the user how to proceed.
-
-Keep the two limits separate: Orca's three-failure circuit breaker covers failed
-Dispatches retried on one child Task; this skill's three-repair limit covers
-succeeded child Tasks that the coordinator review rejects.
-
-Completion criterion: the ticket is `APPROVED`, three rejected repair attempts
-have produced a documented decision gate, or an operational circuit breaker has
-produced a documented escalation.
-
-## 6. Advance and report
-
-Advance only to a parent Task made ready by completion of all dependency parents.
-Use the version-matched `task-list --ready` flow as external queue state, while
-continuing to run only one editing worker in the current worktree. Keep each
-ticket's commits separate so review and rollback boundaries remain visible.
-
-At the end, report each ticket's implementation and repair commits, validation
-commands, Standards and Spec verdicts, repair count, and any blocked remainder.
-Report the queue as complete only when every selected ticket is approved.
+Report each ticket's implementation and repair commits, validation commands,
+Standards and Spec verdicts, repair count, and blocked remainder. Call the queue
+complete only when every selected parent is approved.
