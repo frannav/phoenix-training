@@ -1,0 +1,7 @@
+interface:
+  display_name: "Orchestrate Tickets v2"
+  short_description: "Recommend and supervise parallel ticket worktrees"
+  default_prompt: "Use $orchestrate-tickets-v2 to find a safe 2–5 ticket wave, ask me to approve the exact tickets, then launch $orchestrate-tickets in one main-based worktree per approved ticket."
+
+policy:
+  allow_implicit_invocation: false
