@@ -4,7 +4,7 @@
 
 **Blocked by:** 18 — Explorar el catálogo revisado de Ejercicios.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Una Cuenta puede crear un Ejercicio personalizado con identidad opaca, nombre, instrucciones, Forma de registro y taxonomía necesaria.
 - [ ] La Cuenta propietaria puede renombrar y editar los datos compatibles de su Ejercicio personalizado.
