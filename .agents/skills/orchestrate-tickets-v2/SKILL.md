@@ -164,6 +164,16 @@ blocked outcome, commits, validation, and review verdicts to this outer task.
 Do not merge, rebase, delete the worktree, or edit another worktree.
 ```
 
+When creating Task specs through a shell, preserve the literal
+`$orchestrate-tickets` and `$orchestrate-tickets-v2` tokens. Prefer a
+shell-safe single-quoted argument or another transport that prevents variable
+expansion; do not interpolate a JSON-escaped spec inside shell double quotes.
+Before creating worktrees or dispatching, read back the Run's Tasks with the
+version-matched orchestration command and verify that each spec still contains
+the exact ticket path, base SHA, required branch, and both literal skill names.
+If a spec is malformed, do not dispatch it; correct or replace the Task and
+record the operational failure separately from any worker outcome.
+
 Create all independent Tasks before starting any worker. Start all approved
 workers in one wave; do not wait for ticket A before creating ticket B.
 
@@ -196,11 +206,14 @@ git rev-parse main
 ```
 
 The first output must be exactly `feature/ticket-<N>` and the two commit SHAs
-must match. If Orca created a different branch in a completely fresh,
-unmodified checkout, rename that checked-out branch to the required exact
-name and verify again. If the checkout is dirty, the required branch already
-exists elsewhere, or the base does not match, do not dispatch into it; report
-the worktree-specific blocker and leave the other approved workers running.
+must match. Orca may normalize a slash in `--name feature/ticket-<N>` to a
+hyphenated Git branch such as `feature-ticket-<N>` while retaining the requested
+display name, so never infer the branch from the create response alone. If Orca
+created a different branch in a completely fresh, unmodified checkout, rename
+that checked-out branch to the required exact name and verify again. If the
+checkout is dirty, the required branch already exists elsewhere, or the base
+does not match, do not dispatch into it; report the worktree-specific blocker
+and leave the other approved workers running.
 
 Wait for each agent terminal to reach `tui-idle` with the documented timeout,
 then attach the outer Task using the version-matched injected dispatch. Use
