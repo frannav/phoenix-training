@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
@@ -65,6 +65,7 @@ function planFixture(overrides: Partial<PlanItem> = {}): PlanItem {
     id: "44444444444444444444444444444444",
     name: "Ciclo base",
     status: "borrador",
+    startDate: null,
     revision: 1,
     createdAt: "2025-08-01T10:00:00.000Z",
     updatedAt: "2025-08-01T10:00:00.000Z",
@@ -76,6 +77,8 @@ function planFixture(overrides: Partial<PlanItem> = {}): PlanItem {
           {
             id: "66666666666666666666666666666666",
             day: 0,
+            plannedDate: null,
+            status: null,
             source: "rutina",
             routineId: routine.id,
             routine: { id: routine.id, name: routine.name, archived: false },
@@ -93,7 +96,12 @@ type PlansHandlers = {
   get?: (id: string) => PlanItem;
   create?: (body: unknown) => PlanItem;
   replace?: (id: string, body: unknown) => { status: number; body: unknown };
-  delete?: (id: string) => void;
+  delete?: (id: string, revision: number) => void;
+  activate?: (id: string, body: { revision: number; startDate: string }) => PlanItem;
+  complete?: (id: string, body: { revision: number }) => PlanItem;
+  omit?: (id: string, trainingId: string, body: { revision: number }) => PlanItem;
+  restore?: (id: string, trainingId: string, body: { revision: number }) => PlanItem;
+  duplicate?: (id: string, body: { revision: number; name?: string }) => PlanItem;
   routines?: () => RoutineItem[];
   availableExercises?: () => ExerciseItem[];
 };
@@ -118,8 +126,63 @@ function stubPlans(handlers: PlansHandlers) {
       return handlers.replace!(detailMatch[1]!, body);
     }
     if (detailMatch && method === "DELETE") {
-      handlers.delete!(detailMatch[1]!);
+      handlers.delete!(detailMatch[1]!, Number(parsed.searchParams.get("revision")));
       return { status: 200, body: { deleted: true } };
+    }
+    const activateMatch = parsed.pathname.match(/^\/api\/plans\/([0-9a-f]+)\/activate$/);
+    if (activateMatch && method === "POST") {
+      return {
+        status: 200,
+        body: {
+          plan: handlers.activate!(
+            activateMatch[1]!,
+            body as { revision: number; startDate: string },
+          ),
+        },
+      };
+    }
+    const completeMatch = parsed.pathname.match(/^\/api\/plans\/([0-9a-f]+)\/complete$/);
+    if (completeMatch && method === "POST") {
+      return {
+        status: 200,
+        body: {
+          plan: handlers.complete!(completeMatch[1]!, body as { revision: number }),
+        },
+      };
+    }
+    const omitMatch = parsed.pathname.match(
+      /^\/api\/plans\/([0-9a-f]+)\/trainings\/([0-9a-f]+)\/omit$/,
+    );
+    if (omitMatch && method === "POST") {
+      return {
+        status: 200,
+        body: {
+          plan: handlers.omit!(omitMatch[1]!, omitMatch[2]!, body as { revision: number }),
+        },
+      };
+    }
+    const restoreMatch = parsed.pathname.match(
+      /^\/api\/plans\/([0-9a-f]+)\/trainings\/([0-9a-f]+)\/restore$/,
+    );
+    if (restoreMatch && method === "POST") {
+      return {
+        status: 200,
+        body: {
+          plan: handlers.restore!(restoreMatch[1]!, restoreMatch[2]!, body as { revision: number }),
+        },
+      };
+    }
+    const duplicateMatch = parsed.pathname.match(/^\/api\/plans\/([0-9a-f]+)\/duplicate$/);
+    if (duplicateMatch && method === "POST") {
+      return {
+        status: 201,
+        body: {
+          plan: handlers.duplicate!(
+            duplicateMatch[1]!,
+            body as { revision: number; name?: string },
+          ),
+        },
+      };
     }
     if (parsed.pathname === "/api/routines" && method === "GET") {
       return { status: 200, body: { items: handlers.routines?.() ?? [] } };
@@ -178,7 +241,8 @@ describe("listado de Planes", () => {
     const items = [planFixture()];
     stubPlans({
       list: () => items,
-      delete: (id) => {
+      delete: (id, revision) => {
+        expect(revision).toBe(1);
         items.splice(
           items.findIndex((item) => item.id === id),
           1,
@@ -439,5 +503,404 @@ describe("editar un Plan", () => {
     await user.click(screen.getByRole("button", { name: "Cargar la versión actual" }));
     await waitFor(() => expect(refetches.count).toBeGreaterThan(fetchesBefore));
     expect(await screen.findByLabelText("Nombre del Plan")).toHaveValue("Ciclo base");
+  });
+});
+
+function activePlanFixture(overrides: Partial<PlanItem> = {}): PlanItem {
+  const plan = planFixture({ status: "activo", startDate: "2025-08-04" });
+  return {
+    ...plan,
+    weeks: [
+      {
+        ...plan.weeks[0]!,
+        trainings: [
+          {
+            ...plan.weeks[0]!.trainings[0]!,
+            plannedDate: "2025-08-04",
+            status: "pendiente",
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function completedPlanFixture(overrides: Partial<PlanItem> = {}): PlanItem {
+  return {
+    ...activePlanFixture({ status: "completado" }),
+    weeks: [
+      {
+        ...activePlanFixture().weeks[0]!,
+        trainings: [
+          {
+            ...activePlanFixture().weeks[0]!.trainings[0]!,
+            plannedDate: "2025-08-04",
+            status: "omitido",
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+describe("ciclo de vida en el listado", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  test("distingue Borrador, Activo y Completado y solo ofrece las transiciones reales", async () => {
+    stubPlans({
+      list: () => [
+        planFixture(),
+        activePlanFixture({ id: "99999999999999999999999999999991", name: "Ciclo activo" }),
+        completedPlanFixture({ id: "99999999999999999999999999999992", name: "Ciclo completado" }),
+      ],
+    });
+    renderWithRoutes(
+      "/planes",
+      <Routes>
+        <Route path="/planes" element={<PlansPage />} />
+      </Routes>,
+    );
+
+    expect(await screen.findByText("Ciclo base")).toBeInTheDocument();
+    expect(screen.getByText("Ciclo activo")).toBeInTheDocument();
+    expect(screen.getByText("Ciclo completado")).toBeInTheDocument();
+
+    // estados distinguibles por texto
+    expect(screen.getByText("Borrador")).toBeInTheDocument();
+    expect(screen.getByText("Activo")).toBeInTheDocument();
+    expect(screen.getByText("Completado")).toBeInTheDocument();
+
+    // el calendario solo se muestra para Planes activos o completados
+    expect(screen.getAllByText(/4 ago – 10 ago/)).toHaveLength(2);
+
+    // transiciones inexistentes nunca se ofrecen
+    expect(screen.queryByRole("button", { name: /Pausar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Cancelar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Archivar/i })).not.toBeInTheDocument();
+
+    // las acciones dependen del estado: eliminar solo borradores, duplicar cualquiera
+    expect(screen.getByRole("button", { name: "Eliminar Ciclo base" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Eliminar Ciclo activo" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Eliminar Ciclo completado" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Duplicar/ })).toHaveLength(3);
+  });
+
+  test("duplicar desde el listado pide un borrador nuevo", async () => {
+    const user = userEvent.setup();
+    const items = [planFixture()];
+    const requests: Array<{ id: string; body: unknown }> = [];
+    stubPlans({
+      list: () => items,
+      duplicate: (id, body) => {
+        requests.push({ id, body });
+        const copy = planFixture({
+          id: "99999999999999999999999999999999",
+          name: "Ciclo base (copia)",
+        });
+        items.push(copy);
+        return copy;
+      },
+    });
+    renderWithRoutes(
+      "/planes",
+      <Routes>
+        <Route path="/planes" element={<PlansPage />} />
+      </Routes>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Duplicar Ciclo base" }));
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]).toEqual({
+      id: "44444444444444444444444444444444",
+      body: { revision: 1 },
+    });
+    expect(await screen.findByText("Ciclo base (copia)")).toBeInTheDocument();
+  });
+});
+
+describe("activar un Plan borrador", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  test("envía la fecha elegida y refleja la Fecha prevista calculada", async () => {
+    const user = userEvent.setup();
+    const plan = planFixture();
+    const requests: Array<{ id: string; body: { revision: number; startDate: string } }> = [];
+    stubPlans({
+      list: () => [plan],
+      get: () => plan,
+      activate: (id, body) => {
+        requests.push({ id, body });
+        return {
+          ...activePlanFixture(),
+          id: plan.id,
+          name: plan.name,
+          revision: 2,
+        };
+      },
+    });
+    renderWithRoutes(
+      `/planes/${plan.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+        <Route path="/planes" element={<div>Listado de Planes</div>} />
+      </Routes>,
+    );
+
+    expect(await screen.findByText("Activar en el calendario")).toBeInTheDocument();
+    expect(screen.getByText(/calculará las Fechas previstas/)).toBeInTheDocument();
+
+    const dateInput = screen.getByLabelText("Lunes de la primera semana");
+    const activateButton = screen.getByRole("button", { name: "Activar Plan" });
+    expect(activateButton).toBeDisabled();
+
+    // La validación de que la fecha sea lunes pertenece al servidor; aquí se
+    // comprueba que el editor envía la fecha elegida junto a la revisión.
+    fireEvent.change(dateInput, { target: { value: "2025-08-04" } });
+    expect(activateButton).toBeEnabled();
+
+    await user.click(activateButton);
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]).toEqual({
+      id: plan.id,
+      body: { revision: 1, startDate: "2025-08-04" },
+    });
+
+    // el estado activo se refleja y el panel de activación desaparece
+    expect(await screen.findByRole("button", { name: "Completar Plan" })).toBeInTheDocument();
+    expect(screen.queryByText("Activar en el calendario")).not.toBeInTheDocument();
+  });
+
+  test("un conflicto de unicidad muestra el mensaje del servidor sin salir del borrador", async () => {
+    const user = userEvent.setup();
+    const plan = planFixture();
+    stubFetch((url, init) => {
+      const path = new URL(url, "http://test").pathname;
+      const method = init.method ?? "GET";
+      if (path === "/api/plans" && method === "GET") {
+        return { status: 200, body: { items: [plan] } };
+      }
+      if (path === `/api/plans/${plan.id}` && method === "GET") {
+        return { status: 200, body: { plan } };
+      }
+      if (path === `/api/plans/${plan.id}/activate` && method === "POST") {
+        return {
+          status: 409,
+          body: {
+            error: {
+              code: "TRANSITION_IMPOSSIBLE",
+              message: "Ya tienes un Plan activo. Complétalo antes de activar otro.",
+            },
+          },
+        };
+      }
+      return { status: 404, body: { error: { code: "NOT_FOUND", message: "no" } } };
+    });
+    renderWithRoutes(
+      `/planes/${plan.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+        <Route path="/planes" element={<div>Listado de Planes</div>} />
+      </Routes>,
+    );
+
+    const dateInput = await screen.findByLabelText("Lunes de la primera semana");
+    fireEvent.change(dateInput, { target: { value: "2025-08-04" } });
+    await user.click(screen.getByRole("button", { name: "Activar Plan" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Ya tienes un Plan activo/);
+    // el Plan sigue en el panel de activación, sin transición parcial
+    expect(screen.getByText("Activar en el calendario")).toBeInTheDocument();
+  });
+});
+
+describe("gestionar un Plan activo", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  test("omite con confirmación, devuelve a pendiente y completa con confirmación", async () => {
+    const user = userEvent.setup();
+    const trainingId = "66666666666666666666666666666666";
+    let current = activePlanFixture();
+    const requests: string[] = [];
+    stubPlans({
+      list: () => [current],
+      get: () => current,
+      omit: (id, training, _body) => {
+        requests.push(`omit:${id}:${training}`);
+        current = {
+          ...current,
+          revision: current.revision + 1,
+          weeks: current.weeks.map((week) => ({
+            ...week,
+            trainings: week.trainings.map((t) =>
+              t.id === training ? { ...t, status: "omitido" } : t,
+            ),
+          })),
+        };
+        return current;
+      },
+      restore: (id, training, _body) => {
+        requests.push(`restore:${id}:${training}`);
+        current = {
+          ...current,
+          revision: current.revision + 1,
+          weeks: current.weeks.map((week) => ({
+            ...week,
+            trainings: week.trainings.map((t) =>
+              t.id === training ? { ...t, status: "pendiente" } : t,
+            ),
+          })),
+        };
+        return current;
+      },
+      complete: (id, _body) => {
+        requests.push(`complete:${id}`);
+        current = {
+          ...current,
+          status: "completado",
+          revision: current.revision + 1,
+          weeks: current.weeks.map((week) => ({
+            ...week,
+            trainings: week.trainings.map((t) => ({ ...t, status: "omitido" })),
+          })),
+        };
+        return current;
+      },
+    });
+    renderWithRoutes(
+      `/planes/${current.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+        <Route path="/planes" element={<div>Listado de Planes</div>} />
+      </Routes>,
+    );
+
+    // el día pendiente muestra su Fecha prevista como «Prevista» y ofrece omitir
+    const omitButton = await screen.findByRole("button", { name: "Omitir este día" });
+    expect(screen.getByText(/Día de empuje/)).toBeInTheDocument();
+    await user.click(omitButton);
+
+    // la omisión exige confirmación accesible y explícita
+    const dialog = await screen.findByRole("dialog", { name: /Omitir este Entrenamiento/i });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(within(dialog).getByText(/Lunes/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Omitir" }));
+
+    await waitFor(() => expect(requests).toContain(`omit:${current.id}:${trainingId}`));
+    // el día omitido se presenta cerrado con su Fecha prevista
+    expect(await screen.findByRole("article", { name: "Lunes omitido" })).toBeInTheDocument();
+    expect(screen.getByText(/Prevista · 4 ago/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Omitir este día" })).not.toBeInTheDocument();
+
+    // devolver a pendiente es directo y restaura la edición
+    await user.click(screen.getByRole("button", { name: "Devolver a pendiente" }));
+    await waitFor(() => expect(requests).toContain(`restore:${current.id}:${trainingId}`));
+    expect(await screen.findByRole("button", { name: "Omitir este día" })).toBeInTheDocument();
+
+    // completar exige confirmación y cierra el calendario
+    await user.click(screen.getByRole("button", { name: "Completar Plan" }));
+    const completeDialog = await screen.findByRole("dialog", {
+      name: /Completar «Ciclo base»/i,
+    });
+    await user.click(within(completeDialog).getByRole("button", { name: "Completar" }));
+    await waitFor(() => expect(requests).toContain(`complete:${current.id}`));
+
+    // calendario cerrado: sin transiciones de Plan activo
+    expect(await screen.findByText("Calendario cerrado")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Omitir este día" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Completar Plan" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Devolver a pendiente" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Duplicar Plan" })).toBeInTheDocument();
+  });
+
+  test("un Plan activo no permite reorganizar el calendario en el editor", async () => {
+    const plan = activePlanFixture();
+    stubPlans({ list: () => [plan], get: () => plan });
+    renderWithRoutes(
+      `/planes/${plan.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+      </Routes>,
+    );
+
+    expect(await screen.findByLabelText("Nombre del Plan")).toHaveValue("Ciclo base");
+    expect(screen.queryByRole("button", { name: "Añadir semana" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Quitar semana" })).not.toBeInTheDocument();
+  });
+
+  test("un día pendiente de un Plan activo muestra su Fecha prevista como «Prevista»", async () => {
+    const plan = activePlanFixture();
+    stubPlans({ list: () => [plan], get: () => plan });
+    renderWithRoutes(
+      `/planes/${plan.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+      </Routes>,
+    );
+
+    // el día pendiente del editor presenta la Fecha prevista etiquetada, sin
+    // confundirla con una Fecha realizada
+    expect(await screen.findByText(/Prevista · 4 ago/)).toBeInTheDocument();
+    expect(screen.queryByText(/Realizada/)).not.toBeInTheDocument();
+  });
+});
+
+describe("un Plan completado en solo lectura", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  test("presenta el calendario cerrado sin transiciones y sin confundir Fechas previstas con realizadas", async () => {
+    const completed = completedPlanFixture();
+    stubPlans({ list: () => [completed], get: () => completed });
+    renderWithRoutes(
+      `/planes/${completed.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+      </Routes>,
+    );
+
+    expect(await screen.findByText("Calendario cerrado")).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Semana 1" })).toBeInTheDocument();
+    // Fechas previstas etiquetadas como previstas, nunca como realizadas
+    expect(screen.getByText(/Prevista · 4 ago/)).toBeInTheDocument();
+    expect(screen.queryByText(/Realizada/)).not.toBeInTheDocument();
+
+    // sin transiciones posibles: sin editar, sin omitir, sin completar
+    expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Omitir este día" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Completar Plan" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Duplicar Plan" })).toBeInTheDocument();
   });
 });

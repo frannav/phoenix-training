@@ -12,6 +12,7 @@ import { listRoutines, type RoutineItem } from "../../routines/api/routines-api"
 import {
   createPlan,
   dayLabels,
+  formatDomainDate,
   replacePlan,
   type PlanExerciseContent,
   type PlanInput,
@@ -57,6 +58,9 @@ type EditorTraining = {
   id?: string;
   weekKey: string;
   day: string;
+  /** Fecha prevista y estado: solo existen en un Plan activo o completado. */
+  plannedDate: string | null;
+  status: "pendiente" | "omitido" | null;
   source: "rutina" | "especifico";
   routineId: string;
   routine: ResolvedRoutine | null;
@@ -156,6 +160,8 @@ function toEditorTraining(training: PlanTraining, weekKey: string): EditorTraini
     id: training.id,
     weekKey,
     day: String(training.day),
+    plannedDate: training.plannedDate,
+    status: training.status,
     source: training.source,
     routineId: training.source === "rutina" ? (training.routineId ?? "") : "",
     routine:
@@ -437,9 +443,21 @@ type PlanEditorProps = {
   onCancel: () => void;
   /** La revisión enviada quedó obsoleta: el padre debe cargar la versión vigente. */
   onConflict?: () => void;
+  /** Un Plan activo solo edita pendientes: pide al padre omitir un día. */
+  onRequestOmit?: (training: { id: string; day: number; plannedDate: string | null }) => void;
+  /** Pide al padre devolver a pendiente un día omitido de un Plan activo. */
+  onRequestRestore?: (training: { id: string; day: number; plannedDate: string | null }) => void;
 };
 
-export function PlanEditor({ plan, submitLabel, onSaved, onCancel, onConflict }: PlanEditorProps) {
+export function PlanEditor({
+  plan,
+  submitLabel,
+  onSaved,
+  onCancel,
+  onConflict,
+  onRequestOmit,
+  onRequestRestore,
+}: PlanEditorProps) {
   const [name, setName] = useState(plan?.name ?? "");
   const [weeks, setWeeks] = useState<EditorWeek[]>(() =>
     plan ? plan.weeks.map(toEditorWeek) : [emptyWeek()],
@@ -452,6 +470,7 @@ export function PlanEditor({ plan, submitLabel, onSaved, onCancel, onConflict }:
 
   const isEdit = plan !== undefined && plan !== null;
   const prefix = isEdit ? `plan-${plan!.id}` : "plan-nuevo";
+  const isActive = plan?.status === "activo";
 
   const routinesQuery = useQuery({
     queryKey: ["routines"],
@@ -526,6 +545,8 @@ export function PlanEditor({ plan, submitLabel, onSaved, onCancel, onConflict }:
               key: nextKey(),
               weekKey,
               day: String(day),
+              plannedDate: null,
+              status: "pendiente" as const,
               source: "rutina" as const,
               routineId: "",
               routine: null,
@@ -779,14 +800,16 @@ export function PlanEditor({ plan, submitLabel, onSaved, onCancel, onConflict }:
           <article key={week.key} className={styles.weekCard} aria-label={`Semana ${weekIndex + 1}`}>
             <div className={styles.weekHeader}>
               <h3 className={styles.weekTitle}>Semana {weekIndex + 1}</h3>
-              <button
-                type="button"
-                className={styles.removeWeek}
-                disabled={weeks.length <= 1}
-                onClick={() => removeWeek(week.key)}
-              >
-                Quitar semana
-              </button>
+              {!isActive && (
+                <button
+                  type="button"
+                  className={styles.removeWeek}
+                  disabled={weeks.length <= 1}
+                  onClick={() => removeWeek(week.key)}
+                >
+                  Quitar semana
+                </button>
+              )}
             </div>
 
             {week.trainings.length === 0 && (
@@ -796,6 +819,54 @@ export function PlanEditor({ plan, submitLabel, onSaved, onCancel, onConflict }:
             )}
 
             {week.trainings.map((training, trainingIndex) => {
+              const isClosed = isActive && training.status === "omitido";
+              if (isClosed) {
+                const plannedLabel =
+                  training.plannedDate === null ? "" : formatDomainDate(training.plannedDate);
+                const contentLabel =
+                  training.source === "rutina"
+                    ? (training.routine?.name ?? "Rutina")
+                    : training.specific
+                        .map((entry) => entry.exercise?.name ?? "Ejercicio")
+                        .join(" · ");
+                return (
+                  <article
+                    key={training.key}
+                    className={styles.closedTraining}
+                    aria-label={`${dayLabels[Number(training.day)]} omitido`}
+                  >
+                    <div className={styles.closedTrainingHeader}>
+                      <div className={styles.closedTrainingDay}>
+                        <span className={styles.closedDayLabel}>{dayLabels[Number(training.day)]}</span>
+                        {plannedLabel !== "" && (
+                          <span className={styles.closedDate}>Prevista · {plannedLabel}</span>
+                        )}
+                      </div>
+                      <span className={styles.closedStatus}>
+                        <span className={styles.statusDot} aria-hidden="true" />
+                        Omitido
+                      </span>
+                    </div>
+                    <p className={styles.closedContent}>{contentLabel}</p>
+                    {onRequestRestore && (
+                      <button
+                        type="button"
+                        className={styles.restoreTraining}
+                        onClick={() =>
+                          onRequestRestore({
+                            id: training.id ?? "",
+                            day: Number(training.day),
+                            plannedDate: training.plannedDate,
+                          })
+                        }
+                      >
+                        Devolver a pendiente
+                      </button>
+                    )}
+                  </article>
+                );
+              }
+
               const trainingErrors = (keySuffix: Array<string | number>) =>
                 fieldError(
                   errors,
@@ -854,6 +925,28 @@ export function PlanEditor({ plan, submitLabel, onSaved, onCancel, onConflict }:
                       Quitar entrenamiento
                     </button>
                   </div>
+
+                  {isActive && training.plannedDate !== null && (
+                    <p className={styles.pendingDate}>
+                      Prevista · {formatDomainDate(training.plannedDate)}
+                    </p>
+                  )}
+
+                  {isActive && onRequestOmit && (
+                    <button
+                      type="button"
+                      className={styles.omitTraining}
+                      onClick={() =>
+                        onRequestOmit({
+                          id: training.id ?? "",
+                          day: Number(training.day),
+                          plannedDate: training.plannedDate,
+                        })
+                      }
+                    >
+                      Omitir este día
+                    </button>
+                  )}
 
                   <div className={styles.sourceToggle} role="group" aria-label="Contenido del Entrenamiento">
                     <label className={styles.sourceOption}>
@@ -1103,9 +1196,11 @@ export function PlanEditor({ plan, submitLabel, onSaved, onCancel, onConflict }:
           </article>
         ))}
 
-        <button type="button" className={styles.addWeek} onClick={addWeek}>
-          Añadir semana
-        </button>
+        {!isActive && (
+          <button type="button" className={styles.addWeek} onClick={addWeek}>
+            Añadir semana
+          </button>
+        )}
       </section>
 
       {serverError && (

@@ -212,10 +212,24 @@ export const plan = sqliteTable(
     name: text("name").notNull(),
     status: text("status").notNull().default("borrador"),
     revision: integer("revision").notNull().default(1),
+    /**
+     * Lunes de la primera semana en formato de dominio `YYYY-MM-DD`.
+     * Solo un Plan activo o completado lo tiene: la activación lo fija
+     * atómicamente y el cierre del Plan lo conserva como calendario.
+     */
+    startDate: text("start_date"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [index("plan_account_idx").on(table.accountId)],
+  (table) => [
+    index("plan_account_idx").on(table.accountId),
+    // A lo sumo un Plan activo por Cuenta: el índice parcial respalda en la
+    // base de datos la unicidad que la transición de activación comprueba
+    // dentro de su transacción. Completar libera el cupo.
+    uniqueIndex("plan_single_active_idx")
+      .on(table.accountId)
+      .where(sql`${table.status} = 'activo'`),
+  ],
 );
 
 /**
@@ -255,6 +269,18 @@ export const planTraining = sqliteTable(
       .notNull()
       .references(() => planWeek.id, { onDelete: "cascade" }),
     day: integer("day").notNull(),
+    /**
+     * Fecha prevista en formato de dominio `YYYY-MM-DD` derivada de la
+     * posición de la semana y el día al activar el Plan. Los borradores no
+     * tienen Fechas previstas; un Entrenamiento omitido conserva la suya.
+     */
+    plannedDate: text("planned_date"),
+    /**
+     * Estado del Entrenamiento: `pendiente` u `omitido`. Sin estado mientras
+     * el Plan es borrador; la activación deja todos los Entrenamientos en
+     * pendiente y completar el Plan convierte los pendientes en omitidos.
+     */
+    status: text("status"),
     source: text("source").notNull(),
     routineId: text("routine_id").references(() => routine.id),
   },
