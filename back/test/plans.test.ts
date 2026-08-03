@@ -4,7 +4,7 @@ import { createApp } from "../src/app";
 import { loadCatalog, readCatalogAssets } from "../src/catalog/load-catalog";
 import { migrateDatabase } from "../src/db/migrate";
 import { openDatabase, type DatabaseConnection } from "../src/db/open-database";
-import { plan as planTable } from "../src/db/schema";
+import { plan as planTable, planTraining } from "../src/db/schema";
 import type { MailAdapter } from "../src/mail/mail-adapter";
 
 const baseUrl = "http://127.0.0.1:3000";
@@ -164,6 +164,10 @@ export type PlanExerciseDocument = {
 export type PlanTrainingDocument = {
   id: string;
   day: number;
+  /** Fecha prevista del Entrenamiento (YYYY-MM-DD); solo existe tras activar el Plan. */
+  plannedDate: string | null;
+  /** Estado del Entrenamiento; sin estado mientras el Plan es borrador. */
+  status: "pendiente" | "omitido" | null;
   source: "rutina" | "especifico";
   routineId: string | null;
   routine: { id: string; name: string; archived: boolean } | null;
@@ -180,6 +184,8 @@ export type PlanDocument = {
   id: string;
   name: string;
   status: "borrador" | "activo" | "completado";
+  /** Lunes de la primera semana (YYYY-MM-DD); solo un Plan activo o completado lo tiene. */
+  startDate: string | null;
   revision: number;
   weeks: PlanWeekDocument[];
   createdAt: string;
@@ -286,6 +292,20 @@ async function deletePlan(
   const response = await context.app.request(`/api/plans/${id}`, {
     method: "DELETE",
     headers: { Cookie: cookie, Origin: origin },
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+async function activatePlan(
+  context: TestContext,
+  id: string,
+  cookie: string,
+  body: Record<string, unknown>,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(`/api/plans/${id}/activate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify(body),
   });
   return { status: response.status, body: (await response.json()) as unknown };
 }
@@ -1354,6 +1374,870 @@ describe("listar y aislar Planes por Cuenta", () => {
     const unknown = await context!.app.request(
       "/api/plans/ffffffffffffffffffffffffffffffff",
       { headers: { Cookie: cookieA, Origin: origin } },
+    );
+    expect(unknown.status).toBe(404);
+  });
+});
+
+describe("activar Planes en el calendario", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+  let press: ExerciseItem;
+  let dominada: ExerciseItem;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+    press = await exerciseOfMode(context, cookie, "fuerza_con_carga");
+    dominada = await exerciseOfMode(context, cookie, "repeticiones_sin_carga");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  test("la activación fija el lunes de la primera semana y calcula las Fechas previstas de cada Entrenamiento", async () => {
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press.id, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            { day: 0, source: "rutina", routineId: routine.id },
+            {
+              day: 3,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 8 }] }],
+            },
+          ],
+        },
+        { trainings: [{ day: 1, source: "rutina", routineId: routine.id }] },
+      ]),
+    );
+    expect(created.status).toBe(201);
+    const draft = (created.body as { plan: PlanDocument }).plan;
+
+    // un borrador no tiene Fechas previstas ni estados
+    expect(draft.startDate).toBeNull();
+    for (const week of draft.weeks) {
+      for (const training of week.trainings) {
+        expect(training.plannedDate).toBeNull();
+        expect(training.status).toBeNull();
+      }
+    }
+
+    const { status, body } = await activatePlan(context!, draft.id, cookie, {
+      startDate: "2025-08-04",
+    });
+    expect(status).toBe(200);
+    const active = (body as { plan: PlanDocument }).plan;
+    expect(active.status).toBe("activo");
+    expect(active.startDate).toBe("2025-08-04");
+    expect(active.revision).toBe(2);
+    expect(active.name).toBe(draft.name);
+    expect(active.weeks).toHaveLength(2);
+
+    // Fechas previstas: la semana 0 comienza el lunes elegido y la semana 1 una semana después
+    expect(active.weeks[0]!.trainings[0]).toMatchObject({
+      day: 0,
+      plannedDate: "2025-08-04",
+      status: "pendiente",
+    });
+    expect(active.weeks[0]!.trainings[1]).toMatchObject({
+      day: 3,
+      plannedDate: "2025-08-07",
+      status: "pendiente",
+    });
+    expect(active.weeks[1]!.trainings[0]).toMatchObject({
+      day: 1,
+      plannedDate: "2025-08-12",
+      status: "pendiente",
+    });
+
+    // la activación no cambia la estructura: las identidades se conservan
+    expect(active.weeks[0]!.trainings[0]!.id).toBe(draft.weeks[0]!.trainings[0]!.id);
+    expect(active.weeks[0]!.trainings[0]!.routine).toMatchObject({ name: "Día de empuje" });
+  });
+
+  test("activar exige el lunes de la primera semana y no deja cambios parciales", async () => {
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            {
+              day: 0,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const id = (created.body as { plan: PlanDocument }).plan.id;
+
+    const notMonday = await activatePlan(context!, id, cookie, { startDate: "2025-08-05" });
+    expect(notMonday.status).toBe(400);
+    expect(
+      (notMonday.body as { error: { fields?: Record<string, string[]> } }).error.fields
+        ?.startDate,
+    ).toBeDefined();
+
+    const badFormat = await activatePlan(context!, id, cookie, { startDate: "04-08-2025" });
+    expect(badFormat.status).toBe(400);
+    expect(
+      (badFormat.body as { error: { fields?: Record<string, string[]> } }).error.fields
+        ?.startDate,
+    ).toBeDefined();
+
+    // el Plan sigue siendo borrador sin fechas: la activación fallida no persiste nada
+    const after = (await getPlan(context!, id, cookie)).body as { plan: PlanDocument };
+    expect(after.plan.status).toBe("borrador");
+    expect(after.plan.startDate).toBeNull();
+    expect(after.plan.weeks[0]!.trainings[0]!.plannedDate).toBeNull();
+    expect(after.plan.revision).toBe(1);
+  });
+
+  test("una Cuenta solo puede tener un Plan activo y el segundo intento no deja cambios parciales", async () => {
+    const first = await createPlan(
+      context!,
+      cookie,
+      planPayload(
+        [
+          {
+            trainings: [
+              {
+                day: 0,
+                source: "especifico",
+                specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }],
+              },
+            ],
+          },
+        ],
+        { name: "Primero" },
+      ),
+    );
+    const firstId = (first.body as { plan: PlanDocument }).plan.id;
+    const firstActivation = await activatePlan(context!, firstId, cookie, {
+      startDate: "2025-08-04",
+    });
+    expect(firstActivation.status).toBe(200);
+
+    const second = await createPlan(
+      context!,
+      cookie,
+      planPayload(
+        [
+          {
+            trainings: [
+              {
+                day: 0,
+                source: "especifico",
+                specific: [{ exerciseId: press.id, series: [{ repeticiones: 8 }] }],
+              },
+            ],
+          },
+        ],
+        { name: "Segundo" },
+      ),
+    );
+    const secondId = (second.body as { plan: PlanDocument }).plan.id;
+    const secondActivation = await activatePlan(context!, secondId, cookie, {
+      startDate: "2025-08-11",
+    });
+    expect(secondActivation.status).toBe(409);
+    expect(secondActivation.body).toEqual({
+      error: {
+        code: "TRANSITION_IMPOSSIBLE",
+        message: "Ya tienes un Plan activo. Complétalo antes de activar otro.",
+      },
+    });
+
+    // sin cambios parciales: el segundo Plan sigue siendo borrador sin fechas
+    const unchanged = (await getPlan(context!, secondId, cookie)).body as {
+      plan: PlanDocument;
+    };
+    expect(unchanged.plan.status).toBe("borrador");
+    expect(unchanged.plan.startDate).toBeNull();
+    for (const week of unchanged.plan.weeks) {
+      for (const training of week.trainings) {
+        expect(training.plannedDate).toBeNull();
+        expect(training.status).toBeNull();
+      }
+    }
+  });
+
+  test("un Plan activo no se reactiva y el de otra Cuenta responde inexistente", async () => {
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            {
+              day: 0,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const id = (created.body as { plan: PlanDocument }).plan.id;
+    await activatePlan(context!, id, cookie, { startDate: "2025-08-04" });
+
+    const again = await activatePlan(context!, id, cookie, { startDate: "2025-08-11" });
+    expect(again.status).toBe(409);
+    expect((again.body as { error: { code: string } }).error.code).toBe(
+      "TRANSITION_IMPOSSIBLE",
+    );
+
+    const cookieB = await registerVerified(context!, "otra@example.com");
+    const foreign = await activatePlan(context!, id, cookieB, { startDate: "2025-08-04" });
+    expect(foreign.status).toBe(404);
+  });
+
+  test("sin sesión la activación responde 401", async () => {
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            {
+              day: 0,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const id = (created.body as { plan: PlanDocument }).plan.id;
+    const response = await context!.app.request(`/api/plans/${id}/activate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ startDate: "2025-08-04" }),
+    });
+    expect(response.status).toBe(401);
+  });
+});
+
+describe("editar un Plan activo", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+  let press: ExerciseItem;
+  let dominada: ExerciseItem;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+    press = await exerciseOfMode(context, cookie, "fuerza_con_carga");
+    dominada = await exerciseOfMode(context, cookie, "repeticiones_sin_carga");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  function toInput(plan: PlanDocument): Record<string, unknown> {
+    return {
+      name: plan.name,
+      weeks: plan.weeks.map((week) => ({
+        id: week.id,
+        trainings: week.trainings.map((training) => ({
+          id: training.id,
+          day: training.day,
+          source: training.source,
+          routineId: training.routineId,
+          specific:
+            training.source === "especifico"
+              ? training.content.map((entry) => ({
+                  id: entry.id,
+                  exerciseId: entry.exerciseId,
+                  series: entry.series.map((series) => ({
+                    id: series.id,
+                    carga: series.carga,
+                    repeticiones: series.repeticiones,
+                    duracion: series.duracion,
+                  })),
+                }))
+              : [],
+        })),
+      })),
+    };
+  }
+
+  async function activePlanFixture(): Promise<PlanDocument> {
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press.id, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            { day: 0, source: "rutina", routineId: routine.id },
+            {
+              day: 3,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 8 }] }],
+            },
+          ],
+        },
+        { trainings: [{ day: 1, source: "rutina", routineId: routine.id }] },
+      ]),
+    );
+    const draft = (created.body as { plan: PlanDocument }).plan;
+    const activated = await activatePlan(context!, draft.id, cookie, { startDate: "2025-08-04" });
+    expect(activated.status).toBe(200);
+    return (activated.body as { plan: PlanDocument }).plan;
+  }
+
+  test("permite cambiar el nombre y editar, añadir o eliminar Entrenamientos pendientes sin tocar los días cerrados", async () => {
+    const plan = await activePlanFixture();
+    const routineTraining = plan.weeks[0]!.trainings[0]!;
+    const specificTraining = plan.weeks[0]!.trainings[1]!;
+
+    // el día 3 queda omitido: un día que ya no está pendiente no cambia
+    await context!.connection.db
+      .update(planTraining)
+      .set({ status: "omitido" })
+      .where(eq(planTraining.id, specificTraining.id));
+
+    const weeks = (toInput(plan) as { weeks: Array<Record<string, unknown>> }).weeks;
+    const weekZero = weeks[0] as { trainings: Array<Record<string, unknown>> };
+    const weekOne = weeks[1] as { trainings: Array<Record<string, unknown>> };
+    const movedRoutine = {
+      ...(weekZero.trainings[0] as Record<string, unknown>),
+      day: 1,
+    };
+
+    const { status, body } = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: "Ciclo activo v2",
+      weeks: [
+        {
+          id: plan.weeks[0]!.id,
+          // el día omitido viaja intacto; el pendiente se mueve de día
+          trainings: [movedRoutine, weekZero.trainings[1]],
+        },
+        {
+          id: plan.weeks[1]!.id,
+          trainings: [...weekOne.trainings, { day: 4, source: "especifico", specific: [{ exerciseId: dominada.id, series: [{ repeticiones: 6 }] }] }],
+        },
+      ],
+    });
+    expect(status).toBe(200);
+    const updated = (body as { plan: PlanDocument }).plan;
+    expect(updated.name).toBe("Ciclo activo v2");
+    expect(updated.revision).toBe(plan.revision + 1);
+
+    // el Entrenamiento pendiente movido de día recalcula su Fecha prevista
+    const moved = updated.weeks[0]!.trainings[0]!;
+    expect(moved.id).toBe(routineTraining.id);
+    expect(moved.day).toBe(1);
+    expect(moved.plannedDate).toBe("2025-08-05");
+    expect(moved.status).toBe("pendiente");
+
+    // el día omitido conserva identidad, día, Fecha prevista y estado
+    const closed = updated.weeks[0]!.trainings[1]!;
+    expect(closed.id).toBe(specificTraining.id);
+    expect(closed.day).toBe(3);
+    expect(closed.plannedDate).toBe("2025-08-07");
+    expect(closed.status).toBe("omitido");
+
+    // el Entrenamiento añadido nace pendiente con su Fecha prevista calculada
+    const added = updated.weeks[1]!.trainings[1]!;
+    expect(added.day).toBe(4);
+    expect(added.plannedDate).toBe("2025-08-15");
+    expect(added.status).toBe("pendiente");
+  });
+
+  test("una edición que modifica un día que ya no está pendiente devuelve conflicto sin cambios parciales", async () => {
+    const plan = await activePlanFixture();
+    const specificTraining = plan.weeks[0]!.trainings[1]!;
+    await context!.connection.db
+      .update(planTraining)
+      .set({ status: "omitido" })
+      .where(eq(planTraining.id, specificTraining.id));
+
+    const input = toInput(plan) as { weeks: Array<Record<string, unknown>> };
+    const week = input.weeks[0] as { trainings: Array<Record<string, unknown>> };
+    const training = week.trainings[1] as { specific: Array<Record<string, unknown>> };
+    training.specific = [{ exerciseId: dominada.id, series: [{ repeticiones: 5 }] }];
+
+    const { status, body } = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: "Edición prohibida",
+      weeks: input.weeks,
+    });
+    expect(status).toBe(409);
+    expect(body).toEqual({
+      error: {
+        code: "TRANSITION_IMPOSSIBLE",
+        message: "Un día que ya no está pendiente no puede modificarse.",
+      },
+    });
+
+    const current = (await getPlan(context!, plan.id, cookie)).body as { plan: PlanDocument };
+    expect(current.plan.revision).toBe(plan.revision);
+    expect(current.plan.name).toBe(plan.name);
+  });
+
+  test("el calendario de un Plan activo no reorganiza semanas", async () => {
+    const plan = await activePlanFixture();
+    const input = toInput(plan) as { weeks: Array<Record<string, unknown>> };
+    input.weeks = [input.weeks[1]!, input.weeks[0]!];
+
+    const { status, body } = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: "Semana movida",
+      weeks: input.weeks,
+    });
+    expect(status).toBe(409);
+    expect(body).toEqual({
+      error: {
+        code: "TRANSITION_IMPOSSIBLE",
+        message: "El calendario de un Plan activo no puede reorganizar sus semanas.",
+      },
+    });
+  });
+
+  test("un Plan completado no puede editarse", async () => {
+    const plan = await activePlanFixture();
+    await context!.connection.db
+      .update(planTable)
+      .set({ status: "completado" })
+      .where(eq(planTable.id, plan.id));
+
+    const { status, body } = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: "Renombrado imposible",
+      weeks: toInput(plan).weeks as Array<Record<string, unknown>>,
+    });
+    expect(status).toBe(409);
+    expect(body).toEqual({
+      error: {
+        code: "TRANSITION_IMPOSSIBLE",
+        message: "Un Plan completado no puede editarse.",
+      },
+    });
+  });
+
+  test("una revisión obsoleta en un Plan activo sigue devolviendo conflicto", async () => {
+    const plan = await activePlanFixture();
+    const { status, body } = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision - 1,
+      name: "Obsoleto",
+      weeks: toInput(plan).weeks as Array<Record<string, unknown>>,
+    });
+    expect(status).toBe(409);
+    expect((body as { error: { code: string } }).error.code).toBe("STALE_REVISION");
+  });
+});
+
+async function omitTraining(
+  context: TestContext,
+  planId: string,
+  trainingId: string,
+  cookie: string,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(`/api/plans/${planId}/trainings/${trainingId}/omit`, {
+    method: "POST",
+    headers: { Cookie: cookie, Origin: origin },
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+async function restoreTraining(
+  context: TestContext,
+  planId: string,
+  trainingId: string,
+  cookie: string,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(
+    `/api/plans/${planId}/trainings/${trainingId}/restore`,
+    { method: "POST", headers: { Cookie: cookie, Origin: origin } },
+  );
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+async function completePlan(
+  context: TestContext,
+  planId: string,
+  cookie: string,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(`/api/plans/${planId}/complete`, {
+    method: "POST",
+    headers: { Cookie: cookie, Origin: origin },
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+async function duplicatePlan(
+  context: TestContext,
+  planId: string,
+  cookie: string,
+  body: Record<string, unknown> = {},
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(`/api/plans/${planId}/duplicate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify(body),
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+describe("omitir, devolver a pendiente y completar Planes", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+  let press: ExerciseItem;
+  let dominada: ExerciseItem;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+    press = await exerciseOfMode(context, cookie, "fuerza_con_carga");
+    dominada = await exerciseOfMode(context, cookie, "repeticiones_sin_carga");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function activeFixture(): Promise<PlanDocument> {
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press.id, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            { day: 0, source: "rutina", routineId: routine.id },
+            {
+              day: 3,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 8 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const draft = (created.body as { plan: PlanDocument }).plan;
+    const activated = await activatePlan(context!, draft.id, cookie, { startDate: "2025-08-04" });
+    expect(activated.status).toBe(200);
+    return (activated.body as { plan: PlanDocument }).plan;
+  }
+
+  test("omitir y devolver a pendiente son acciones explícitas y recuperables solo en un Plan activo", async () => {
+    const plan = await activeFixture();
+    const trainingId = plan.weeks[0]!.trainings[0]!.id;
+
+    // omitir: el Entrenamiento conserva su Fecha prevista
+    const omitted = await omitTraining(context!, plan.id, trainingId, cookie);
+    expect(omitted.status).toBe(200);
+    const afterOmit = (omitted.body as { plan: PlanDocument }).plan;
+    expect(afterOmit.weeks[0]!.trainings[0]!.status).toBe("omitido");
+    expect(afterOmit.weeks[0]!.trainings[0]!.plannedDate).toBe(
+      plan.weeks[0]!.trainings[0]!.plannedDate,
+    );
+    expect(afterOmit.revision).toBe(plan.revision + 1);
+
+    // repetir la omisión es una transición imposible
+    const again = await omitTraining(context!, plan.id, trainingId, cookie);
+    expect(again.status).toBe(409);
+    expect(again.body).toEqual({
+      error: {
+        code: "TRANSITION_IMPOSSIBLE",
+        message: "El Entrenamiento ya está omitido.",
+      },
+    });
+
+    // devolver a pendiente mientras el Plan siga activo
+    const restored = await restoreTraining(context!, plan.id, trainingId, cookie);
+    expect(restored.status).toBe(200);
+    expect((restored.body as { plan: PlanDocument }).plan.weeks[0]!.trainings[0]!.status).toBe(
+      "pendiente",
+    );
+
+    // devolver un Entrenamiento que no está omitido es imposible
+    const restorePending = await restoreTraining(context!, plan.id, trainingId, cookie);
+    expect(restorePending.status).toBe(409);
+    expect(restorePending.body).toEqual({
+      error: {
+        code: "TRANSITION_IMPOSSIBLE",
+        message: "El Entrenamiento no está omitido.",
+      },
+    });
+  });
+
+  test("solo un Plan activo permite omitir y un completado no devuelve días a pendiente", async () => {
+    // un borrador no tiene estados: no se puede omitir
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }],
+    });
+    const draftCreated = await createPlan(
+      context!,
+      cookie,
+      planPayload([{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }]),
+    );
+    const draft = (draftCreated.body as { plan: PlanDocument }).plan;
+    const omitDraft = await omitTraining(context!, draft.id, draft.weeks[0]!.trainings[0]!.id, cookie);
+    expect(omitDraft.status).toBe(409);
+    expect((omitDraft.body as { error: { message: string } }).error.message).toBe(
+      "Solo un Plan activo permite omitir Entrenamientos.",
+    );
+
+    // un Entrenamiento desconocido de un Plan activo responde inexistente
+    const plan = await activeFixture();
+    const unknownTraining = await omitTraining(
+      context!,
+      plan.id,
+      "ffffffffffffffffffffffffffffffff",
+      cookie,
+    );
+    expect(unknownTraining.status).toBe(404);
+
+    // un Plan completado no devuelve Entrenamientos a pendiente
+    await completePlan(context!, plan.id, cookie);
+    const trainingId = plan.weeks[0]!.trainings[0]!.id;
+    const restoreCompleted = await restoreTraining(context!, plan.id, trainingId, cookie);
+    expect(restoreCompleted.status).toBe(409);
+    expect((restoreCompleted.body as { error: { message: string } }).error.message).toBe(
+      "Solo un Plan activo permite devolver un Entrenamiento a pendiente.",
+    );
+  });
+
+  test("completar un Plan convierte todos los días pendientes en omitidos y cierra el calendario", async () => {
+    const plan = await activeFixture();
+    // un día queda omitido expresamente; el otro sigue pendiente
+    const trainingId = plan.weeks[0]!.trainings[1]!.id;
+    const omitted = await omitTraining(context!, plan.id, trainingId, cookie);
+    expect(omitted.status).toBe(200);
+
+    const completed = await completePlan(context!, plan.id, cookie);
+    expect(completed.status).toBe(200);
+    const doc = (completed.body as { plan: PlanDocument }).plan;
+    expect(doc.status).toBe("completado");
+    expect(doc.startDate).toBe("2025-08-04");
+    expect(doc.revision).toBe(plan.revision + 2);
+    for (const week of doc.weeks) {
+      for (const training of week.trainings) {
+        expect(training.status).toBe("omitido");
+        expect(training.plannedDate).not.toBeNull();
+      }
+    }
+
+    // completar de nuevo es imposible y un completado no se reactiva
+    const again = await completePlan(context!, plan.id, cookie);
+    expect(again.status).toBe(409);
+    expect((again.body as { error: { message: string } }).error.message).toBe(
+      "Solo un Plan activo puede completarse.",
+    );
+    const reactivate = await activatePlan(context!, plan.id, cookie, { startDate: "2025-08-11" });
+    expect(reactivate.status).toBe(409);
+
+    // completar libera el cupo de Plan activo: otro Plan puede activarse
+    const second = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            {
+              day: 0,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const secondId = (second.body as { plan: PlanDocument }).plan.id;
+    const secondActivation = await activatePlan(context!, secondId, cookie, {
+      startDate: "2025-08-11",
+    });
+    expect(secondActivation.status).toBe(200);
+  });
+
+  test("omitir, restaurar o completar un Plan ajeno responde inexistente", async () => {
+    const plan = await activeFixture();
+    const cookieB = await registerVerified(context!, "otra@example.com");
+    const trainingId = plan.weeks[0]!.trainings[0]!.id;
+
+    expect((await omitTraining(context!, plan.id, trainingId, cookieB)).status).toBe(404);
+    expect((await restoreTraining(context!, plan.id, trainingId, cookieB)).status).toBe(404);
+    expect((await completePlan(context!, plan.id, cookieB)).status).toBe(404);
+  });
+});
+
+describe("duplicar Planes", () => {
+  let context: TestContext | undefined;
+  let cookieA: string;
+  let cookieB: string;
+  let press: ExerciseItem;
+  let dominada: ExerciseItem;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookieA = await registerVerified(context, "a@example.com");
+    cookieB = await registerVerified(context, "b@example.com");
+    press = await exerciseOfMode(context, cookieA, "fuerza_con_carga");
+    dominada = await exerciseOfMode(context, cookieA, "repeticiones_sin_carga");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function sourcePlanFixture(status: "borrador" | "activo" | "completado"): Promise<{
+    plan: PlanDocument;
+    routine: RoutineDocument;
+  }> {
+    const routine = await createRoutine(context!, cookieA, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press.id, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const created = await createPlan(
+      context!,
+      cookieA,
+      planPayload([
+        {
+          trainings: [
+            { day: 0, source: "rutina", routineId: routine.id },
+            {
+              day: 3,
+              source: "especifico",
+              specific: [{ exerciseId: dominada.id, series: [{ repeticiones: 8 }, { repeticiones: 6 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    let plan = (created.body as { plan: PlanDocument }).plan;
+    if (status !== "borrador") {
+      const activated = await activatePlan(context!, plan.id, cookieA, { startDate: "2025-08-04" });
+      expect(activated.status).toBe(200);
+      plan = (activated.body as { plan: PlanDocument }).plan;
+    }
+    if (status === "completado") {
+      const completed = await completePlan(context!, plan.id, cookieA);
+      expect(completed.status).toBe(200);
+      plan = (completed.body as { plan: PlanDocument }).plan;
+    }
+    return { plan, routine };
+  }
+
+  test("duplicar un borrador crea otro borrador con referencias vivas y copias independientes", async () => {
+    const { plan, routine } = await sourcePlanFixture("borrador");
+    const originalSpecific = plan.weeks[0]!.trainings[1]!;
+    const originalEntries = originalSpecific.content;
+
+    const duplicated = await duplicatePlan(context!, plan.id, cookieA);
+    expect(duplicated.status).toBe(201);
+    const copy = (duplicated.body as { plan: PlanDocument }).plan;
+
+    expect(copy.id).not.toBe(plan.id);
+    expect(copy.name).toBe(`${plan.name} (copia)`);
+    expect(copy.status).toBe("borrador");
+    expect(copy.startDate).toBeNull();
+    expect(copy.revision).toBe(1);
+    expect(copy.weeks).toHaveLength(plan.weeks.length);
+    expect(copy.weeks[0]!.id).not.toBe(plan.weeks[0]!.id);
+
+    // sin fechas ni estados
+    for (const week of copy.weeks) {
+      for (const training of week.trainings) {
+        expect(training.plannedDate).toBeNull();
+        expect(training.status).toBeNull();
+      }
+    }
+
+    // la referencia viva a la Rutina se conserva
+    const copiedRoutineDay = copy.weeks[0]!.trainings[0]!;
+    expect(copiedRoutineDay).toMatchObject({
+      source: "rutina",
+      routineId: routine.id,
+      routine: { id: routine.id, name: routine.name },
+    });
+    expect(copiedRoutineDay.content[0]).toMatchObject({
+      exerciseId: press.id,
+      series: [{ order: 0, carga: 60, repeticiones: 10 }],
+    });
+
+    // el Entrenamiento específico se copia con identidades nuevas y valores iguales
+    const copiedSpecific = copy.weeks[0]!.trainings[1]!;
+    expect(copiedSpecific.id).not.toBe(originalSpecific.id);
+    expect(copiedSpecific.content).toHaveLength(originalEntries.length);
+    const first = copiedSpecific.content[0]!;
+    expect(first.id).not.toBe(originalEntries[0]!.id);
+    expect(first.exerciseId).toBe(originalEntries[0]!.exerciseId);
+    expect(first.series).toHaveLength(2);
+    expect(first.series[0]).toMatchObject({ order: 0, repeticiones: 8 });
+    expect(first.series[1]).toMatchObject({ order: 1, repeticiones: 6 });
+    expect(first.series[0]!.id).not.toBe(originalEntries[0]!.series[0]!.id);
+    expect(first.series[1]!.id).not.toBe(originalEntries[0]!.series[1]!.id);
+
+    // el nombre se puede decidir al duplicar
+    const named = await duplicatePlan(context!, plan.id, cookieA, { name: "Ciclo nuevo" });
+    expect(named.status).toBe(201);
+    expect((named.body as { plan: PlanDocument }).plan.name).toBe("Ciclo nuevo");
+  });
+
+  test("duplicar un Plan activo o completado pierde fechas, estados y Sesiones", async () => {
+    // el completado se procesa primero: completar libera el cupo de Plan activo
+    for (const status of ["completado", "activo"] as const) {
+      const { plan } = await sourcePlanFixture(status);
+      const duplicated = await duplicatePlan(context!, plan.id, cookieA);
+      expect(duplicated.status).toBe(201);
+      const copy = (duplicated.body as { plan: PlanDocument }).plan;
+
+      expect(copy.status).toBe("borrador");
+      expect(copy.startDate).toBeNull();
+      expect(copy.revision).toBe(1);
+      const sourceTrainings = plan.weeks.flatMap((week) => week.trainings);
+      const copyTrainings = copy.weeks.flatMap((week) => week.trainings);
+      expect(copyTrainings).toHaveLength(sourceTrainings.length);
+      for (const training of copyTrainings) {
+        expect(training.plannedDate).toBeNull();
+        expect(training.status).toBeNull();
+      }
+      // cada copia del día conserva la referencia a la Rutina del original
+      expect(copy.weeks[0]!.trainings[0]!.routineId).toBe(
+        plan.weeks[0]!.trainings[0]!.routineId,
+      );
+    }
+  });
+
+  test("duplicar un Plan de otra Cuenta o inexistente responde inexistente", async () => {
+    const { plan } = await sourcePlanFixture("activo");
+    const foreign = await duplicatePlan(context!, plan.id, cookieB);
+    expect(foreign.status).toBe(404);
+
+    const unknown = await duplicatePlan(
+      context!,
+      "ffffffffffffffffffffffffffffffff",
+      cookieA,
     );
     expect(unknown.status).toBe(404);
   });

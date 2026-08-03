@@ -4,11 +4,16 @@ import type { AppDatabase } from "../db/open-database";
 import { fieldKey } from "../domain/series-goals";
 import { apiError } from "../http/api-error";
 import {
+  activatePlan,
+  completePlan,
   createPlan,
   deletePlan,
+  duplicatePlan,
   getPlanDocument,
   listPlanDocuments,
+  omitTraining,
   replacePlan,
+  restoreTraining,
   type PlanInput,
 } from "./plans";
 
@@ -83,6 +88,29 @@ const notFoundMessage = "El Plan solicitado no existe o no pertenece a tu Cuenta
 const staleRevisionMessage =
   "El Plan fue modificado por otra sesión. Carga la versión actual antes de guardar.";
 const notDraftMessage = "Solo un Plan borrador puede eliminarse.";
+const activateNotDraftMessage = "Solo un Plan borrador puede activarse.";
+const activePlanExistsMessage = "Ya tienes un Plan activo. Complétalo antes de activar otro.";
+
+const planActivateSchema = z
+  .object({
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe usar el formato AAAA-MM-DD."),
+  })
+  .strict();
+
+const planDuplicateSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Escribe un nombre para el Plan duplicado.")
+      .max(80, "El nombre no puede superar los 80 caracteres.")
+      .optional(),
+  })
+  .strict();
+
+const completeNotActiveMessage = "Solo un Plan activo puede completarse.";
 
 function toPlanInput(body: {
   name: string;
@@ -215,6 +243,9 @@ export function createPlansRouter({
       if (outcome.reason === "stale-revision") {
         return context.json(apiError("STALE_REVISION", staleRevisionMessage), 409);
       }
+      if (outcome.reason === "transition-impossible") {
+        return context.json(apiError("TRANSITION_IMPOSSIBLE", outcome.message), 409);
+      }
       return context.json(apiError("VALIDATION_ERROR", "La petición no es válida.", outcome.fields), 400);
     }
 
@@ -237,6 +268,138 @@ export function createPlansRouter({
       return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
     }
     return context.json({ deleted: true });
+  });
+
+  router.post("/plans/:planId/activate", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = planActivateSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
+    const outcome = await activatePlan(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+      startDate: parsed.data.startDate,
+      now: now(),
+    });
+    if (!outcome.ok) {
+      if (outcome.reason === "not-draft") {
+        return context.json(apiError("TRANSITION_IMPOSSIBLE", activateNotDraftMessage), 409);
+      }
+      if (outcome.reason === "active-exists") {
+        return context.json(apiError("TRANSITION_IMPOSSIBLE", activePlanExistsMessage), 409);
+      }
+      if (outcome.reason === "validation") {
+        return context.json(
+          apiError("VALIDATION_ERROR", "La petición no es válida.", outcome.fields),
+          400,
+        );
+      }
+      return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+    }
+
+    const document = await getPlanDocument(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+    });
+    return context.json({ plan: document });
+  });
+
+  router.post("/plans/:planId/complete", async (context) => {
+    const outcome = await completePlan(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+      now: now(),
+    });
+    if (!outcome.ok) {
+      if (outcome.reason === "not-active") {
+        return context.json(apiError("TRANSITION_IMPOSSIBLE", completeNotActiveMessage), 409);
+      }
+      return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+    }
+    const document = await getPlanDocument(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+    });
+    return context.json({ plan: document });
+  });
+
+  router.post("/plans/:planId/trainings/:trainingId/omit", async (context) => {
+    const outcome = await omitTraining(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+      trainingId: context.req.param("trainingId"),
+      now: now(),
+    });
+    if (!outcome.ok) {
+      if (outcome.reason === "not-active") {
+        return context.json(apiError("TRANSITION_IMPOSSIBLE", outcome.message), 409);
+      }
+      if (outcome.reason === "transition-impossible") {
+        return context.json(apiError("TRANSITION_IMPOSSIBLE", outcome.message), 409);
+      }
+      return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+    }
+    const document = await getPlanDocument(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+    });
+    return context.json({ plan: document });
+  });
+
+  router.post("/plans/:planId/trainings/:trainingId/restore", async (context) => {
+    const outcome = await restoreTraining(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+      trainingId: context.req.param("trainingId"),
+      now: now(),
+    });
+    if (!outcome.ok) {
+      if (outcome.reason === "not-active" || outcome.reason === "transition-impossible") {
+        return context.json(apiError("TRANSITION_IMPOSSIBLE", outcome.message), 409);
+      }
+      return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+    }
+    const document = await getPlanDocument(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+    });
+    return context.json({ plan: document });
+  });
+
+  router.post("/plans/:planId/duplicate", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = planDuplicateSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
+    const source = await getPlanDocument(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+    });
+    if (!source) {
+      return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+    }
+    const defaultName =
+      source.name.length + " (copia)".length <= 80 ? `${source.name} (copia)` : source.name;
+
+    const outcome = await duplicatePlan(database, {
+      accountId: context.get("accountId"),
+      planId: context.req.param("planId"),
+      name: parsed.data.name ?? defaultName,
+      now: now(),
+    });
+    if (!outcome.ok) {
+      return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+    }
+
+    const document = await getPlanDocument(database, {
+      accountId: context.get("accountId"),
+      planId: outcome.planId,
+    });
+    return context.json({ plan: document }, 201);
   });
 
   return router;

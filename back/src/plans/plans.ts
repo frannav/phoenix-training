@@ -12,12 +12,16 @@ import {
   type RecordingMode,
 } from "../db/schema";
 import { allowedTargetFields, fieldKey, targetLimitMessage } from "../domain/series-goals";
+import { isMonday, parseDomainDate, plannedDateFor, toDomainDate } from "../domain/domain-dates";
 import {
   resolveRoutineReferences,
   type RoutineExerciseDocument,
 } from "../routines/routines";
 
 export type PlanStatus = "borrador" | "activo" | "completado";
+
+/** Estado de un Entrenamiento planificado de un Plan activo o completado. */
+export type PlanTrainingStatus = "pendiente" | "omitido";
 
 /** Entrada del cliente para una Serie prevista: los objetivos son opcionales e independientes. */
 export type PlanSeriesGoalInput = {
@@ -65,6 +69,10 @@ export type PlanExerciseDocument = RoutineExerciseDocument;
 export type PlanTrainingDocument = {
   id: string;
   day: number;
+  /** Fecha prevista del Entrenamiento (YYYY-MM-DD); solo existe tras activar el Plan. */
+  plannedDate: string | null;
+  /** Estado del Entrenamiento; sin estado mientras el Plan es borrador. */
+  status: PlanTrainingStatus | null;
   source: "rutina" | "especifico";
   routineId: string | null;
   /** Rutina de la referencia viva, resuelta por el servidor aunque esté archivada. */
@@ -83,6 +91,8 @@ export type PlanDocument = {
   id: string;
   name: string;
   status: PlanStatus;
+  /** Lunes de la primera semana (YYYY-MM-DD); solo un Plan activo o completado lo tiene. */
+  startDate: string | null;
   revision: number;
   weeks: PlanWeekDocument[];
   createdAt: string;
@@ -97,6 +107,7 @@ export type PlanReplaceOutcome =
   | { ok: true }
   | { ok: false; reason: "not-found" }
   | { ok: false; reason: "stale-revision"; currentRevision: number }
+  | { ok: false; reason: "transition-impossible"; message: string }
   | { ok: false; reason: "validation"; fields: Record<string, string[]> };
 
 export type PlanDeleteOutcome =
@@ -329,6 +340,9 @@ export async function createPlan(
           planId,
           weekId,
           training,
+          // un borrador no tiene Fechas previstas ni estados
+          plannedDate: null,
+          status: null,
         });
       }
     }
@@ -337,7 +351,279 @@ export async function createPlan(
   return { ok: true, planId };
 }
 
+export type PlanActivateOutcome =
+  | { ok: true }
+  | { ok: false; reason: "not-found" }
+  | { ok: false; reason: "not-draft" }
+  | { ok: false; reason: "active-exists" }
+  | { ok: false; reason: "validation"; fields: Record<string, string[]> };
+
+/**
+ * Activa un Plan borrador en el calendario de la Cuenta dentro de una única
+ * transacción: fija el lunes de la primera semana, calcula las Fechas
+ * previstas de todos los Entrenamientos planificados sin cambiar la
+ * estructura y deja todos en pendiente. Cada Cuenta puede tener como máximo
+ * un Plan activo: la transición lo comprueba en la misma transacción y el
+ * índice parcial de unicidad respalda el caso concurrente. Un lunes inválido
+ * o una activación imposible no persisten ningún cambio.
+ */
+export async function activatePlan(
+  database: AppDatabase,
+  {
+    accountId,
+    planId,
+    startDate,
+    now,
+  }: { accountId: string; planId: string; startDate: string; now: Date },
+): Promise<PlanActivateOutcome> {
+  let outcome: PlanActivateOutcome = { ok: false, reason: "not-found" };
+  await database.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(plan)
+      .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)))
+      .get();
+    if (!current) {
+      outcome = { ok: false, reason: "not-found" };
+      return;
+    }
+    if (current.status !== "borrador") {
+      outcome = { ok: false, reason: "not-draft" };
+      return;
+    }
+
+    // El lunes de la primera semana es una regla de dominio: se valida en el
+    // caso de uso y no solo en el límite HTTP.
+    const monday = parseDomainDate(startDate);
+    if (!monday) {
+      outcome = {
+        ok: false,
+        reason: "validation",
+        fields: { startDate: ["Elige una fecha válida en formato AAAA-MM-DD."] },
+      };
+      return;
+    }
+    if (!isMonday(startDate)) {
+      outcome = {
+        ok: false,
+        reason: "validation",
+        fields: { startDate: ["La primera semana empieza en lunes."] },
+      };
+      return;
+    }
+
+    const otherActive = tx
+      .select({ id: plan.id })
+      .from(plan)
+      .where(and(eq(plan.accountId, accountId), eq(plan.status, "activo")))
+      .get();
+    if (otherActive) {
+      outcome = { ok: false, reason: "active-exists" };
+      return;
+    }
+
+    try {
+      const updated = tx
+        .update(plan)
+        .set({ status: "activo", startDate, revision: current.revision + 1, updatedAt: now })
+        .where(and(eq(plan.id, planId), eq(plan.status, "borrador")))
+        .returning()
+        .get();
+      if (!updated) {
+        outcome = { ok: false, reason: "not-draft" };
+        return;
+      }
+    } catch (error) {
+      // Dos activaciones concurrentes: el índice parcial de unicidad respalda
+      // la transición y el perdedor obtiene el mismo conflicto recuperable.
+      if (String(error).includes("UNIQUE constraint failed")) {
+        outcome = { ok: false, reason: "active-exists" };
+        return;
+      }
+      throw error;
+    }
+
+    // Fechas previstas: cada Entrenamiento del día `day` de la semana en
+    // posición `position` recibe `startDate + 7 * position + day`.
+    const weeks = tx
+      .select()
+      .from(planWeek)
+      .where(eq(planWeek.planId, planId))
+      .orderBy(asc(planWeek.position), asc(planWeek.id))
+      .all();
+    const weekPositionById = new Map(weeks.map((week) => [week.id, week.position]));
+    const trainings = tx
+      .select()
+      .from(planTraining)
+      .where(eq(planTraining.planId, planId))
+      .all();
+    for (const training of trainings) {
+      const position = weekPositionById.get(training.weekId);
+      if (position === undefined) {
+        continue;
+      }
+      tx.update(planTraining)
+        .set({
+          plannedDate: plannedDateFor(startDate, position, training.day),
+          status: "pendiente",
+        })
+        .where(eq(planTraining.id, training.id))
+        .run();
+    }
+
+    outcome = { ok: true };
+  });
+  return outcome;
+}
+
 type PlanTx = AppDatabase;
+
+/**
+ * Serialización estable del contenido específico de un Entrenamiento para
+ * comparar exactitud entre lo persistido y lo enviado en una sustitución.
+ */
+function serializeSpecificContent(
+  entries: Array<{
+    id: string;
+    exerciseId: string;
+    series: Array<{
+      id: string;
+      carga: number | null;
+      repeticiones: number | null;
+      duracion: number | null;
+    }>;
+  }>,
+): string {
+  return JSON.stringify(
+    entries.map((entry) => ({
+      id: entry.id,
+      exerciseId: entry.exerciseId,
+      series: entry.series.map((series) => ({
+        id: series.id,
+        carga: series.carga,
+        repeticiones: series.repeticiones,
+        duracion: series.duracion,
+      })),
+    })),
+  );
+}
+
+/**
+ * Reglas de edición de un Plan activo (spec «Planes de entrenamiento»):
+ * se pueden editar el nombre y los Entrenamientos planificados pendientes
+ * (añadir, eliminar, mover o cambiar contenido), pero el calendario no se
+ * reorganiza y los días que ya no están pendientes permanecen exactamente
+ * iguales. Devuelve el mensaje de la transición imposible o `null`.
+ */
+function validateActivePlanEdit(args: {
+  currentWeeks: PlanWeekRow[];
+  currentTrainings: PlanTrainingRow[];
+  currentSpecific: PlanTrainingExerciseRow[];
+  currentSeries: PlanTrainingSeriesGoalRow[];
+  input: PlanInput;
+}): string | null {
+  const { currentWeeks, currentTrainings, currentSpecific, currentSeries, input } = args;
+  const closedDayMessage = "Un día que ya no está pendiente no puede modificarse.";
+
+  // Las semanas de un Plan activo son fijas: mismas identidades y orden.
+  const currentOrder = [...currentWeeks]
+    .sort((a, b) => a.position - b.position)
+    .map((week) => week.id);
+  if (input.weeks.length !== currentOrder.length) {
+    return "El calendario de un Plan activo no puede reorganizar sus semanas.";
+  }
+  for (let index = 0; index < input.weeks.length; index += 1) {
+    if (input.weeks[index]!.id !== currentOrder[index]) {
+      return "El calendario de un Plan activo no puede reorganizar sus semanas.";
+    }
+  }
+
+  // Días que ya no están pendientes: conservan identidad, semana, día,
+  // fuente, Rutina y contenido específico completos.
+  const specificByTrainingId = new Map<string, PlanTrainingExerciseRow[]>();
+  for (const entry of currentSpecific) {
+    const existing = specificByTrainingId.get(entry.planTrainingId) ?? [];
+    existing.push(entry);
+    specificByTrainingId.set(entry.planTrainingId, existing);
+  }
+  const seriesByExerciseId = new Map<string, PlanTrainingSeriesGoalRow[]>();
+  for (const seriesGoal of currentSeries) {
+    const existing = seriesByExerciseId.get(seriesGoal.planTrainingExerciseId) ?? [];
+    existing.push(seriesGoal);
+    seriesByExerciseId.set(seriesGoal.planTrainingExerciseId, existing);
+  }
+
+  const closedById = new Map<string, PlanTrainingRow>();
+  for (const training of currentTrainings) {
+    if (training.status === "omitido") {
+      closedById.set(training.id, training);
+    }
+  }
+  if (closedById.size === 0) {
+    return null;
+  }
+
+  const inputById = new Map<string, { weekId: string; training: PlanTrainingInput }>();
+  for (const week of input.weeks) {
+    for (const training of week.trainings) {
+      if (training.id !== undefined && training.id.length > 0) {
+        inputById.set(training.id, { weekId: week.id ?? "", training });
+      }
+    }
+  }
+
+  for (const [trainingId, closed] of closedById) {
+    const found = inputById.get(trainingId);
+    if (!found || found.weekId !== closed.weekId) {
+      return closedDayMessage;
+    }
+    if (
+      found.training.day !== closed.day ||
+      found.training.source !== closed.source
+    ) {
+      return closedDayMessage;
+    }
+    const routineId =
+      found.training.source === "rutina" ? (found.training.routineId ?? null) : null;
+    if (routineId !== closed.routineId) {
+      return closedDayMessage;
+    }
+    if (found.training.source === "especifico") {
+      const currentFingerprint = serializeSpecificContent(
+        (specificByTrainingId.get(trainingId) ?? [])
+          .sort((a, b) => a.position - b.position)
+          .map((entry) => ({
+            id: entry.id,
+            exerciseId: entry.exerciseId,
+            series: (seriesByExerciseId.get(entry.id) ?? [])
+              .sort((a, b) => a.position - b.position)
+              .map((series) => ({
+                id: series.id,
+                carga: series.carga,
+                repeticiones: series.repeticiones,
+                duracion: series.duracion,
+              })),
+          })),
+      );
+      const inputFingerprint = serializeSpecificContent(
+        found.training.specific.map((entry) => ({
+          id: entry.id ?? "",
+          exerciseId: entry.exerciseId,
+          series: entry.series.map((series) => ({
+            id: series.id ?? "",
+            carga: series.carga ?? null,
+            repeticiones: series.repeticiones ?? null,
+            duracion: series.duracion ?? null,
+          })),
+        })),
+      );
+      if (currentFingerprint !== inputFingerprint) {
+        return closedDayMessage;
+      }
+    }
+  }
+  return null;
+}
 
 function insertTraining(
   tx: PlanTx,
@@ -345,7 +631,15 @@ function insertTraining(
     planId,
     weekId,
     training,
-  }: { planId: string; weekId: string; training: PlanTrainingInput },
+    plannedDate,
+    status,
+  }: {
+    planId: string;
+    weekId: string;
+    training: PlanTrainingInput;
+    plannedDate: string | null;
+    status: PlanTrainingStatus | null;
+  },
 ): void {
   const trainingId = createOpaquePlanId();
   tx.insert(planTraining)
@@ -354,6 +648,8 @@ function insertTraining(
       planId,
       weekId,
       day: training.day,
+      plannedDate,
+      status,
       source: training.source,
       routineId: training.source === "rutina" ? (training.routineId ?? null) : null,
     })
@@ -441,32 +737,18 @@ export async function replacePlan(
       return;
     }
 
-    // CAS de la cabecera dentro de la transacción: la actualización exige la
-    // revisión esperada y no solo el identificador. Si otra escritura ganó
-    // entre la lectura y esta actualización, no coincide y la sustitución se
-    // abandona antes de tocar los hijos: no hay nada que deshacer.
-    const updated = tx
-      .update(plan)
-      .set({ name: input.name, revision: current.revision + 1, updatedAt: now })
-      .where(and(eq(plan.id, planId), eq(plan.revision, revision)))
-      .returning()
-      .get();
-    if (!updated) {
-      const fresh = tx
-        .select()
-        .from(plan)
-        .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)))
-        .get();
+    if (current.status === "completado") {
       outcome = {
         ok: false,
-        reason: "stale-revision",
-        currentRevision: fresh?.revision ?? revision,
+        reason: "transition-impossible",
+        message: "Un Plan completado no puede editarse.",
       };
       return;
     }
 
     // Hijos vigentes: semanas, Entrenamientos, Ejercicios específicos y
-    // Objetivos de serie con su identidad, agrupados para la conservación.
+    // Objetivos de serie con su identidad, agrupados para la conservación y
+    // para validar las reglas de edición de un Plan activo.
     const currentWeeks = tx.select().from(planWeek).where(eq(planWeek.planId, planId)).all();
     const currentWeekIds = new Set(currentWeeks.map((week) => week.id));
     const currentTrainings = tx
@@ -474,6 +756,7 @@ export async function replacePlan(
       .from(planTraining)
       .where(eq(planTraining.planId, planId))
       .all();
+    const trainingById = new Map(currentTrainings.map((training) => [training.id, training]));
     const trainingsByWeekId = new Map<string, Set<string>>();
     for (const training of currentTrainings) {
       const existing = trainingsByWeekId.get(training.weekId) ?? new Set<string>();
@@ -519,6 +802,44 @@ export async function replacePlan(
       seriesByExerciseId.set(seriesGoal.planTrainingExerciseId, existing);
     }
 
+    if (current.status === "activo") {
+      const editError = validateActivePlanEdit({
+        currentWeeks,
+        currentTrainings,
+        currentSpecific,
+        currentSeries,
+        input,
+      });
+      if (editError) {
+        outcome = { ok: false, reason: "transition-impossible", message: editError };
+        return;
+      }
+    }
+
+    // CAS de la cabecera dentro de la transacción: la actualización exige la
+    // revisión esperada y no solo el identificador. Si otra escritura ganó
+    // entre la lectura y esta actualización, no coincide y la sustitución se
+    // abandona antes de tocar los hijos: no hay nada que deshacer.
+    const updated = tx
+      .update(plan)
+      .set({ name: input.name, revision: current.revision + 1, updatedAt: now })
+      .where(and(eq(plan.id, planId), eq(plan.revision, revision)))
+      .returning()
+      .get();
+    if (!updated) {
+      const fresh = tx
+        .select()
+        .from(plan)
+        .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)))
+        .get();
+      outcome = {
+        ok: false,
+        reason: "stale-revision",
+        currentRevision: fresh?.revision ?? revision,
+      };
+      return;
+    }
+
     // La edición sustituye el agregado completo: se borran los hijos y se
     // reinsertan con las identidades conservadas de los existentes. Borrar
     // las semanas propaga el borrado en cascada a sus Entrenamientos.
@@ -539,8 +860,10 @@ export async function replacePlan(
         weekId = createOpaquePlanId();
       }
       usedWeekIds.add(weekId);
+      const position = weekPosition;
+      weekPosition += 1;
       tx.insert(planWeek)
-        .values({ id: weekId, planId, position: weekPosition++ })
+        .values({ id: weekId, planId, position })
         .run();
 
       const existingTrainings = trainingsByWeekId.get(weekId) ?? new Set<string>();
@@ -554,12 +877,29 @@ export async function replacePlan(
           trainingId = createOpaquePlanId();
         }
         usedTrainingIds.add(trainingId);
+
+        // Fecha prevista y estado: un borrador no tiene ni uno ni otro; un
+        // día omitido de un Plan activo conserva los suyos exactamente; todo
+        // lo demás nace pendiente con la fecha derivada de su semana y día.
+        let plannedDate: string | null = null;
+        let trainingStatus: PlanTrainingStatus | null = null;
+        const existingTraining = trainingById.get(trainingId);
+        if (existingTraining?.status === "omitido") {
+          plannedDate = existingTraining.plannedDate;
+          trainingStatus = "omitido";
+        } else if (current.startDate) {
+          plannedDate = plannedDateFor(current.startDate, position, training.day);
+          trainingStatus = "pendiente";
+        }
+
         tx.insert(planTraining)
           .values({
             id: trainingId,
             planId,
             weekId,
             day: training.day,
+            plannedDate,
+            status: trainingStatus,
             source: training.source,
             routineId: training.source === "rutina" ? (training.routineId ?? null) : null,
           })
@@ -647,6 +987,323 @@ export async function deletePlan(
     .delete(plan)
     .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)));
   return { ok: true };
+}
+
+export type PlanTrainingTransitionOutcome =
+  | { ok: true }
+  | { ok: false; reason: "not-found" }
+  | { ok: false; reason: "not-active"; message: string }
+  | { ok: false; reason: "training-not-found" }
+  | { ok: false; reason: "transition-impossible"; message: string };
+
+/**
+ * Transición explícita del estado de un Entrenamiento planificado dentro de
+ * una única transacción: omitir exige que esté pendiente y devolver a
+ * pendiente exige que esté omitido, y ambas solo existen mientras el Plan
+ * siga activo. Un estado imposible o una transición repetida devuelven el
+ * error común de transición con estado 409 sin cambios parciales.
+ */
+async function transitionTrainingStatus(
+  database: AppDatabase,
+  {
+    accountId,
+    planId,
+    trainingId,
+    from,
+    to,
+    planErrorMessage,
+    trainingErrorMessage,
+    now,
+  }: {
+    accountId: string;
+    planId: string;
+    trainingId: string;
+    from: PlanTrainingStatus;
+    to: PlanTrainingStatus;
+    planErrorMessage: string;
+    trainingErrorMessage: string;
+    now: Date;
+  },
+): Promise<PlanTrainingTransitionOutcome> {
+  let outcome: PlanTrainingTransitionOutcome = { ok: false, reason: "not-found" };
+  await database.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(plan)
+      .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)))
+      .get();
+    if (!current) {
+      outcome = { ok: false, reason: "not-found" };
+      return;
+    }
+    if (current.status !== "activo") {
+      outcome = { ok: false, reason: "not-active", message: planErrorMessage };
+      return;
+    }
+    const training = tx
+      .select()
+      .from(planTraining)
+      .where(and(eq(planTraining.id, trainingId), eq(planTraining.planId, planId)))
+      .get();
+    if (!training) {
+      outcome = { ok: false, reason: "training-not-found" };
+      return;
+    }
+    if (training.status !== from) {
+      outcome = { ok: false, reason: "transition-impossible", message: trainingErrorMessage };
+      return;
+    }
+    tx.update(plan)
+      .set({ revision: current.revision + 1, updatedAt: now })
+      .where(eq(plan.id, planId))
+      .run();
+    tx.update(planTraining)
+      .set({ status: to })
+      .where(eq(planTraining.id, trainingId))
+      .run();
+    outcome = { ok: true };
+  });
+  return outcome;
+}
+
+/** Omite un Entrenamiento planificado pendiente de un Plan activo. */
+export async function omitTraining(
+  database: AppDatabase,
+  args: Omit<Parameters<typeof transitionTrainingStatus>[1], "from" | "to" | "planErrorMessage" | "trainingErrorMessage">,
+): Promise<PlanTrainingTransitionOutcome> {
+  return transitionTrainingStatus(database, {
+    ...args,
+    from: "pendiente",
+    to: "omitido",
+    planErrorMessage: "Solo un Plan activo permite omitir Entrenamientos.",
+    trainingErrorMessage: "El Entrenamiento ya está omitido.",
+  });
+}
+
+/** Devuelve a pendiente un Entrenamiento omitido de un Plan activo. */
+export async function restoreTraining(
+  database: AppDatabase,
+  args: Omit<Parameters<typeof transitionTrainingStatus>[1], "from" | "to" | "planErrorMessage" | "trainingErrorMessage">,
+): Promise<PlanTrainingTransitionOutcome> {
+  return transitionTrainingStatus(database, {
+    ...args,
+    from: "omitido",
+    to: "pendiente",
+    planErrorMessage: "Solo un Plan activo permite devolver un Entrenamiento a pendiente.",
+    trainingErrorMessage: "El Entrenamiento no está omitido.",
+  });
+}
+
+export type PlanCompleteOutcome =
+  | { ok: true }
+  | { ok: false; reason: "not-found" }
+  | { ok: false; reason: "not-active" };
+
+/**
+ * Completa un Plan activo dentro de una única transacción: cierra el Plan y
+ * convierte atómicamente todos los Entrenamientos pendientes en omitidos,
+ * conservando las Fechas previstas como calendario cerrado. Un Plan
+ * completado no se reactiva; completar libera el cupo de Plan activo.
+ */
+export async function completePlan(
+  database: AppDatabase,
+  { accountId, planId, now }: { accountId: string; planId: string; now: Date },
+): Promise<PlanCompleteOutcome> {
+  let outcome: PlanCompleteOutcome = { ok: false, reason: "not-found" };
+  await database.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(plan)
+      .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)))
+      .get();
+    if (!current) {
+      outcome = { ok: false, reason: "not-found" };
+      return;
+    }
+    if (current.status !== "activo") {
+      outcome = { ok: false, reason: "not-active" };
+      return;
+    }
+    // Guarda de Sesión activa originada en el Plan: el origen de Sesión
+    // todavía no puede ser un Entrenamiento planificado (ticket 28), así que
+    // no existe ninguna Sesión que comprobar; la guarda llegará con ese
+    // origen dentro de esta misma transacción.
+    tx.update(plan)
+      .set({ status: "completado", revision: current.revision + 1, updatedAt: now })
+      .where(eq(plan.id, planId))
+      .run();
+    tx.update(planTraining)
+      .set({ status: "omitido" })
+      .where(and(eq(planTraining.planId, planId), eq(planTraining.status, "pendiente")))
+      .run();
+    outcome = { ok: true };
+  });
+  return outcome;
+}
+
+export type PlanDuplicateOutcome =
+  | { ok: true; planId: string }
+  | { ok: false; reason: "not-found" };
+
+/**
+ * Duplica cualquier Plan propio como un borrador nuevo dentro de una única
+ * transacción: sin Fechas previstas, sin estados ni Sesiones, conservando
+ * las referencias vivas a las Rutinas del original y copiando de forma
+ * independiente los Entrenamientos específicos con identidades nuevas y los
+ * mismos valores. Las copias reciben identidad del servidor.
+ */
+export async function duplicatePlan(
+  database: AppDatabase,
+  {
+    accountId,
+    planId,
+    name,
+    now,
+  }: { accountId: string; planId: string; name: string; now: Date },
+): Promise<PlanDuplicateOutcome> {
+  let outcome: PlanDuplicateOutcome = { ok: false, reason: "not-found" };
+  await database.transaction((tx) => {
+    const source = tx
+      .select()
+      .from(plan)
+      .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)))
+      .get();
+    if (!source) {
+      outcome = { ok: false, reason: "not-found" };
+      return;
+    }
+
+    const sourceWeeks = tx
+      .select()
+      .from(planWeek)
+      .where(eq(planWeek.planId, planId))
+      .orderBy(asc(planWeek.position), asc(planWeek.id))
+      .all();
+    const sourceTrainings = tx
+      .select()
+      .from(planTraining)
+      .where(eq(planTraining.planId, planId))
+      .all();
+    const trainingsByWeekId = new Map<string, PlanTrainingRow[]>();
+    for (const training of sourceTrainings) {
+      const existing = trainingsByWeekId.get(training.weekId) ?? [];
+      existing.push(training);
+      trainingsByWeekId.set(training.weekId, existing);
+    }
+    const specificRows =
+      sourceTrainings.length === 0
+        ? []
+        : tx
+            .select()
+            .from(planTrainingExercise)
+            .where(
+              inArray(
+                planTrainingExercise.planTrainingId,
+                sourceTrainings.map((training) => training.id),
+              ),
+            )
+            .all();
+    const specificByTrainingId = new Map<string, PlanTrainingExerciseRow[]>();
+    for (const entry of specificRows) {
+      const existing = specificByTrainingId.get(entry.planTrainingId) ?? [];
+      existing.push(entry);
+      specificByTrainingId.set(entry.planTrainingId, existing);
+    }
+    const seriesRows =
+      specificRows.length === 0
+        ? []
+        : tx
+            .select()
+            .from(planTrainingSeriesGoal)
+            .where(
+              inArray(
+                planTrainingSeriesGoal.planTrainingExerciseId,
+                specificRows.map((entry) => entry.id),
+              ),
+            )
+            .all();
+    const seriesByExerciseId = new Map<string, PlanTrainingSeriesGoalRow[]>();
+    for (const seriesGoal of seriesRows) {
+      const existing = seriesByExerciseId.get(seriesGoal.planTrainingExerciseId) ?? [];
+      existing.push(seriesGoal);
+      seriesByExerciseId.set(seriesGoal.planTrainingExerciseId, existing);
+    }
+
+    const copyId = createOpaquePlanId();
+    tx.insert(plan)
+      .values({
+        id: copyId,
+        accountId,
+        name,
+        status: "borrador",
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    for (const week of sourceWeeks) {
+      const weekId = createOpaquePlanId();
+      tx.insert(planWeek)
+        .values({ id: weekId, planId: copyId, position: week.position })
+        .run();
+      const trainings = (trainingsByWeekId.get(week.id) ?? []).sort(
+        (a, b) => a.day - b.day || a.id.localeCompare(b.id),
+      );
+      for (const training of trainings) {
+        const trainingId = createOpaquePlanId();
+        tx.insert(planTraining)
+          .values({
+            id: trainingId,
+            planId: copyId,
+            weekId,
+            day: training.day,
+            // el borrador copiado no tiene Fechas previstas ni estados
+            plannedDate: null,
+            status: null,
+            source: training.source,
+            routineId: training.routineId,
+          })
+          .run();
+
+        if (training.source !== "especifico") {
+          continue;
+        }
+        let exercisePosition = 0;
+        for (const entry of (specificByTrainingId.get(training.id) ?? []).sort(
+          (a, b) => a.position - b.position,
+        )) {
+          const exerciseChildId = createOpaquePlanId();
+          tx.insert(planTrainingExercise)
+            .values({
+              id: exerciseChildId,
+              planTrainingId: trainingId,
+              exerciseId: entry.exerciseId,
+              position: exercisePosition++,
+            })
+            .run();
+          let seriesPosition = 0;
+          for (const seriesGoal of (seriesByExerciseId.get(entry.id) ?? []).sort(
+            (a, b) => a.position - b.position,
+          )) {
+            tx.insert(planTrainingSeriesGoal)
+              .values({
+                id: createOpaquePlanId(),
+                planTrainingExerciseId: exerciseChildId,
+                position: seriesPosition++,
+                carga: seriesGoal.carga,
+                repeticiones: seriesGoal.repeticiones,
+                duracion: seriesGoal.duracion,
+              })
+              .run();
+          }
+        }
+      }
+    }
+
+    outcome = { ok: true, planId: copyId };
+  });
+  return outcome;
 }
 
 type PlanFetched = {
@@ -811,6 +1468,8 @@ function buildPlanDocuments(fetched: PlanFetched): PlanDocument[] {
             return {
               id: training.id,
               day: training.day,
+              plannedDate: training.plannedDate,
+              status: training.status as PlanTrainingStatus | null,
               source: training.source as "rutina" | "especifico",
               routineId: training.source === "rutina" ? training.routineId : null,
               routine: routineReference
@@ -833,6 +1492,7 @@ function buildPlanDocuments(fetched: PlanFetched): PlanDocument[] {
       id: planRow.id,
       name: planRow.name,
       status: planRow.status as PlanStatus,
+      startDate: planRow.startDate,
       revision: planRow.revision,
       weeks,
       createdAt: planRow.createdAt.toISOString(),
