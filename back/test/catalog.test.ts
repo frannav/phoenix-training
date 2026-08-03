@@ -326,6 +326,43 @@ describe("API de exploración del catálogo", () => {
     expect(seenIds.size).toBeGreaterThan(0);
   });
 
+  test("el cursor opaco no expone el desplazamiento interno", async () => {
+    const { status, body } = await getExercises("?limit=4");
+    expect(status).toBe(200);
+
+    const payload = body as { items: unknown[]; nextCursor: string | null };
+    expect(payload.nextCursor).not.toBeNull();
+
+    // El cursor es una cadena opaca: no revela la posición interna.
+    const decoded = Buffer.from(payload.nextCursor!, "base64url").toString("utf8");
+    expect(decoded).not.toContain("offset");
+    expect(decoded).not.toMatch(/^\d+$/);
+  });
+
+  test("rechaza un cursor manipulado con 400", async () => {
+    const { body: first } = await getExercises("?limit=4");
+    const cursor = (first as { nextCursor: string | null }).nextCursor;
+    expect(cursor).not.toBeNull();
+
+    const tampered = (cursor![0] === "A" ? "B" : "A") + cursor!.slice(1);
+    const { status, body } = await getExercises(`?limit=4&cursor=${tampered}`);
+    expect(status).toBe(400);
+    expect(body).toEqual({
+      error: { code: "VALIDATION_ERROR", message: "La petición no es válida." },
+    });
+  });
+
+  test("rechaza un cursor malformado con 400", async () => {
+    const garbage = await getExercises("?cursor=no-es-un-cursor");
+    expect(garbage.status).toBe(400);
+    expect(garbage.body).toEqual({
+      error: { code: "VALIDATION_ERROR", message: "La petición no es válida." },
+    });
+
+    const empty = await getExercises("?cursor=");
+    expect(empty.status).toBe(400);
+  });
+
   test("el catálogo compartido se lee igual desde Cuentas distintas", async () => {
     const fromA = (await getExercises("?limit=50", cookieA)).body as {
       items: { id: string }[];

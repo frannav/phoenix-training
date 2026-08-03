@@ -14,6 +14,11 @@ import { appMetadata, exercise, passwordResetToken, recordingModes, user, verifi
 import type { AppDatabase } from "./db/open-database";
 import { listExercises } from "./exercises/list-exercises";
 import { apiError, type ApiError, type ApiErrorCode } from "./http/api-error";
+import {
+  decodeOpaqueCursor,
+  encodeOpaqueCursor,
+  opaqueCursorKey,
+} from "./http/opaque-cursor";
 import type { MailAdapter } from "./mail/mail-adapter";
 
 export type AuthDependencies = {
@@ -57,31 +62,6 @@ const exercisesQuerySchema = z
     limit: z.coerce.number().int().min(1).max(exercisesMaxLimit).optional(),
   })
   .strict();
-
-function encodeOpaqueCursor(offset: number): string {
-  return Buffer.from(JSON.stringify({ offset })).toString("base64url");
-}
-
-function decodeOpaqueCursor(cursor: string | undefined): number {
-  if (cursor === undefined) {
-    return 0;
-  }
-  try {
-    const decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
-      offset?: unknown;
-    };
-    if (
-      typeof decoded.offset === "number" &&
-      Number.isInteger(decoded.offset) &&
-      decoded.offset >= 0
-    ) {
-      return decoded.offset;
-    }
-  } catch {
-    // cursor opaco no válido: se trata como comienzo
-  }
-  return 0;
-}
 
 /**
  * Endpoints de autenticación cuyas respuestas JSON no deben revelar el token
@@ -170,6 +150,7 @@ export function createApp({
   now = () => new Date(),
 }: AppDependencies): Hono {
   const app = new Hono();
+  const cursorKey = opaqueCursorKey(authConfig?.secret);
   const healthQuery = z.object({}).strict();
 
   app.get("/api/health", async (context) => {
@@ -427,7 +408,10 @@ export function createApp({
       }
 
       const { q, recordingMode, category, limit = exercisesDefaultLimit } = parsed.data;
-      const offset = decodeOpaqueCursor(parsed.data.cursor);
+      const offset = decodeOpaqueCursor(parsed.data.cursor, cursorKey);
+      if (offset === null) {
+        return context.json(apiError("VALIDATION_ERROR", "La petición no es válida."), 400);
+      }
       const items = await listExercises(database, {
         accountId: userId,
         q,
@@ -441,7 +425,7 @@ export function createApp({
 
       return context.json({
         items: page,
-        nextCursor: hasMore ? encodeOpaqueCursor(offset + limit) : null,
+        nextCursor: hasMore ? encodeOpaqueCursor(offset + limit, cursorKey) : null,
       });
     });
 
