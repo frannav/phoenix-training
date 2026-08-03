@@ -110,7 +110,7 @@ export type SessionDocument = {
   id: string;
   revision: number;
   origin: "libre";
-  status: "activa";
+  status: "activa" | "finalizada";
   datePerformed: string;
   lastExerciseId: string | null;
   exercises: SessionExerciseDocument[];
@@ -1208,5 +1208,420 @@ describe("registrar resultados por Serie", () => {
       ],
     });
     expect(misplaced.status).toBe(400);
+  });
+});
+
+async function finalizeSessionRequest(
+  context: TestContext,
+  cookie: string,
+  id: string,
+  revision: number,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(`/api/sessions/${id}/finalize`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify({ revision }),
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+describe("finalizar una Sesión", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  test("finaliza una Sesión con Series completadas y pendientes: estas pasan a omitidas y deja de estar activa", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      {
+        status: "completada",
+        goal: { carga: 80, repeticiones: 10 },
+        result: { carga: 80, repeticiones: 10 },
+        rpe: 8.5,
+      },
+      { status: "pendiente", goal: { carga: 80, repeticiones: 10 }, result: null },
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const seriesIds = session.exercises[0]!.series.map((series) => series.id);
+
+    const { status, body } = await finalizeSessionRequest(
+      context!, cookie, session.id, session.revision,
+    );
+    expect(status).toBe(200);
+
+    const finalized = (body as { session: SessionDocument }).session;
+    expect(finalized.status).toBe("finalizada");
+    expect(finalized.revision).toBe(session.revision + 1);
+    expect(finalized.exercises).toHaveLength(1);
+    const series = finalized.exercises[0]!.series;
+    expect(series.map((entry) => entry.id)).toEqual(seriesIds);
+    // la completada conserva resultado y RPE; las pendientes pasan a omitidas
+    // conservando sus objetivos y sin resultado ni RPE
+    expect(series[0]!.status).toBe("completada");
+    expect(series[0]!.result).toEqual({ carga: 80, repeticiones: 10, duracion: null });
+    expect(series[0]!.rpe).toBe(8.5);
+    expect(series[1]!.status).toBe("omitida");
+    expect(series[1]!.goal).toEqual({ carga: 80, repeticiones: 10, duracion: null });
+    expect(series[1]!.result).toEqual({ carga: null, repeticiones: null, duracion: null });
+    expect(series[1]!.rpe).toBeNull();
+    expect(series[2]!.status).toBe("omitida");
+    expect(finalized.exercises[0]!.series.some((entry) => entry.status === "pendiente")).toBe(false);
+
+    // ya no aparece como activa y una nueva Sesión puede iniciarse
+    const active = await getActiveSession(context!, cookie);
+    expect(active.status).toBe(200);
+    expect(active.body).toEqual({ session: null });
+
+    const restarted = await startFreeSession(context!, cookie);
+    expect(restarted.status).toBe(201);
+  });
+
+  test("finalizar sin ninguna Serie completada responde 400", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+      { status: "omitida", goal: null, result: null },
+    ]);
+
+    const { status, body } = await finalizeSessionRequest(
+      context!, cookie, session.id, session.revision,
+    );
+    expect(status).toBe(400);
+    const error = (body as { error: { code: string; message: string } }).error;
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.message).toContain("al menos una Serie completada");
+
+    // nada cambió: la Sesión sigue activa con sus Series pendientes
+    const active = await getActiveSession(context!, cookie);
+    const after = (active.body as { session: SessionDocument }).session;
+    expect(after.status).toBe("activa");
+    expect(after.exercises[0]!.series[0]!.status).toBe("pendiente");
+  });
+
+  test("finalizar con una revisión obsoleta responde 409 sin cambiar el estado", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: null, result: { repeticiones: 10 } },
+    ]);
+
+    const stale = await finalizeSessionRequest(context!, cookie, session.id, session.revision - 1);
+    expect(stale.status).toBe(409);
+    expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
+
+    const active = await getActiveSession(context!, cookie);
+    const after = (active.body as { session: SessionDocument }).session;
+    expect(after.status).toBe("activa");
+    expect(after.revision).toBe(session.revision);
+
+    // con la revisión vigente finaliza
+    const ok = await finalizeSessionRequest(context!, cookie, session.id, after.revision);
+    expect(ok.status).toBe(200);
+  });
+
+  test("una Sesión ya finalizada no puede finalizarse de nuevo", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: null, result: { repeticiones: 10 } },
+    ]);
+    const first = await finalizeSessionRequest(context!, cookie, session.id, session.revision);
+    expect(first.status).toBe(200);
+    const finalized = (first.body as { session: SessionDocument }).session;
+
+    const again = await finalizeSessionRequest(
+      context!, cookie, finalized.id, finalized.revision,
+    );
+    expect(again.status).toBe(409);
+    expect((again.body as { error: { code: string } }).error.code).toBe("SESSION_NOT_ACTIVE");
+  });
+
+  test("finalizar una Sesión ajena o inexistente responde 404", async () => {
+    const { status } = await finalizeSessionRequest(
+      context!, cookie, "ffffffffffffffffffffffffffffffff", 1,
+    );
+    expect(status).toBe(404);
+  });
+
+  test("finalizar sin revisión es entrada inválida", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: null, result: { repeticiones: 10 } },
+    ]);
+    const response = await context!.app.request(`/api/sessions/${session.id}/finalize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(400);
+  });
+});
+
+async function deleteSessionRequest(
+  context: TestContext,
+  cookie: string,
+  id: string,
+  revision: number,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(
+    `/api/sessions/${id}?revision=${revision}`,
+    { method: "DELETE", headers: { Cookie: cookie, Origin: origin } },
+  );
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+describe("eliminar una Sesión activa", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  test("elimina el agregado en una transacción y permite iniciar una nueva Sesión", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: null, result: { carga: 80, repeticiones: 10 }, rpe: 7 },
+      { status: "pendiente", goal: null, result: null },
+    ]);
+
+    const { status, body } = await deleteSessionRequest(
+      context!, cookie, session.id, session.revision,
+    );
+    expect(status).toBe(200);
+    expect(body).toEqual({ deleted: true });
+
+    // el agregado y sus hijos desaparecen: lectura y activa responden como inexistentes
+    const byId = await getSession(context!, cookie, session.id);
+    expect(byId.status).toBe(404);
+    const active = await getActiveSession(context!, cookie);
+    expect(active.status).toBe(200);
+    expect(active.body).toEqual({ session: null });
+
+    // una nueva Sesión puede iniciarse: la unicidad de la activa quedó libre
+    const restarted = await startFreeSession(context!, cookie);
+    expect(restarted.status).toBe(201);
+  });
+
+  test("una revisión obsoleta responde 409 y conserva la Sesión", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+    ]);
+
+    const stale = await deleteSessionRequest(context!, cookie, session.id, session.revision - 1);
+    expect(stale.status).toBe(409);
+    expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
+
+    const active = await getActiveSession(context!, cookie);
+    const after = (active.body as { session: SessionDocument }).session;
+    expect(after.id).toBe(session.id);
+    expect(after.revision).toBe(session.revision);
+
+    // con la revisión vigente elimina
+    const ok = await deleteSessionRequest(context!, cookie, session.id, after.revision);
+    expect(ok.status).toBe(200);
+  });
+
+  test("una Sesión ya finalizada no puede eliminarse por este canal", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: null, result: { repeticiones: 10 } },
+    ]);
+    const finalized = await finalizeSessionRequest(context!, cookie, session.id, session.revision);
+    expect(finalized.status).toBe(200);
+    const after = (finalized.body as { session: SessionDocument }).session;
+
+    const { status, body } = await deleteSessionRequest(
+      context!, cookie, after.id, after.revision,
+    );
+    expect(status).toBe(409);
+    expect((body as { error: { code: string } }).error.code).toBe("SESSION_NOT_ACTIVE");
+  });
+
+  test("eliminar una Sesión ajena o inexistente responde 404", async () => {
+    const { status } = await deleteSessionRequest(
+      context!, cookie, "ffffffffffffffffffffffffffffffff", 1,
+    );
+    expect(status).toBe(404);
+  });
+
+  test("eliminar sin revisión es entrada inválida", async () => {
+    const response = await context!.app.request("/api/sessions/sesion-sin-revision", {
+      method: "DELETE",
+      headers: { Cookie: cookie, Origin: origin },
+    });
+    expect(response.status).toBe(400);
+  });
+});
+
+describe("eliminar y transicionar Series y Ejercicios añadidos", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  test("una Serie añadida pendiente puede eliminarse de la Sesión", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const occurrence = session.exercises[0]!;
+    const keptId = occurrence.series[0]!.id;
+    const removedId = occurrence.series[1]!.id;
+
+    const { status, body } = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId,
+          series: [{ id: keptId, status: "pendiente", goal: null, result: null }],
+        },
+      ],
+    });
+    expect(status).toBe(200);
+
+    const next = (body as { session: SessionDocument }).session;
+    expect(next.revision).toBe(session.revision + 1);
+    expect(next.exercises[0]!.series).toHaveLength(1);
+    expect(next.exercises[0]!.series[0]!.id).toBe(keptId);
+    expect(next.exercises[0]!.series[0]!.id).not.toBe(removedId);
+  });
+
+  test("una Serie añadida con resultado puede eliminarse: la confirmación es de la interfaz", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: null, result: { repeticiones: 10 }, rpe: 7 },
+    ]);
+    const occurrence = session.exercises[0]!;
+
+    const { status, body } = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [{ id: occurrence.id, exerciseId, series: [] }],
+    });
+    expect(status).toBe(200);
+    const next = (body as { session: SessionDocument }).session;
+    expect(next.exercises[0]!.series).toEqual([]);
+    expect(next.revision).toBe(session.revision + 1);
+  });
+
+  test("pasar una Serie completada a omitida elimina resultado y RPE y conserva los objetivos", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: { carga: 80, repeticiones: 10 }, result: { carga: 82.5, repeticiones: 10 }, rpe: 9 },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    const { status, body } = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "omitida",
+      goal: { carga: 80, repeticiones: 10 },
+      result: null,
+      rpe: null,
+    });
+    expect(status).toBe(200);
+
+    const series = (body as { session: SessionDocument }).session.exercises[0]!.series[0]!;
+    expect(series.status).toBe("omitida");
+    expect(series.goal).toEqual({ carga: 80, repeticiones: 10, duracion: null });
+    expect(series.result).toEqual({ carga: null, repeticiones: null, duracion: null });
+    expect(series.rpe).toBeNull();
+  });
+
+  test("devolver una Serie completada a pendiente elimina resultado y RPE", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: null, result: { repeticiones: 12 }, rpe: 8 },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    const { status, body } = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "pendiente",
+      goal: null,
+      result: null,
+      rpe: null,
+    });
+    expect(status).toBe(200);
+
+    const series = (body as { session: SessionDocument }).session.exercises[0]!.series[0]!;
+    expect(series.status).toBe("pendiente");
+    expect(series.result).toEqual({ carga: null, repeticiones: null, duracion: null });
+    expect(series.rpe).toBeNull();
+  });
+
+  test("un Ejercicio añadido puede eliminarse con todas sus Series", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+      { status: "completada", goal: null, result: { repeticiones: 10 }, rpe: 6 },
+    ]);
+    const occurrenceId = session.exercises[0]!.id;
+
+    const { status, body } = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [],
+    });
+    expect(status).toBe(200);
+
+    const next = (body as { session: SessionDocument }).session;
+    expect(next.exercises).toEqual([]);
+    expect(next.revision).toBe(session.revision + 1);
+    expect(next.lastExerciseId).toBeNull();
+    expect(occurrenceId).toBeTruthy();
+  });
+
+  test("un Ejercicio añadido con resultados en sus Series puede eliminarse", async () => {
+    const ejercicioA = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const ejercicioB = await createCustomExercise(context!, cookie, { recordingMode: "tiempo_por_serie" });
+    const started = await startFreeSession(context!, cookie);
+    const session = (started.body as { session: SessionDocument }).session;
+    const { status, body } = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        { exerciseId: ejercicioA, series: [{ status: "completada", goal: null, result: { repeticiones: 10 } }] },
+        { exerciseId: ejercicioB, series: [{ status: "completada", goal: null, result: { duracion: 60 } }] },
+      ],
+    });
+    expect(status).toBe(200);
+    let current = (body as { session: SessionDocument }).session;
+    expect(current.exercises).toHaveLength(2);
+
+    const removed = await replaceSession(context!, cookie, current.id, {
+      revision: current.revision,
+      exercises: [echoExerciseInput(current.exercises[1]!)],
+    });
+    expect(removed.status).toBe(200);
+    const next = (removed.body as { session: SessionDocument }).session;
+    expect(next.exercises).toHaveLength(1);
+    expect(next.exercises[0]!.id).toBe(current.exercises[1]!.id);
+    expect(next.exercises[0]!.series[0]!.status).toBe("completada");
+    expect(next.lastExerciseId).toBe(ejercicioB);
   });
 });

@@ -30,6 +30,9 @@ export type SessionAggregate = {
 
 export type SeriesStatus = "pendiente" | "completada" | "omitida";
 
+/** Estado de una Sesión: activa mientras se registra o finalizada como registro del Historial. */
+export type SessionStatus = "activa" | "finalizada";
+
 /** Magnitudes de una Serie: los tres campos de objetivo y resultado por Forma de registro. */
 export type SeriesMagnitudes = {
   carga: number | null;
@@ -62,7 +65,7 @@ export type SessionDocument = {
   id: string;
   revision: number;
   origin: "libre";
-  status: "activa";
+  status: SessionStatus;
   datePerformed: string;
   lastExerciseId: string | null;
   exercises: SessionExerciseDocument[];
@@ -117,6 +120,17 @@ export type ReplaceSessionOutcome =
       fields?: Record<string, string[]>;
     };
 
+export type FinalizeSessionOutcome =
+  | { ok: true; session: SessionDocument }
+  | {
+      ok: false;
+      reason: "not-found" | "revision-conflict" | "not-active" | "no-completed-series";
+    };
+
+export type DeleteSessionOutcome =
+  | { ok: true }
+  | { ok: false; reason: "not-found" | "revision-conflict" | "not-active" };
+
 export function createOpaqueSessionId(): string {
   return randomBytes(16).toString("hex");
 }
@@ -134,7 +148,7 @@ function toSessionDocument(aggregate: SessionAggregate): SessionDocument {
     id: aggregate.session.id,
     revision: aggregate.session.revision,
     origin: aggregate.session.origin as "libre",
-    status: aggregate.session.status as "activa",
+    status: aggregate.session.status as SessionStatus,
     datePerformed: aggregate.session.datePerformed,
     lastExerciseId: aggregate.session.lastExerciseId,
     exercises: aggregate.exercises.map((occurrence) => ({
@@ -725,4 +739,157 @@ export async function replaceSession(
   }
   const aggregate = await loadSessionAggregate(database, { sessionId });
   return { ok: true, session: toSessionDocument(aggregate!) };
+}
+
+/**
+ * Finaliza una Sesión activa propia en una sola transacción: exige al menos
+ * una Serie completada (invariante del Historial) y convierte todas las
+ * Series pendientes en omitidas conservando sus objetivos. La transición es
+ * una acción explícita — nunca un valor libre del PUT — y respeta la
+ * concurrencia optimista: una revisión obsoleta produce un conflicto
+ * recuperable sin tocar los hijos.
+ */
+export async function finalizeSession(
+  database: AppDatabase,
+  {
+    accountId,
+    sessionId,
+    expectedRevision,
+    now,
+  }: {
+    accountId: string;
+    sessionId: string;
+    expectedRevision: number;
+    now: Date;
+  },
+): Promise<FinalizeSessionOutcome> {
+  let outcome: FinalizeSessionOutcome = { ok: false, reason: "not-found" };
+  let succeeded = false;
+
+  await database.transaction((tx) => {
+    const sessionRow = tx
+      .select()
+      .from(trainingSession)
+      .where(and(eq(trainingSession.id, sessionId), eq(trainingSession.accountId, accountId)))
+      .get();
+    if (!sessionRow) {
+      outcome = { ok: false, reason: "not-found" };
+      return;
+    }
+    if (sessionRow.revision !== expectedRevision) {
+      outcome = { ok: false, reason: "revision-conflict" };
+      return;
+    }
+    if (sessionRow.status !== "activa") {
+      outcome = { ok: false, reason: "not-active" };
+      return;
+    }
+
+    const occurrences = tx
+      .select()
+      .from(trainingSessionExercise)
+      .where(eq(trainingSessionExercise.sessionId, sessionId))
+      .all();
+    const seriesRows =
+      occurrences.length === 0
+        ? []
+        : tx
+            .select()
+            .from(trainingSessionSeries)
+            .where(
+              inArray(
+                trainingSessionSeries.sessionExerciseId,
+                occurrences.map((entry) => entry.id),
+              ),
+            )
+            .all();
+
+    if (!seriesRows.some((series) => series.status === "completada")) {
+      outcome = { ok: false, reason: "no-completed-series" };
+      return;
+    }
+
+    // CAS de la cabecera antes de tocar los hijos: la actualización exige la
+    // revisión esperada y la transición a «finalizada» libera la unicidad de
+    // la Sesión activa de la Cuenta.
+    const updated = tx
+      .update(trainingSession)
+      .set({ status: "finalizada", revision: sessionRow.revision + 1, updatedAt: now })
+      .where(and(eq(trainingSession.id, sessionId), eq(trainingSession.revision, expectedRevision)))
+      .returning()
+      .get();
+    if (!updated) {
+      outcome = { ok: false, reason: "revision-conflict" };
+      return;
+    }
+
+    const pendingIds = seriesRows
+      .filter((series) => series.status === "pendiente")
+      .map((series) => series.id);
+    if (pendingIds.length > 0) {
+      tx.update(trainingSessionSeries)
+        .set({ status: "omitida", updatedAt: now })
+        .where(inArray(trainingSessionSeries.id, pendingIds))
+        .run();
+    }
+
+    succeeded = true;
+  });
+
+  if (!succeeded) {
+    return outcome;
+  }
+  const aggregate = await loadSessionAggregate(database, { sessionId });
+  return { ok: true, session: toSessionDocument(aggregate!) };
+}
+
+/**
+ * Elimina una Sesión activa propia en una sola transacción; los hijos
+ * (apariciones y Series) se eliminan en cascada por la clave foránea. La
+ * unicidad de la Sesión activa queda liberada para una nueva. La eliminación
+ * exige la revisión leída: una revisión obsoleta produce un conflicto
+ * recuperable y no borra un agregado que cambió en otra pestaña.
+ */
+export async function deleteActiveSession(
+  database: AppDatabase,
+  {
+    accountId,
+    sessionId,
+    expectedRevision,
+  }: {
+    accountId: string;
+    sessionId: string;
+    expectedRevision: number;
+  },
+): Promise<DeleteSessionOutcome> {
+  let outcome: DeleteSessionOutcome = { ok: false, reason: "not-found" };
+  let deleted = false;
+
+  await database.transaction((tx) => {
+    const sessionRow = tx
+      .select()
+      .from(trainingSession)
+      .where(and(eq(trainingSession.id, sessionId), eq(trainingSession.accountId, accountId)))
+      .get();
+    if (!sessionRow) {
+      outcome = { ok: false, reason: "not-found" };
+      return;
+    }
+    if (sessionRow.revision !== expectedRevision) {
+      outcome = { ok: false, reason: "revision-conflict" };
+      return;
+    }
+    if (sessionRow.status !== "activa") {
+      outcome = { ok: false, reason: "not-active" };
+      return;
+    }
+
+    // La comprobación de revisión ya ocurrió en esta misma transacción
+    // síncrona; el borrado por identificador elimina el agregado y sus hijos
+    // en cascada sin dejar la unicidad de la Sesión activa ocupada.
+    tx.delete(trainingSession).where(eq(trainingSession.id, sessionId)).run();
+    deleted = true;
+  });
+
+  return deleted ? { ok: true } : outcome;
 }

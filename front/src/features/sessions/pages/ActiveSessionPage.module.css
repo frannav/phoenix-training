@@ -252,6 +252,27 @@
   margin-bottom: 0.75rem;
 }
 
+.exerciseDetailsActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.deleteExerciseButton {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--color-surface);
+  color: var(--color-danger-dark, #b42318);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.deleteExerciseButton:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 .exerciseProgress {
   color: var(--color-ink-muted);
   font-size: 0.8rem;
@@ -323,6 +344,161 @@
 .failure p {
   margin: 0;
   color: var(--color-ink-muted);
+}
+
+.finalized {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.finalized h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.finalizedDate {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.finalizedList {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.finalizedExercise {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--color-surface);
+}
+
+.finalizedNote {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.homeLink {
+  width: fit-content;
+  border-radius: 0.8rem;
+  padding: 0.7rem 1.1rem;
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  gap: 0.75rem;
+  border-top: 1px solid var(--color-border);
+  padding: 0.9rem 1.25rem;
+  background: rgba(250, 251, 247, 0.96);
+}
+
+.deleteSessionButton,
+.finalizeButton {
+  flex: 1;
+  border: 0;
+  border-radius: 0.8rem;
+  padding: 0.8rem 1rem;
+  font-weight: 800;
+}
+
+.deleteSessionButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-danger-dark, #b42318);
+}
+
+.finalizeButton {
+  background: var(--color-ink);
+  color: var(--color-surface);
+}
+
+.deleteSessionButton:disabled,
+.finalizeButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(28, 25, 23, 0.45);
+}
+
+.dialog {
+  width: min(24rem, 100%);
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 1.1rem;
+  padding: 1.25rem;
+  background: var(--color-surface);
+}
+
+.dialog h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.dialog p {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+}
+
+.dialogActions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+.dialogDanger,
+.dialogCancel {
+  flex: 1;
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  font-weight: 800;
+}
+
+.dialogDanger {
+  border: 0;
+  background: var(--color-danger-dark, #b42318);
+  color: var(--color-surface);
+}
+
+.dialogCancel {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-ink);
+}
+
+.dialogDanger:disabled,
+.dialogCancel:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .error {

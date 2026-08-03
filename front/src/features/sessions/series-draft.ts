@@ -39,14 +39,19 @@ export function emptyDraft(): SeriesDraft {
   return { carga: "", repeticiones: "", duracion: "", rpe: "" };
 }
 
-/** Borrador inicial de una Serie: los Objetivos inicializan los campos de resultado. */
-export function draftFromSeries(series: SessionSeriesDocument): SeriesDraft {
+/** Borrador inicial desde unas magnitudes (Objetivos o Resultado de una Serie anterior). */
+export function draftFromMagnitudes(source: SeriesMagnitudes): SeriesDraft {
   return {
-    carga: series.goal.carga === null ? "" : String(series.goal.carga),
-    repeticiones: series.goal.repeticiones === null ? "" : String(series.goal.repeticiones),
-    duracion: series.goal.duracion === null ? "" : String(series.goal.duracion),
+    carga: source.carga === null ? "" : String(source.carga),
+    repeticiones: source.repeticiones === null ? "" : String(source.repeticiones),
+    duracion: source.duracion === null ? "" : String(source.duracion),
     rpe: "",
   };
+}
+
+/** Borrador inicial de una Serie: los Objetivos inicializan los campos de resultado. */
+export function draftFromSeries(series: SessionSeriesDocument): SeriesDraft {
+  return draftFromMagnitudes(series.goal);
 }
 
 function parseMagnitude(raw: string): number | null | "invalid" {

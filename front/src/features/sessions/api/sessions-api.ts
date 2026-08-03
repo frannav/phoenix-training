@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "../../../shared/http/api-client";
+import { apiDelete, apiGet, apiPost, apiPut } from "../../../shared/http/api-client";
 import type { RecordingMode } from "../../exercises/api/exercises-api";
 
 /** Estado de una Serie dentro de la Sesión activa. */
@@ -53,6 +53,9 @@ export type SessionExerciseDocument = {
   series: SessionSeriesDocument[];
 };
 
+/** Estado de una Sesión: activa mientras se registra o finalizada como registro del Historial. */
+export type SessionStatus = "activa" | "finalizada";
+
 /**
  * Documento canónico de una Sesión tal como lo entrega la API: el estado
  * confirmado completo con su revisión entera.
@@ -61,7 +64,7 @@ export type SessionDocument = {
   id: string;
   revision: number;
   origin: "libre";
-  status: "activa";
+  status: SessionStatus;
   datePerformed: string;
   lastExerciseId: string | null;
   exercises: SessionExerciseDocument[];
@@ -105,6 +108,24 @@ export async function saveSession(
     revision,
     exercises,
   });
+}
+
+/** Finaliza la Sesión activa: exige al menos una Serie completada y omite las pendientes. */
+export async function finalizeSession(
+  id: string,
+  revision: number,
+): Promise<{ session: SessionDocument }> {
+  return apiPost<{ session: SessionDocument }>(`/api/sessions/${id}/finalize`, {
+    revision,
+  });
+}
+
+/** Elimina la Sesión activa con su revisión para la concurrencia optimista. */
+export async function deleteSession(
+  id: string,
+  revision: number,
+): Promise<{ deleted: true }> {
+  return apiDelete<{ deleted: true }>(`/api/sessions/${id}?revision=${revision}`);
 }
 
 /** Nombre mostrado de una Sesión según su Origen de sesión. */
@@ -154,6 +175,26 @@ export function occurrenceProgressLabel(occurrence: SessionExerciseDocument): st
   }
   const { completada, omitida, pendiente } = countSeriesByStatus(occurrence.series);
   const parts = [`${completada} completadas`];
+  if (omitida > 0) {
+    parts.push(`${omitida} omitidas`);
+  }
+  if (pendiente > 0) {
+    parts.push(`${pendiente} pendientes`);
+  }
+  return parts.join(" · ");
+}
+
+/** Resumen de Series de toda la Sesión para la cabecera y el resumen al finalizar. */
+export function sessionSeriesSummary(session: SessionDocument): string {
+  const series = session.exercises.flatMap((occurrence) => occurrence.series);
+  if (series.length === 0) {
+    return "Sin Series";
+  }
+  const { completada, omitida, pendiente } = countSeriesByStatus(series);
+  const parts = [];
+  if (completada > 0) {
+    parts.push(`${completada} completadas`);
+  }
   if (omitida > 0) {
     parts.push(`${omitida} omitidas`);
   }
