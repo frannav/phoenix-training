@@ -214,6 +214,50 @@ export const routineSeriesGoal = sqliteTable(
  * origen auditado. La carga versionada verifica estos datos antes de
  * publicar cualquier Ejercicio.
  */
+/**
+ * RM registrado: mejor marca real de un Ejercicio declarada expresamente por
+ * el Deportista, asociada a una fecha y un número de repeticiones. Pertenece
+ * a la Cuenta autenticada y puede referenciar Ejercicios del catálogo o
+ * personalizados, incluso si después dejan de estar disponibles para usos
+ * nuevos: el Ejercicio no se elimina nunca de forma definitiva.
+ *
+ * El RM vigente para un Ejercicio y número de repeticiones en una fecha es
+ * el registro más reciente de esa fecha o anterior. Registrar una Serie no
+ * crea ni actualiza RM automáticamente: solo existen los que el Deportista
+ * introduce expresamente, y la aplicación no calcula 1RM estimado.
+ */
+export const recordedMax = sqliteTable(
+  "recorded_max",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    exerciseId: text("exercise_id")
+      .notNull()
+      .references(() => exercise.id, { onDelete: "cascade" }),
+    /** Carga en kilogramos, de 0 a 9999,99 con como máximo dos decimales. */
+    load: real("load").notNull(),
+    /** Número de repeticiones, entero de 1 a 9999. */
+    repetitions: integer("repetitions").notNull(),
+    /** Fecha de dominio del RM en formato YYYY-MM-DD. */
+    date: text("date").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    // Sirve a la vigencia por Ejercicio, repeticiones y fecha (WHERE cuenta,
+    // ejercicio, repeticiones y fecha <= ... ORDER BY fecha DESC) y al
+    // listado de la Cuenta (prefijo account_id + orden por fecha).
+    index("recorded_max_account_exercise_reps_date_idx").on(
+      table.accountId,
+      table.exerciseId,
+      table.repetitions,
+      table.date,
+    ),
+  ],
+);
+
 export const catalogManifest = sqliteTable("catalog_manifest", {
   id: text("id").primaryKey(),
   source: text("source").notNull(),
