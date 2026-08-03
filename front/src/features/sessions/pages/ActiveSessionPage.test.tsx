@@ -41,6 +41,9 @@ const emptySession: SessionDocument = {
   origin: "libre",
   status: "activa",
   datePerformed: "2025-03-10",
+  plannedDate: null,
+  routineId: null,
+  planTrainingId: null,
   lastExerciseId: null,
   exercises: [],
   startedAt: "2025-03-10T09:30:00.000Z",
@@ -75,6 +78,7 @@ const benchOccurrence: SessionExerciseDocument = {
   id: "cccccccccccccccccccccccccccccccc",
   exerciseId: benchPress.id,
   sortOrder: 0,
+  added: false,
   exercise: {
     id: benchPress.id,
     name: benchPress.name,
@@ -192,6 +196,7 @@ describe("pantalla de la Sesión activa", () => {
                   id: "dddddddddddddddddddddddddddddddd",
                   exerciseId: bulgarianSquats.id,
                   sortOrder: 1,
+                  added: true,
                   exercise: {
                     id: bulgarianSquats.id,
                     name: bulgarianSquats.name,
@@ -379,10 +384,12 @@ function occurrenceDoc(
   series: SessionSeriesDocument[],
   overrides: Partial<SessionExerciseDocument> = {},
 ): SessionExerciseDocument {
+  const { added, ...rest } = overrides;
   return {
-    id: overrides.id ?? "occurrence-1",
+    id: rest.id ?? "occurrence-1",
     exerciseId: exercise.id,
     sortOrder: 0,
+    added: added ?? false,
     exercise: {
       id: exercise.id,
       name: exercise.name,
@@ -390,7 +397,7 @@ function occurrenceDoc(
       provenance: exercise.provenance,
     },
     series,
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -1332,7 +1339,7 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
     const occurrence = occurrenceDoc(benchPress, [
       seriesDoc({ id: "serie-1" }),
       seriesDoc({ id: "serie-2", order: 1 }),
-    ]);
+    ], { added: true });
     const putBodies: unknown[] = [];
     stubFetch((url, init) => {
       if (url === "/api/sessions/sesion-activa" && (init.method ?? "GET") === "PUT") {
@@ -1377,7 +1384,7 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
         status: "completada",
         result: { carga: 80, repeticiones: 10, duracion: null },
       }),
-    ]);
+    ], { added: true });
     const putBodies: unknown[] = [];
     stubFetch((url, init) => {
       if (url === "/api/sessions/sesion-activa" && (init.method ?? "GET") === "PUT") {

@@ -9,6 +9,7 @@ import {
   planTrainingSeriesGoal,
   planWeek,
   routine,
+  trainingSession,
   type RecordingMode,
 } from "../db/schema";
 import { allowedTargetFields, fieldKey, targetLimitMessage } from "../domain/series-goals";
@@ -20,8 +21,12 @@ import {
 
 export type PlanStatus = "borrador" | "activo" | "completado";
 
-/** Estado de un Entrenamiento planificado de un Plan activo o completado. */
-export type PlanTrainingStatus = "pendiente" | "omitido";
+/**
+ * Estado de un Entrenamiento planificado de un Plan activo o completado.
+ * `realizado` solo lo alcanza un Entrenamiento pendiente cuando la Sesión
+ * originada en él finaliza; un día realizado no cambia con las ediciones.
+ */
+export type PlanTrainingStatus = "pendiente" | "omitido" | "realizado";
 
 /** Entrada del cliente para una Serie prevista: los objetivos son opcionales e independientes. */
 export type PlanSeriesGoalInput = {
@@ -102,6 +107,118 @@ export type PlanDocument = {
 export type PlanWriteOutcome =
   | { ok: true; planId: string }
   | { ok: false; fields: Record<string, string[]> };
+
+/**
+ * Contenido vigente de un Entrenamiento planificado propio para iniciar una
+ * Sesión desde él (ticket 28): resuelve la referencia viva de la Rutina o el
+ * contenido específico almacenado, con sus Objetivos de serie, en el instante
+ * del inicio. La Sesión copia estos valores y nunca vuelve a sincronizar con
+ * el origen. Un Plan o Entrenamiento ajeno o inexistente se comporta como
+ * ausente.
+ */
+export async function resolvePlanTrainingStartContent(
+  database: AppDatabase,
+  {
+    accountId,
+    planId,
+    trainingId,
+  }: { accountId: string; planId: string; trainingId: string },
+): Promise<
+  | {
+      ok: true;
+      planStatus: PlanStatus;
+      trainingStatus: PlanTrainingStatus | null;
+      trainingId: string;
+      plannedDate: string | null;
+      content: Array<{
+        exerciseId: string;
+        series: Array<{ carga: number | null; repeticiones: number | null; duracion: number | null }>;
+      }>;
+    }
+  | { ok: false; reason: "plan-not-found" | "training-not-found" }
+> {
+  const planRow = await database
+    .select()
+    .from(plan)
+    .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)))
+    .get();
+  if (!planRow) {
+    return { ok: false, reason: "plan-not-found" };
+  }
+  const trainingRow = await database
+    .select()
+    .from(planTraining)
+    .where(and(eq(planTraining.id, trainingId), eq(planTraining.planId, planId)))
+    .get();
+  if (!trainingRow) {
+    return { ok: false, reason: "training-not-found" };
+  }
+
+  let content: Array<{
+    exerciseId: string;
+    series: Array<{ carga: number | null; repeticiones: number | null; duracion: number | null }>;
+  }>;
+  if (trainingRow.source === "rutina" && trainingRow.routineId) {
+    const reference = (
+      await resolveRoutineReferences(database, {
+        accountId,
+        routineIds: [trainingRow.routineId],
+      })
+    ).get(trainingRow.routineId);
+    content = (reference?.exercises ?? []).map((entry) => ({
+      exerciseId: entry.exerciseId,
+      series: entry.series.map((series) => ({
+        carga: series.carga,
+        repeticiones: series.repeticiones,
+        duracion: series.duracion,
+      })),
+    }));
+  } else {
+    const entries = await database
+      .select()
+      .from(planTrainingExercise)
+      .where(eq(planTrainingExercise.planTrainingId, trainingRow.id))
+      .orderBy(asc(planTrainingExercise.position), asc(planTrainingExercise.id))
+      .all();
+    const seriesRows =
+      entries.length === 0
+        ? []
+        : await database
+            .select()
+            .from(planTrainingSeriesGoal)
+            .where(
+              inArray(
+                planTrainingSeriesGoal.planTrainingExerciseId,
+                entries.map((entry) => entry.id),
+              ),
+            )
+            .orderBy(asc(planTrainingSeriesGoal.position), asc(planTrainingSeriesGoal.id))
+            .all();
+    const seriesByExerciseId = new Map<string, PlanTrainingSeriesGoalRow[]>();
+    for (const seriesGoal of seriesRows) {
+      const existing = seriesByExerciseId.get(seriesGoal.planTrainingExerciseId) ?? [];
+      existing.push(seriesGoal);
+      seriesByExerciseId.set(seriesGoal.planTrainingExerciseId, existing);
+    }
+    content = entries.map((entry) => ({
+      exerciseId: entry.exerciseId,
+      series: (seriesByExerciseId.get(entry.id) ?? []).map((seriesGoal) => ({
+        carga: seriesGoal.carga,
+        repeticiones: seriesGoal.repeticiones,
+        duracion: seriesGoal.duracion,
+      })),
+    }));
+  }
+
+  return {
+    ok: true,
+    planStatus: planRow.status as PlanStatus,
+    trainingStatus: trainingRow.status as PlanTrainingStatus | null,
+    trainingId: trainingRow.id,
+    plannedDate: trainingRow.plannedDate,
+    content,
+  };
+}
 
 export type PlanReplaceOutcome =
   | { ok: true }
@@ -680,7 +797,10 @@ function validateActivePlanEdit(args: {
 
   const closedById = new Map<string, PlanTrainingRow>();
   for (const training of currentTrainings) {
-    if (training.status === "omitido") {
+    // Un día realizado (Sesión originada en él ya finalizada) o omitido ya
+    // no está pendiente: conserva identidad, semana, día, fuente, Rutina y
+    // contenido completos y no puede modificarse.
+    if (training.status === "omitido" || training.status === "realizado") {
       closedById.set(training.id, training);
     }
   }
@@ -975,6 +1095,39 @@ export async function replacePlan(
     // La edición sustituye el agregado completo: se borran los hijos y se
     // reinsertan con las identidades conservadas de los existentes. Borrar
     // las semanas propaga el borrado en cascada a sus Entrenamientos.
+    //
+    // Sesiones originadas en Entrenamientos de este Plan: la clave foránea
+    // con ON DELETE SET NULL libera su referencia al borrarse cada
+    // Entrenamiento. Antes de borrar se anota qué Sesión venía de qué
+    // Entrenamiento para restablecer la referencia tras reinsertar los que
+    // la edición conserva; una Sesión cuyo día desaparece conserva su Origen
+    // y su Fecha prevista como hecho histórico sin referencia viva.
+    const linkedSessions =
+      currentTrainings.length === 0
+        ? []
+        : tx
+            .select({
+              id: trainingSession.id,
+              planTrainingId: trainingSession.planTrainingId,
+            })
+            .from(trainingSession)
+            .where(
+              inArray(
+                trainingSession.planTrainingId,
+                currentTrainings.map((training) => training.id),
+              ),
+            )
+            .all();
+    const sessionIdsByTrainingId = new Map<string, string[]>();
+    for (const row of linkedSessions) {
+      if (!row.planTrainingId) {
+        continue;
+      }
+      const existing = sessionIdsByTrainingId.get(row.planTrainingId) ?? [];
+      existing.push(row.id);
+      sessionIdsByTrainingId.set(row.planTrainingId, existing);
+    }
+
     tx.delete(planWeek).where(eq(planWeek.planId, planId)).run();
 
     const usedWeekIds = new Set<string>();
@@ -1011,14 +1164,15 @@ export async function replacePlan(
         usedTrainingIds.add(trainingId);
 
         // Fecha prevista y estado: un borrador no tiene ni uno ni otro; un
-        // día omitido de un Plan activo conserva los suyos exactamente; todo
-        // lo demás nace pendiente con la fecha derivada de su semana y día.
+        // día cerrado (omitido o realizado) de un Plan activo conserva los
+        // suyos exactamente; todo lo demás nace pendiente con la fecha
+        // derivada de su semana y día.
         let plannedDate: string | null = null;
         let trainingStatus: PlanTrainingStatus | null = null;
         const existingTraining = trainingById.get(trainingId);
-        if (existingTraining?.status === "omitido") {
+        if (existingTraining?.status === "omitido" || existingTraining?.status === "realizado") {
           plannedDate = existingTraining.plannedDate;
-          trainingStatus = "omitido";
+          trainingStatus = existingTraining.status;
         } else if (current.startDate) {
           plannedDate = plannedDateFor(current.startDate, position, training.day);
           trainingStatus = "pendiente";
@@ -1086,6 +1240,20 @@ export async function replacePlan(
           }
         }
       }
+    }
+
+    // Las Sesiones originadas en Entrenamientos conservados por la edición
+    // recuperan su referencia al Origen de sesión (el borrado en cascada la
+    // liberó); las de Entrenamientos eliminados quedan con el origen como
+    // hecho histórico y su Fecha prevista conservada.
+    for (const [trainingId, sessionIds] of sessionIdsByTrainingId) {
+      if (!usedTrainingIds.has(trainingId)) {
+        continue;
+      }
+      tx.update(trainingSession)
+        .set({ planTrainingId: trainingId })
+        .where(inArray(trainingSession.id, sessionIds))
+        .run();
     }
 
     outcome = { ok: true };
@@ -1253,6 +1421,7 @@ export type PlanCompleteOutcome =
   | { ok: true }
   | { ok: false; reason: "not-found" }
   | { ok: false; reason: "not-active" }
+  | { ok: false; reason: "active-session-exists" }
   | { ok: false; reason: "stale-revision" };
 
 /**
@@ -1291,10 +1460,26 @@ export async function completePlan(
       outcome = { ok: false, reason: "stale-revision" };
       return;
     }
-    // Guarda de Sesión activa originada en el Plan: el origen de Sesión
-    // todavía no puede ser un Entrenamiento planificado (ticket 28), así que
-    // no existe ninguna Sesión que comprobar; la guarda llegará con ese
-    // origen dentro de esta misma transacción.
+    // Guarda de Sesión activa originada en el Plan: mientras un Entrenamiento
+    // de este Plan tenga una Sesión activa, completar es una transición
+    // imposible. Eliminar esa Sesión activa deja de bloquear el Plan y el día
+    // vuelve a poder cerrarse como pendiente u omitido.
+    const activeSession = tx
+      .select({ id: trainingSession.id })
+      .from(trainingSession)
+      .innerJoin(planTraining, eq(planTraining.id, trainingSession.planTrainingId))
+      .where(
+        and(
+          eq(trainingSession.accountId, accountId),
+          eq(trainingSession.status, "activa"),
+          eq(planTraining.planId, planId),
+        ),
+      )
+      .get();
+    if (activeSession) {
+      outcome = { ok: false, reason: "active-session-exists" };
+      return;
+    }
     tx.update(plan)
       .set({ status: "completado", revision: current.revision + 1, updatedAt: now })
       .where(eq(plan.id, planId))

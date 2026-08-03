@@ -165,7 +165,7 @@ export type PlanTrainingDocument = {
   /** Fecha prevista del Entrenamiento (YYYY-MM-DD); solo existe tras activar el Plan. */
   plannedDate: string | null;
   /** Estado del Entrenamiento; sin estado mientras el Plan es borrador. */
-  status: "pendiente" | "omitido" | null;
+  status: "pendiente" | "omitido" | "realizado" | null;
   source: "rutina" | "especifico";
   routineId: string | null;
   routine: { id: string; name: string; archived: boolean } | null;
@@ -2962,6 +2962,385 @@ describe("editar un Plan con un Ejercicio archivado", () => {
       exerciseId: custom.id,
       exercise: { id: custom.id, available: false },
     });
+  });
+});
+
+describe("Sesiones originadas en Entrenamientos y el Plan", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+  let press: ExerciseItem;
+  let dominada: ExerciseItem;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+    press = await exerciseOfMode(context, cookie, "fuerza_con_carga");
+    dominada = await exerciseOfMode(context, cookie, "repeticiones_sin_carga");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  type SessionSeriesDocument = {
+    id: string;
+    order: number;
+    status: "pendiente" | "completada" | "omitida";
+    added: boolean;
+    goal: { carga: number | null; repeticiones: number | null; duracion: number | null };
+    result: { carga: number | null; repeticiones: number | null; duracion: number | null };
+    rpe: number | null;
+  };
+
+  type SessionDocument = {
+    id: string;
+    revision: number;
+    origin: "libre" | "rutina" | "plan";
+    status: "activa" | "finalizada";
+    datePerformed: string;
+    plannedDate: string | null;
+    routineId: string | null;
+    planTrainingId: string | null;
+    lastExerciseId: string | null;
+    exercises: {
+      id: string;
+      exerciseId: string;
+      sortOrder: number;
+      added: boolean;
+      exercise: { id: string; name: string; recordingMode: string; provenance: "catalogo" | "personalizado" };
+      series: SessionSeriesDocument[];
+    }[];
+    startedAt: string;
+    updatedAt: string;
+  };
+
+  async function startSessionFromPlan(
+    planId: string,
+    trainingId: string,
+  ): Promise<SessionDocument> {
+    const response = await context!.app.request("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({ origin: "plan", planId, trainingId }),
+    });
+    expect(response.status).toBe(201);
+    return ((await response.json()) as { session: SessionDocument }).session;
+  }
+
+  async function finalizeSession(id: string, revision: number): Promise<unknown> {
+    const response = await context!.app.request(`/api/sessions/${id}/finalize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({ revision }),
+    });
+    return { status: response.status, body: (await response.json()) as unknown };
+  }
+
+  async function deleteActiveSession(id: string, revision: number): Promise<unknown> {
+    const response = await context!.app.request(`/api/sessions/${id}?revision=${revision}`, {
+      method: "DELETE",
+      headers: { Cookie: cookie, Origin: origin },
+    });
+    return { status: response.status, body: (await response.json()) as unknown };
+  }
+
+  async function planFixture(): Promise<PlanDocument> {
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press.id, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            { day: 0, source: "rutina", routineId: routine.id },
+            {
+              day: 3,
+              source: "especifico",
+              specific: [{ exerciseId: dominada.id, series: [{ repeticiones: 8 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const draft = (created.body as { plan: PlanDocument }).plan;
+    const activated = await activatePlan(context!, draft.id, cookie, draft.revision, {
+      startDate: "2025-08-04",
+    });
+    expect(activated.status).toBe(200);
+    return (activated.body as { plan: PlanDocument }).plan;
+  }
+
+  test("completar un Plan devuelve conflicto mientras tenga una Sesión activa originada en él", async () => {
+    const plan = await planFixture();
+    const trainingId = plan.weeks[0]!.trainings[0]!.id;
+    const session = await startSessionFromPlan(plan.id, trainingId);
+
+    const blocked = await completePlan(context!, plan.id, cookie, plan.revision);
+    expect(blocked.status).toBe(409);
+    expect(blocked.body).toEqual({
+      error: {
+        code: "TRANSITION_IMPOSSIBLE",
+        message:
+          "Completa o elimina la Sesión activa originada en este Plan antes de completarlo.",
+      },
+    });
+
+    // el día sigue pendiente y la revisión no cambió
+    const unchanged = (await getPlan(context!, plan.id, cookie)).body as {
+      plan: PlanDocument;
+    };
+    expect(unchanged.plan.revision).toBe(plan.revision);
+    expect(unchanged.plan.weeks[0]!.trainings[0]!.status).toBe("pendiente");
+
+    // eliminar la Sesión activa deja de bloquear el Plan
+    const deleted = await deleteActiveSession(session.id, session.revision);
+    expect((deleted as { status: number }).status).toBe(200);
+    const completed = await completePlan(context!, plan.id, cookie, plan.revision);
+    expect(completed.status).toBe(200);
+  });
+
+  test("finalizar la Sesión marca el Entrenamiento realizado y queda cerrado ante las ediciones", async () => {
+    const plan = await planFixture();
+    const trainings = plan.weeks[0]!.trainings;
+    const realizedTraining = trainings[0]!;
+    const pendingTraining = trainings[1]!;
+
+    const session = await startSessionFromPlan(plan.id, realizedTraining.id);
+    // se completa la Serie prevista y se finaliza
+    const seriesId = session.exercises[0]!.series[0]!.id;
+    const replaced = await context!.app.request(`/api/sessions/${session.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({
+        revision: session.revision,
+        exercises: [
+          {
+            id: session.exercises[0]!.id,
+            exerciseId: session.exercises[0]!.exerciseId,
+            series: [
+              {
+                id: seriesId,
+                status: "completada",
+                goal: { carga: 60, repeticiones: 10 },
+                result: { carga: 62.5, repeticiones: 10 },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(replaced.status).toBe(200);
+    const afterReplace = (await replaced.json()) as { session: SessionDocument };
+    const finalized = await finalizeSession(session.id, afterReplace.session.revision);
+    expect((finalized as { status: number }).status).toBe(200);
+
+    // el día realizado aparece cerrado en el documento del Plan
+    const after = (await getPlan(context!, plan.id, cookie)).body as { plan: PlanDocument };
+    const realized = after.plan.weeks[0]!.trainings[0]!;
+    expect(realized.status).toBe("realizado");
+    expect(realized.plannedDate).toBe(realizedTraining.plannedDate);
+
+    // una edición que modifica el día realizado devuelve conflicto sin cambios
+    const modified: Record<string, unknown> = {
+      ...toInput(after.plan),
+      weeks: (toInput(after.plan).weeks as WeekInput[]).map((week, weekIndex) => ({
+        ...week,
+        trainings: week.trainings.map((training, trainingIndex) => {
+          if (weekIndex === 0 && trainingIndex === 0) {
+            return {
+              ...training,
+              source: "especifico",
+              routineId: null,
+              specific: [{ exerciseId: dominada.id, series: [{ repeticiones: 12 }] }],
+            };
+          }
+          return training;
+        }),
+      })),
+    };
+    const editConflict = await replacePlan(context!, plan.id, cookie, {
+      revision: after.plan.revision,
+      ...modified,
+    });
+    expect(editConflict.status).toBe(409);
+    expect(
+      (editConflict.body as { error: { message: string } }).error.message,
+    ).toBe("Un día que ya no está pendiente no puede modificarse.");
+
+    // editar otro día pendiente sigue permitido y conserva el día realizado
+    const edited = await replacePlan(context!, plan.id, cookie, {
+      revision: after.plan.revision,
+      ...toInput(after.plan),
+    });
+    expect(edited.status).toBe(200);
+    const afterEdit = (edited.body as { plan: PlanDocument }).plan;
+    expect(afterEdit.weeks[0]!.trainings[0]!.status).toBe("realizado");
+    expect(afterEdit.weeks[0]!.trainings[1]!.status).toBe("pendiente");
+  });
+
+  test("completar un Plan conserva los días realizados y convierte los pendientes en omitidos", async () => {
+    const plan = await planFixture();
+    const trainings = plan.weeks[0]!.trainings;
+    const realizedTraining = trainings[0]!;
+
+    const session = await startSessionFromPlan(plan.id, realizedTraining.id);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+    const replaced = await context!.app.request(`/api/sessions/${session.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({
+        revision: session.revision,
+        exercises: [
+          {
+            id: session.exercises[0]!.id,
+            exerciseId: session.exercises[0]!.exerciseId,
+            series: [
+              {
+                id: seriesId,
+                status: "completada",
+                goal: { carga: 60, repeticiones: 10 },
+                result: { carga: 62.5, repeticiones: 10 },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(replaced.status).toBe(200);
+    const afterReplace = (await replaced.json()) as { session: SessionDocument };
+    const finalized = await finalizeSession(session.id, afterReplace.session.revision);
+    expect((finalized as { status: number }).status).toBe(200);
+
+    const afterRealized = (await getPlan(context!, plan.id, cookie)).body as {
+      plan: PlanDocument;
+    };
+    const completed = await completePlan(
+      context!, plan.id, cookie, afterRealized.plan.revision,
+    );
+    expect(completed.status).toBe(200);
+    const doc = (completed.body as { plan: PlanDocument }).plan;
+    expect(doc.status).toBe("completado");
+    expect(doc.weeks[0]!.trainings[0]!.status).toBe("realizado");
+    expect(doc.weeks[0]!.trainings[1]!.status).toBe("omitido");
+  });
+
+  test("editar un Plan conservando el Entrenamiento no rompe el vínculo de la Sesión activa", async () => {
+    const plan = await planFixture();
+    const trainingId = plan.weeks[0]!.trainings[0]!.id;
+    const session = await startSessionFromPlan(plan.id, trainingId);
+
+    // editar el Plan (renombrar) conserva el Entrenamiento con su identidad
+    const edited = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      ...toInput(plan),
+      name: "Ciclo base v2",
+    });
+    expect(edited.status).toBe(200);
+
+    // la Sesión conserva su vínculo y al finalizar marca el día realizado
+    const readResponse = await context!.app.request(`/api/sessions/${session.id}`, {
+      headers: { Cookie: cookie, Origin: origin },
+    });
+    const read = (await readResponse.json()) as { session: SessionDocument };
+    expect(read.session.planTrainingId).toBe(trainingId);
+    expect(read.session.plannedDate).toBe(plan.weeks[0]!.trainings[0]!.plannedDate);
+
+    const seriesId = read.session.exercises[0]!.series[0]!.id;
+    const replaced = await context!.app.request(`/api/sessions/${session.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({
+        revision: read.session.revision,
+        exercises: [
+          {
+            id: read.session.exercises[0]!.id,
+            exerciseId: read.session.exercises[0]!.exerciseId,
+            series: [
+              {
+                id: seriesId,
+                status: "completada",
+                goal: { carga: 60, repeticiones: 10 },
+                result: { carga: 62.5, repeticiones: 10 },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(replaced.status).toBe(200);
+    const afterReplace = (await replaced.json()) as { session: SessionDocument };
+    const finalized = await finalizeSession(session.id, afterReplace.session.revision);
+    expect((finalized as { status: number }).status).toBe(200);
+
+    const after = (await getPlan(context!, plan.id, cookie)).body as { plan: PlanDocument };
+    expect(after.plan.weeks[0]!.trainings[0]!.status).toBe("realizado");
+    expect(after.plan.name).toBe("Ciclo base v2");
+  });
+
+  test("editar un Plan eliminando el día de una Sesión activa conserva la Sesión como origen histórico", async () => {
+    const plan = await planFixture();
+    const trainings = plan.weeks[0]!.trainings;
+    const removedTraining = trainings[0]!;
+    const keptTraining = trainings[1]!;
+    const session = await startSessionFromPlan(plan.id, removedTraining.id);
+
+    // la edición elimina el Entrenamiento con Sesión activa y conserva el otro
+    const edited = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      ...toInput(plan),
+      weeks: (toInput(plan).weeks as Array<Record<string, unknown>>).map((week) => ({
+        ...week,
+        trainings: (week.trainings as Array<Record<string, unknown>>).filter(
+          (training) => training.id !== removedTraining.id,
+        ),
+      })),
+    });
+    expect(edited.status).toBe(200);
+    const doc = (edited.body as { plan: PlanDocument }).plan;
+    expect(doc.weeks[0]!.trainings).toHaveLength(1);
+    expect(doc.weeks[0]!.trainings[0]!.id).toBe(keptTraining.id);
+
+    // la Sesión conserva su Origen y Fecha prevista como hecho histórico
+    const readResponse = await context!.app.request(`/api/sessions/${session.id}`, {
+      headers: { Cookie: cookie, Origin: origin },
+    });
+    const read = (await readResponse.json()) as { session: SessionDocument };
+    expect(read.session.origin).toBe("plan");
+    expect(read.session.planTrainingId).toBeNull();
+    expect(read.session.plannedDate).toBe(removedTraining.plannedDate);
+
+    // finalizar la Sesión sigue funcionando sin Entrenamiento que marcar
+    const seriesId = read.session.exercises[0]!.series[0]!.id;
+    const replaced = await context!.app.request(`/api/sessions/${session.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({
+        revision: read.session.revision,
+        exercises: [
+          {
+            id: read.session.exercises[0]!.id,
+            exerciseId: read.session.exercises[0]!.exerciseId,
+            series: [
+              {
+                id: seriesId,
+                status: "completada",
+                goal: { carga: 60, repeticiones: 10 },
+                result: { carga: 62.5, repeticiones: 10 },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(replaced.status).toBe(200);
+    const afterReplace = (await replaced.json()) as { session: SessionDocument };
+    const finalized = await finalizeSession(session.id, afterReplace.session.revision);
+    expect((finalized as { status: number }).status).toBe(200);
   });
 });
 

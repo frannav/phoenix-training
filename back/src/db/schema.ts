@@ -399,11 +399,12 @@ export const recordedMax = sqliteTable(
 );
 
 /**
- * Sesión de entrenamiento del dominio. Una Sesión libre comienza sin origen;
- * más adelante podrá originarse en un Entrenamiento planificado o una Rutina.
- * Cada Cuenta puede tener como máximo una Sesión activa: el índice parcial de
- * unicidad lo garantiza en la base de datos y la transición de inicio lo
- * comprueba dentro de la misma transacción.
+ * Sesión de entrenamiento del dominio. Una Sesión puede originarse en un
+ * Entrenamiento planificado, en una Rutina o no tener origen si es libre;
+ * conserva la referencia de su Origen de sesión, pero sus contenidos nunca
+ * se sincronizan con él. Cada Cuenta puede tener como máximo una Sesión
+ * activa: el índice parcial de unicidad lo garantiza en la base de datos y
+ * la transición de inicio lo comprueba dentro de la misma transacción.
  */
 export const trainingSession = sqliteTable(
   "training_session",
@@ -412,10 +413,28 @@ export const trainingSession = sqliteTable(
     accountId: text("account_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    /** Origen de la Sesión: «libre», «rutina» o «plan» (Entrenamiento planificado). */
     origin: text("origin").notNull(),
     status: text("status").notNull().default("activa"),
     revision: integer("revision").notNull().default(1),
+    /** Fecha realizada en formato de dominio YYYY-MM-DD, independiente de la Fecha prevista del origen. */
     datePerformed: text("date_performed").notNull(),
+    /**
+     * Fecha prevista del Entrenamiento planificado de origen en formato de
+     * dominio YYYY-MM-DD. La Sesión la conserva por separado de su Fecha
+     * realizada; una Sesión libre o iniciada desde una Rutina no la tiene.
+     */
+    plannedDate: text("planned_date"),
+    /** Origen de sesión: Rutina desde la que se inició (referencia conservada, contenido nunca sincronizado). */
+    routineId: text("routine_id").references(() => routine.id),
+    /** Origen de sesión: Entrenamiento planificado desde el que se inició. */
+    planTrainingId: text("plan_training_id").references(() => planTraining.id, {
+      // Una edición del Plan puede eliminar un Entrenamiento pendiente incluso
+      // con una Sesión activa originada en él: la Sesión conserva su Origen y
+      // su Fecha prevista como hecho histórico y libera la referencia; cuando
+      // el Entrenamiento se conserva, la sustitución del Plan la restablece.
+      onDelete: "set null",
+    }),
     lastExerciseId: text("last_exercise_id").references(() => exercise.id),
     startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
@@ -424,6 +443,12 @@ export const trainingSession = sqliteTable(
     uniqueIndex("training_session_single_active_idx")
       .on(table.accountId)
       .where(sql`${table.status} = 'activa'`),
+    // Cada Entrenamiento planificado origina como máximo una Sesión finalizada:
+    // el índice parcial respalda en la base de datos la unicidad que el inicio
+    // comprueba mediante el estado del Entrenamiento en su transacción.
+    uniqueIndex("training_session_one_finalized_per_training_idx")
+      .on(table.planTrainingId)
+      .where(sql`${table.status} = 'finalizada'`),
   ],
 );
 
@@ -443,6 +468,12 @@ export const trainingSessionExercise = sqliteTable(
       .notNull()
       .references(() => exercise.id),
     sortOrder: integer("sort_order").notNull(),
+    /**
+     * Aparición añadida durante la Sesión (`true`, eliminable con confirmación
+     * si tiene resultados) o procedente de la intención original del origen
+     * (`false`, conservada: sus Series previstas solo se resuelven omitiéndolas).
+     */
+    added: integer("added", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [

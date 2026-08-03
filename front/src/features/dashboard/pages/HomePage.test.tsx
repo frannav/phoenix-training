@@ -21,6 +21,9 @@ const emptySession: SessionDocument = {
   origin: "libre",
   status: "activa",
   datePerformed: "2025-03-10",
+  plannedDate: null,
+  routineId: null,
+  planTrainingId: null,
   lastExerciseId: null,
   exercises: [],
   startedAt: "2025-03-10T09:30:00.000Z",
@@ -37,6 +40,7 @@ const existingSession: SessionDocument = {
       id: "cccccccccccccccccccccccccccccccc",
       exerciseId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       sortOrder: 0,
+      added: false,
       exercise: {
         id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         name: "Press de banca con barra",

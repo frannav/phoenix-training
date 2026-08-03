@@ -60,7 +60,7 @@ type EditorTraining = {
   day: string;
   /** Fecha prevista y estado: solo existen en un Plan activo o completado. */
   plannedDate: string | null;
-  status: "pendiente" | "omitido" | null;
+  status: "pendiente" | "omitido" | "realizado" | null;
   source: "rutina" | "especifico";
   routineId: string;
   routine: ResolvedRoutine | null;
@@ -819,7 +819,9 @@ export function PlanEditor({
             )}
 
             {week.trainings.map((training, trainingIndex) => {
-              const isClosed = isActive && training.status === "omitido";
+              const isClosed =
+                isActive &&
+                (training.status === "omitido" || training.status === "realizado");
               if (isClosed) {
                 const plannedLabel =
                   training.plannedDate === null ? "" : formatDomainDate(training.plannedDate);
@@ -829,11 +831,12 @@ export function PlanEditor({
                     : training.specific
                         .map((entry) => entry.exercise?.name ?? "Ejercicio")
                         .join(" · ");
+                const realized = training.status === "realizado";
                 return (
                   <article
                     key={training.key}
                     className={styles.closedTraining}
-                    aria-label={`${dayLabels[Number(training.day)]} omitido`}
+                    aria-label={`${dayLabels[Number(training.day)]} ${realized ? "realizado" : "omitido"}`}
                   >
                     <div className={styles.closedTrainingHeader}>
                       <div className={styles.closedTrainingDay}>
@@ -844,11 +847,11 @@ export function PlanEditor({
                       </div>
                       <span className={styles.closedStatus}>
                         <span className={styles.statusDot} aria-hidden="true" />
-                        Omitido
+                        {realized ? "Realizado" : "Omitido"}
                       </span>
                     </div>
                     <p className={styles.closedContent}>{contentLabel}</p>
-                    {onRequestRestore && (
+                    {!realized && onRequestRestore && (
                       <button
                         type="button"
                         className={styles.restoreTraining}

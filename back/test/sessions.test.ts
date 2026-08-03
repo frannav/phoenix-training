@@ -97,6 +97,8 @@ export type SessionExerciseDocument = {
   id: string;
   exerciseId: string;
   sortOrder: number;
+  /** Aparición añadida durante la Sesión (`true`) o prevista del origen (`false`). */
+  added: boolean;
   exercise: {
     id: string;
     name: string;
@@ -106,12 +108,18 @@ export type SessionExerciseDocument = {
   series: SeriesDocument[];
 };
 
+export type SessionOrigin = "libre" | "rutina" | "plan";
+
 export type SessionDocument = {
   id: string;
   revision: number;
-  origin: "libre";
+  origin: SessionOrigin;
   status: "activa" | "finalizada";
   datePerformed: string;
+  /** Fecha prevista del Entrenamiento planificado de origen; solo un origen «plan» la tiene. */
+  plannedDate: string | null;
+  routineId: string | null;
+  planTrainingId: string | null;
   lastExerciseId: string | null;
   exercises: SessionExerciseDocument[];
   startedAt: string;
@@ -128,16 +136,24 @@ const customInput = {
   equipment: "Barra",
 } as const;
 
-async function startFreeSession(
+async function startSessionRequest(
   context: TestContext,
   cookie: string,
+  body: Record<string, unknown>,
 ): Promise<{ status: number; body: unknown }> {
   const response = await context.app.request("/api/sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
-    body: JSON.stringify({ origin: "libre" }),
+    body: JSON.stringify(body),
   });
   return { status: response.status, body: (await response.json()) as unknown };
+}
+
+async function startFreeSession(
+  context: TestContext,
+  cookie: string,
+): Promise<{ status: number; body: unknown }> {
+  return startSessionRequest(context, cookie, { origin: "libre" });
 }
 
 async function getActiveSession(
@@ -199,6 +215,185 @@ async function catalogExerciseId(context: TestContext, cookie: string): Promise<
   return item!.id;
 }
 
+export type RoutineExerciseDocument = {
+  id: string;
+  exerciseId: string;
+  order: number;
+  exercise: {
+    id: string;
+    name: string;
+    recordingMode: string;
+    available: boolean;
+    provenance: "catalogo" | "personalizado";
+  };
+  series: { id: string; order: number; carga: number | null; repeticiones: number | null; duracion: number | null }[];
+};
+
+export type RoutineDocument = {
+  id: string;
+  name: string;
+  revision: number;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  exercises: RoutineExerciseDocument[];
+};
+
+async function createRoutine(
+  context: TestContext,
+  cookie: string,
+  body: Record<string, unknown>,
+): Promise<RoutineDocument> {
+  const response = await context.app.request("/api/routines", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify(body),
+  });
+  expect(response.status).toBe(201);
+  return ((await response.json()) as { routine: RoutineDocument }).routine;
+}
+
+async function replaceRoutine(
+  context: TestContext,
+  cookie: string,
+  routineId: string,
+  body: Record<string, unknown>,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(`/api/routines/${routineId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify(body),
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+async function archiveRoutine(
+  context: TestContext,
+  cookie: string,
+  routineId: string,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(`/api/routines/${routineId}/archive`, {
+    method: "POST",
+    headers: { Cookie: cookie, Origin: origin },
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+export type PlanSeriesGoalDocument = {
+  id: string;
+  order: number;
+  carga: number | null;
+  repeticiones: number | null;
+  duracion: number | null;
+};
+
+export type PlanTrainingDocument = {
+  id: string;
+  day: number;
+  plannedDate: string | null;
+  status: "pendiente" | "omitido" | "realizado" | null;
+  source: "rutina" | "especifico";
+  routineId: string | null;
+  routine: { id: string; name: string; archived: boolean } | null;
+  content: {
+    id: string;
+    exerciseId: string;
+    order: number;
+    exercise: { id: string; name: string; recordingMode: string; available: boolean; provenance: "catalogo" | "personalizado" };
+    series: PlanSeriesGoalDocument[];
+  }[];
+};
+
+export type PlanWeekDocument = {
+  id: string;
+  order: number;
+  trainings: PlanTrainingDocument[];
+};
+
+export type PlanDocument = {
+  id: string;
+  name: string;
+  status: "borrador" | "activo" | "completado";
+  startDate: string | null;
+  revision: number;
+  weeks: PlanWeekDocument[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+async function createPlan(
+  context: TestContext,
+  cookie: string,
+  body: Record<string, unknown>,
+): Promise<PlanDocument> {
+  const response = await context.app.request("/api/plans", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify(body),
+  });
+  expect(response.status).toBe(201);
+  return ((await response.json()) as { plan: PlanDocument }).plan;
+}
+
+async function getPlan(
+  context: TestContext,
+  cookie: string,
+  planId: string,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(`/api/plans/${planId}`, {
+    headers: { Cookie: cookie, Origin: origin },
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+async function activatePlan(
+  context: TestContext,
+  cookie: string,
+  planId: string,
+  revision: number,
+  startDate: string,
+): Promise<PlanDocument> {
+  const response = await context.app.request(`/api/plans/${planId}/activate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify({ revision, startDate }),
+  });
+  expect(response.status).toBe(200);
+  return ((await response.json()) as { plan: PlanDocument }).plan;
+}
+
+async function omitPlanTraining(
+  context: TestContext,
+  cookie: string,
+  planId: string,
+  trainingId: string,
+  revision: number,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(
+    `/api/plans/${planId}/trainings/${trainingId}/omit`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({ revision }),
+    },
+  );
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+async function completePlanRequest(
+  context: TestContext,
+  cookie: string,
+  planId: string,
+  revision: number,
+): Promise<{ status: number; body: unknown }> {
+  const response = await context.app.request(`/api/plans/${planId}/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify({ revision }),
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
 describe("iniciar una Sesión libre", () => {
   let context: TestContext | undefined;
   let cookie: string;
@@ -245,7 +440,7 @@ describe("iniciar una Sesión libre", () => {
     });
   });
 
-  test("rechaza un origen todavía no disponible", async () => {
+  test("iniciar exige los datos del origen elegido", async () => {
     const response = await context!.app.request("/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
@@ -256,7 +451,18 @@ describe("iniciar una Sesión libre", () => {
       error: { code: string; fields?: Record<string, string[]> };
     };
     expect(error.error.code).toBe("VALIDATION_ERROR");
-    expect(error.error.fields?.origin).toBeDefined();
+    expect(error.error.fields?.routineId).toBeDefined();
+
+    const planMissing = await context!.app.request("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({ origin: "plan" }),
+    });
+    expect(planMissing.status).toBe(400);
+    const planError = (await planMissing.json()) as {
+      error: { fields?: Record<string, string[]> };
+    };
+    expect(planError.error.fields?.planId).toBeDefined();
   });
 
   test("una única Sesión activa por Cuenta: el segundo intento devuelve conflicto con la identidad de la existente", async () => {
@@ -274,6 +480,836 @@ describe("iniciar una Sesión libre", () => {
     const active = await getActiveSession(context!, cookie);
     expect(active.status).toBe(200);
     expect((active.body as { session: SessionDocument }).session.id).toBe(firstId);
+  });
+});
+
+describe("iniciar una Sesión desde una Rutina", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  test("iniciar desde una Rutina copia los Ejercicios y Objetivos vigentes como previstas y conserva el origen", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const dominada = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [
+        { exerciseId: press, series: [{ carga: 60, repeticiones: 10 }] },
+        { exerciseId: dominada, series: [{ repeticiones: 8 }, { repeticiones: 6 }] },
+      ],
+    });
+
+    const { status, body } = await startSessionRequest(context!, cookie, {
+      origin: "rutina",
+      routineId: routine.id,
+    });
+    expect(status).toBe(201);
+
+    const session = (body as { session: SessionDocument }).session;
+    expect(session.origin).toBe("rutina");
+    expect(session.routineId).toBe(routine.id);
+    expect(session.planTrainingId).toBeNull();
+    expect(session.plannedDate).toBeNull();
+    expect(session.status).toBe("activa");
+    expect(session.revision).toBe(1);
+    expect(session.datePerformed).toBe("2025-03-10");
+    expect(session.lastExerciseId).toBeNull();
+
+    // el contenido del origen se copia como intención original: Series
+    // previstas pendientes con sus Objetivos, sin resultados
+    expect(session.exercises).toHaveLength(2);
+    const first = session.exercises[0]!;
+    expect(first.exerciseId).toBe(press);
+    expect(first.sortOrder).toBe(0);
+    expect(first.added).toBe(false);
+    expect(first.series).toHaveLength(1);
+    expect(first.series[0]).toMatchObject({
+      status: "pendiente",
+      added: false,
+      goal: { carga: 60, repeticiones: 10, duracion: null },
+      result: { carga: null, repeticiones: null, duracion: null },
+      rpe: null,
+    });
+
+    const second = session.exercises[1]!;
+    expect(second.exerciseId).toBe(dominada);
+    expect(second.sortOrder).toBe(1);
+    expect(second.added).toBe(false);
+    expect(second.series).toHaveLength(2);
+    expect(second.series[1]!.goal).toEqual({ carga: null, repeticiones: 6, duracion: null });
+  });
+
+  test("editar la Rutina después de iniciar no modifica los Objetivos copiados en la Sesión", async () => {
+    const exerciseId = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "rutina",
+      routineId: routine.id,
+    });
+    const session = (started.body as { session: SessionDocument }).session;
+    const copiedGoal = session.exercises[0]!.series[0]!.goal;
+
+    // la Rutina cambia después de iniciar: la Sesión conserva la copia
+    const replaced = await replaceRoutine(context!, cookie, routine.id, {
+      name: "Día de empuje v2",
+      revision: routine.revision,
+      exercises: [
+        { id: routine.exercises[0]!.id, exerciseId, series: [{ carga: 100, repeticiones: 3 }] },
+      ],
+    });
+    expect(replaced.status).toBe(200);
+
+    const active = await getActiveSession(context!, cookie);
+    const after = (active.body as { session: SessionDocument }).session;
+    expect(after.id).toBe(session.id);
+    expect(after.exercises[0]!.series[0]!.goal).toEqual(copiedGoal);
+    expect(after.exercises[0]!.series[0]!.goal).toEqual({
+      carga: 60,
+      repeticiones: 10,
+      duracion: null,
+    });
+  });
+
+  test("iniciar desde una Rutina archivada se rechaza como uso nuevo", async () => {
+    const exerciseId = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId, series: [{ repeticiones: 10 }] }],
+    });
+    await archiveRoutine(context!, cookie, routine.id);
+
+    const { status, body } = await startSessionRequest(context!, cookie, {
+      origin: "rutina",
+      routineId: routine.id,
+    });
+    expect(status).toBe(400);
+    const error = (body as { error: { code: string; fields?: Record<string, string[]> } }).error;
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.fields?.routineId).toBeDefined();
+  });
+
+  test("con una Sesión activa existente, iniciar desde una Rutina conduce a la existente", async () => {
+    const first = await startFreeSession(context!, cookie);
+    expect(first.status).toBe(201);
+    const firstId = (first.body as { session: SessionDocument }).session.id;
+
+    const exerciseId = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId, series: [{ repeticiones: 10 }] }],
+    });
+    const fromRoutine = await startSessionRequest(context!, cookie, {
+      origin: "rutina",
+      routineId: routine.id,
+    });
+    expect(fromRoutine.status).toBe(409);
+    const error = (fromRoutine.body as { error: { code: string; sessionId: string } }).error;
+    expect(error.code).toBe("ACTIVE_SESSION_EXISTS");
+    expect(error.sessionId).toBe(firstId);
+  });
+
+  test("la Rutina ajena o inexistente responde inexistente", async () => {
+    const cookieB = await registerVerified(context!, "otra@example.com");
+    const exerciseId = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId, series: [{ repeticiones: 10 }] }],
+    });
+
+    const foreign = await startSessionRequest(context!, cookieB, {
+      origin: "rutina",
+      routineId: routine.id,
+    });
+    expect(foreign.status).toBe(404);
+
+    const unknown = await startSessionRequest(context!, cookie, {
+      origin: "rutina",
+      routineId: "ffffffffffffffffffffffffffffffff",
+    });
+    expect(unknown.status).toBe(404);
+  });
+});
+
+describe("iniciar una Sesión desde un Entrenamiento planificado", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function activePlanFixture(weeks: Record<string, unknown>[]): Promise<{
+    plan: PlanDocument;
+    trainings: PlanTrainingDocument[];
+  }> {
+    const plan = await createPlan(context!, cookie, {
+      name: "Ciclo base",
+      weeks: weeks.map((week) => ({
+        ...week,
+        trainings: (week.trainings as Record<string, unknown>[]).map((training) => ({
+          ...training,
+          specific: training.specific ?? [],
+        })),
+      })),
+    });
+    const activated = await activatePlan(context!, cookie, plan.id, plan.revision, "2025-03-03");
+    return { plan: activated, trainings: activated.weeks.flatMap((week) => week.trainings) };
+  }
+
+  test("iniciar desde un Entrenamiento con Rutina copia el contenido vigente, el origen y las fechas por separado", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const dominada = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [
+        { exerciseId: press, series: [{ carga: 60, repeticiones: 10 }] },
+        { exerciseId: dominada, series: [{ repeticiones: 8 }, { repeticiones: 6 }] },
+      ],
+    });
+    const { plan, trainings } = await activePlanFixture([
+      { trainings: [{ day: 0, source: "rutina", routineId: routine.id }] },
+    ]);
+    const training = trainings[0]!;
+    // Fecha prevista pasada respecto de la Fecha realizada (2025-03-10)
+    expect(training.plannedDate).toBe("2025-03-03");
+
+    const { status, body } = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(status).toBe(201);
+
+    const session = (body as { session: SessionDocument }).session;
+    expect(session.origin).toBe("plan");
+    expect(session.planTrainingId).toBe(training.id);
+    expect(session.routineId).toBeNull();
+    expect(session.plannedDate).toBe("2025-03-03");
+    expect(session.datePerformed).toBe("2025-03-10");
+    expect(session.status).toBe("activa");
+    expect(session.revision).toBe(1);
+    expect(session.lastExerciseId).toBeNull();
+
+    // el contenido vigente de la referencia viva se copia como previstas
+    expect(session.exercises).toHaveLength(2);
+    expect(session.exercises[0]!.exerciseId).toBe(press);
+    expect(session.exercises[0]!.added).toBe(false);
+    expect(session.exercises[0]!.series[0]!.goal).toEqual({
+      carga: 60,
+      repeticiones: 10,
+      duracion: null,
+    });
+    expect(session.exercises[0]!.series[0]!.status).toBe("pendiente");
+    expect(session.exercises[0]!.series[0]!.added).toBe(false);
+    expect(session.exercises[1]!.exerciseId).toBe(dominada);
+    expect(session.exercises[1]!.series).toHaveLength(2);
+  });
+
+  test("iniciar desde un Entrenamiento específico copia sus Ejercicios y Objetivos", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const dominada = await catalogExerciseId(context!, cookie);
+    const { plan, trainings } = await activePlanFixture([
+      {
+        trainings: [
+          {
+            day: 3,
+            source: "especifico",
+            specific: [
+              { exerciseId: press, series: [{ carga: 100, repeticiones: 5 }] },
+              { exerciseId: dominada, series: [{ repeticiones: 10 }] },
+            ],
+          },
+        ],
+      },
+    ]);
+    const training = trainings[0]!;
+    // Fecha prevista futura (el lunes de la primera semana + 3 días) sin
+    // impedir el inicio: la Fecha realizada se guarda por separado.
+    expect(training.plannedDate).toBe("2025-03-06");
+
+    const { status, body } = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(status).toBe(201);
+
+    const session = (body as { session: SessionDocument }).session;
+    expect(session.origin).toBe("plan");
+    expect(session.planTrainingId).toBe(training.id);
+    expect(session.plannedDate).toBe("2025-03-06");
+    expect(session.datePerformed).toBe("2025-03-10");
+    expect(session.exercises).toHaveLength(2);
+    expect(session.exercises[0]!.series[0]!.goal).toEqual({
+      carga: 100,
+      repeticiones: 5,
+      duracion: null,
+    });
+  });
+
+  test("editar el Plan o su Rutina después de iniciar no modifica la Sesión", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const dominada = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const { plan, trainings } = await activePlanFixture([
+      { trainings: [{ day: 0, source: "rutina", routineId: routine.id }] },
+    ]);
+    const training = trainings[0]!;
+
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    const session = (started.body as { session: SessionDocument }).session;
+    const copiedGoal = session.exercises[0]!.series[0]!.goal;
+
+    // la Rutina cambia después de iniciar: la referencia viva del Plan cambia
+    const replacedRoutine = await replaceRoutine(context!, cookie, routine.id, {
+      name: "Día de empuje v2",
+      revision: routine.revision,
+      exercises: [
+        { id: routine.exercises[0]!.id, exerciseId: dominada, series: [{ repeticiones: 20 }] },
+      ],
+    });
+    expect(replacedRoutine.status).toBe(200);
+
+    // el Plan también cambia después de iniciar (día pendiente: puede editarse)
+    const planAfter = (await getPlan(context!, cookie, plan.id)).body as { plan: PlanDocument };
+    const edited = await context!.app.request(`/api/plans/${plan.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({
+        name: "Ciclo base v2",
+        revision: planAfter.plan.revision,
+        weeks: planAfter.plan.weeks.map((week) => ({
+          id: week.id,
+          trainings: week.trainings.map((entry) => ({
+            id: entry.id,
+            day: entry.day,
+            source: "rutina",
+            routineId: routine.id,
+            specific: [],
+          })),
+        })),
+      }),
+    });
+    expect(edited.status).toBe(200);
+
+    const active = await getActiveSession(context!, cookie);
+    const after = (active.body as { session: SessionDocument }).session;
+    expect(after.id).toBe(session.id);
+    expect(after.exercises[0]!.exerciseId).toBe(press);
+    expect(after.exercises[0]!.series[0]!.goal).toEqual(copiedGoal);
+    expect(after.exercises[0]!.series[0]!.goal).toEqual({
+      carga: 60,
+      repeticiones: 10,
+      duracion: null,
+    });
+  });
+
+  test("iniciar desde un Entrenamiento no pendiente es una transición imposible", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ repeticiones: 10 }] }],
+    });
+    const { plan, trainings } = await activePlanFixture([
+      { trainings: [{ day: 0, source: "rutina", routineId: routine.id }] },
+    ]);
+    const training = trainings[0]!;
+
+    const omitted = await omitPlanTraining(context!, cookie, plan.id, training.id, plan.revision);
+    expect(omitted.status).toBe(200);
+
+    const { status, body } = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(status).toBe(409);
+    const error = (body as { error: { code: string; message: string } }).error;
+    expect(error.code).toBe("TRANSITION_IMPOSSIBLE");
+    expect(error.message).toContain("pendiente");
+  });
+
+  test("iniciar desde un Plan que no está activo es una transición imposible", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ repeticiones: 10 }] }],
+    });
+    const draft = await createPlan(context!, cookie, {
+      name: "Ciclo base",
+      weeks: [{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }],
+    });
+    const draftTraining = draft.weeks[0]!.trainings[0]!;
+
+    const fromDraft = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: draft.id,
+      trainingId: draftTraining.id,
+    });
+    expect(fromDraft.status).toBe(409);
+
+    const { plan, trainings } = await activePlanFixture([
+      { trainings: [{ day: 0, source: "rutina", routineId: routine.id }] },
+    ]);
+    const training = trainings[0]!;
+    const completed = await completePlanRequest(context!, cookie, plan.id, plan.revision);
+    expect(completed.status).toBe(200);
+
+    const fromCompleted = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(fromCompleted.status).toBe(409);
+    expect(
+      (fromCompleted.body as { error: { code: string } }).error.code,
+    ).toBe("TRANSITION_IMPOSSIBLE");
+  });
+
+  test("el Entrenamiento de otro Plan o de otra Cuenta responde inexistente", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ repeticiones: 10 }] }],
+    });
+    const { plan, trainings } = await activePlanFixture([
+      { trainings: [{ day: 0, source: "rutina", routineId: routine.id }] },
+    ]);
+    const training = trainings[0]!;
+
+    // un Entrenamiento de otro Plan (aunque sea de la misma Cuenta) es
+    // inexistente bajo ese Plan: la combinación planId + trainingId no casa
+    const otherDraft = await createPlan(context!, cookie, {
+      name: "Otro ciclo",
+      weeks: [{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }],
+    });
+    const wrongPlan = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: otherDraft.id,
+      trainingId: training.id,
+    });
+    expect(wrongPlan.status).toBe(404);
+
+    // un Entrenamiento desconocido responde inexistente
+    const unknown = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: "ffffffffffffffffffffffffffffffff",
+    });
+    expect(unknown.status).toBe(404);
+
+    // el Plan de otra Cuenta responde inexistente
+    const cookieB = await registerVerified(context!, "otra@example.com");
+    const foreign = await startSessionRequest(context!, cookieB, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(foreign.status).toBe(404);
+  });
+
+  test("una Sesión iniciada desde una Rutina no cambia el estado de ningún día del Plan", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ repeticiones: 10 }] }],
+    });
+    const { plan } = await activePlanFixture([
+      { trainings: [{ day: 0, source: "rutina", routineId: routine.id }] },
+    ]);
+
+    await startSessionRequest(context!, cookie, { origin: "rutina", routineId: routine.id });
+
+    const after = (await getPlan(context!, cookie, plan.id)).body as { plan: PlanDocument };
+    expect(after.plan.weeks[0]!.trainings[0]!.status).toBe("pendiente");
+    expect(after.plan.revision).toBe(plan.revision);
+  });
+
+  test("con una Sesión activa existente, iniciar desde un Entrenamiento conduce a la existente", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ repeticiones: 10 }] }],
+    });
+    const { plan, trainings } = await activePlanFixture([
+      { trainings: [{ day: 0, source: "rutina", routineId: routine.id }] },
+    ]);
+    const training = trainings[0]!;
+
+    const first = await startSessionRequest(context!, cookie, { origin: "libre" });
+    const firstId = (first.body as { session: SessionDocument }).session.id;
+
+    const fromPlan = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(fromPlan.status).toBe(409);
+    const error = (fromPlan.body as { error: { code: string; sessionId: string } }).error;
+    expect(error.code).toBe("ACTIVE_SESSION_EXISTS");
+    expect(error.sessionId).toBe(firstId);
+  });
+});
+
+describe("conservación de la intención original en Sesiones con origen", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  test("las Series previstas no pueden eliminarse: se resuelven omitiéndolas", async () => {
+    const exerciseId = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId, series: [{ repeticiones: 10 }, { repeticiones: 8 }] }],
+    });
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "rutina",
+      routineId: routine.id,
+    });
+    const session = (started.body as { session: SessionDocument }).session;
+    const occurrence = session.exercises[0]!;
+    const keptId = occurrence.series[0]!.id;
+    const removedId = occurrence.series[1]!.id;
+
+    // soltar una Serie prevista del agregado: rechazado
+    const dropped = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId,
+          series: [{ id: keptId, status: "pendiente", goal: { repeticiones: 10 }, result: null }],
+        },
+      ],
+    });
+    expect(dropped.status).toBe(400);
+    const error = (dropped.body as { error: { code: string; fields?: Record<string, string[]> } }).error;
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.fields?.["exercises[0].series"]).toBeDefined();
+
+    // omitir la Serie prevista conserva la intención original
+    const omitted = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId,
+          series: [
+            { id: keptId, status: "pendiente", goal: { repeticiones: 10 }, result: null },
+            { id: removedId, status: "omitida", goal: { repeticiones: 8 }, result: null },
+          ],
+        },
+      ],
+    });
+    expect(omitted.status).toBe(200);
+    const after = (omitted.body as { session: SessionDocument }).session;
+    expect(after.exercises[0]!.series).toHaveLength(2);
+    expect(after.exercises[0]!.series[1]!.status).toBe("omitida");
+    expect(after.exercises[0]!.series[1]!.added).toBe(false);
+  });
+
+  test("los Ejercicios del origen no pueden eliminarse de la Sesión", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const dominada = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [
+        { exerciseId: press, series: [{ repeticiones: 10 }] },
+        { exerciseId: dominada, series: [{ repeticiones: 8 }] },
+      ],
+    });
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "rutina",
+      routineId: routine.id,
+    });
+    const session = (started.body as { session: SessionDocument }).session;
+    const kept = session.exercises[0]!;
+    const removed = session.exercises[1]!;
+
+    // soltar un Ejercicio del origen: rechazado
+    const dropped = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: kept.id,
+          exerciseId: press,
+          series: [{ id: kept.series[0]!.id, status: "pendiente", goal: { repeticiones: 10 }, result: null }],
+        },
+      ],
+    });
+    expect(dropped.status).toBe(400);
+    const error = (dropped.body as { error: { code: string; fields?: Record<string, string[]> } }).error;
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.fields?.exercises).toBeDefined();
+
+    // conservar ambos Ejercicios (una Serie omitida) es válido
+    const keptAll = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: kept.id,
+          exerciseId: press,
+          series: [{ id: kept.series[0]!.id, status: "pendiente", goal: { repeticiones: 10 }, result: null }],
+        },
+        {
+          id: removed.id,
+          exerciseId: dominada,
+          series: [{ id: removed.series[0]!.id, status: "omitida", goal: { repeticiones: 8 }, result: null }],
+        },
+      ],
+    });
+    expect(keptAll.status).toBe(200);
+    expect((keptAll.body as { session: SessionDocument }).session.exercises).toHaveLength(2);
+  });
+
+  test("las Series y Ejercicios añadidos mantienen las reglas del ticket 27", async () => {
+    const exerciseId = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId, series: [{ repeticiones: 10 }] }],
+    });
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "rutina",
+      routineId: routine.id,
+    });
+    const session = (started.body as { session: SessionDocument }).session;
+    const prevista = session.exercises[0]!;
+    const previstaSeriesId = prevista.series[0]!.id;
+
+    // se añade una Serie y un Ejercicio durante la Sesión
+    const added = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: prevista.id,
+          exerciseId,
+          series: [
+            { id: previstaSeriesId, status: "pendiente", goal: { repeticiones: 10 }, result: null },
+            { status: "pendiente", goal: null, result: null },
+          ],
+        },
+        { exerciseId, series: [{ status: "pendiente", goal: null, result: null }] },
+      ],
+    });
+    expect(added.status).toBe(200);
+    let current = (added.body as { session: SessionDocument }).session;
+    expect(current.exercises[0]!.series[1]!.added).toBe(true);
+    expect(current.exercises[1]!.added).toBe(true);
+
+    // la Serie añadida puede eliminarse
+    const removedSeries = await replaceSession(context!, cookie, current.id, {
+      revision: current.revision,
+      exercises: current.exercises.map((entry, index) =>
+        index === 0
+          ? {
+              id: entry.id,
+              exerciseId: entry.exerciseId,
+              series: [{ id: previstaSeriesId, status: "pendiente", goal: { repeticiones: 10 }, result: null }],
+            }
+          : { id: entry.id, exerciseId: entry.exerciseId, series: entry.series.map((series) => ({ id: series.id, status: series.status, goal: series.goal, result: series.result })) },
+      ),
+    });
+    expect(removedSeries.status).toBe(200);
+    current = (removedSeries.body as { session: SessionDocument }).session;
+    expect(current.exercises[0]!.series).toHaveLength(1);
+    expect(current.exercises[0]!.series[0]!.id).toBe(previstaSeriesId);
+
+    // el Ejercicio añadido puede eliminarse conservando el del origen
+    const removedExercise = await replaceSession(context!, cookie, current.id, {
+      revision: current.revision,
+      exercises: [
+        {
+          id: current.exercises[0]!.id,
+          exerciseId,
+          series: [{ id: previstaSeriesId, status: "pendiente", goal: { repeticiones: 10 }, result: null }],
+        },
+      ],
+    });
+    expect(removedExercise.status).toBe(200);
+    const after = (removedExercise.body as { session: SessionDocument }).session;
+    expect(after.exercises).toHaveLength(1);
+    expect(after.exercises[0]!.added).toBe(false);
+  });
+});
+
+describe("finalizar una Sesión originada en un Plan", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function planFixture(): Promise<{ plan: PlanDocument; training: PlanTrainingDocument; routine: RoutineDocument }> {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const plan = await createPlan(context!, cookie, {
+      name: "Ciclo base",
+      weeks: [{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }],
+    });
+    const activated = await activatePlan(context!, cookie, plan.id, plan.revision, "2025-03-03");
+    return {
+      plan: activated,
+      training: activated.weeks[0]!.trainings[0]!,
+      routine,
+    };
+  }
+
+  async function startFromPlan(plan: PlanDocument, training: PlanTrainingDocument): Promise<SessionDocument> {
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(started.status).toBe(201);
+    return (started.body as { session: SessionDocument }).session;
+  }
+
+  test("finalizar la Sesión marca el Entrenamiento como realizado y conserva su Fecha prevista", async () => {
+    const { plan, training } = await planFixture();
+    const session = await startFromPlan(plan, training);
+    // se completa una Serie para poder finalizar
+    const seriesId = session.exercises[0]!.series[0]!.id;
+    const completed = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: session.exercises[0]!.id,
+          exerciseId: session.exercises[0]!.exerciseId,
+          series: [
+            { id: seriesId, status: "completada", goal: { carga: 60, repeticiones: 10 }, result: { carga: 62.5, repeticiones: 10 } },
+          ],
+        },
+      ],
+    });
+    expect(completed.status).toBe(200);
+    const afterComplete = (completed.body as { session: SessionDocument }).session;
+
+    const finalized = await finalizeSessionRequest(
+      context!, cookie, afterComplete.id, afterComplete.revision,
+    );
+    expect(finalized.status).toBe(200);
+
+    // el Entrenamiento pasa a realizado únicamente al finalizar la Sesión
+    const planAfter = (await getPlan(context!, cookie, plan.id)).body as { plan: PlanDocument };
+    const day = planAfter.plan.weeks[0]!.trainings[0]!;
+    expect(day.status).toBe("realizado");
+    expect(day.plannedDate).toBe(training.plannedDate);
+    expect(planAfter.plan.status).toBe("activo");
+  });
+
+  test("cada Entrenamiento planificado origina como máximo una Sesión finalizada", async () => {
+    const { plan, training } = await planFixture();
+    const session = await startFromPlan(plan, training);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+    const completed = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: session.exercises[0]!.id,
+          exerciseId: session.exercises[0]!.exerciseId,
+          series: [
+            { id: seriesId, status: "completada", goal: { carga: 60, repeticiones: 10 }, result: { carga: 62.5, repeticiones: 10 } },
+          ],
+        },
+      ],
+    });
+    const afterComplete = (completed.body as { session: SessionDocument }).session;
+    const finalized = await finalizeSessionRequest(
+      context!, cookie, afterComplete.id, afterComplete.revision,
+    );
+    expect(finalized.status).toBe(200);
+
+    // el Entrenamiento ya está realizado: no origina otra Sesión
+    const again = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(again.status).toBe(409);
+    expect((again.body as { error: { code: string } }).error.code).toBe(
+      "TRANSITION_IMPOSSIBLE",
+    );
+
+    // una Sesión libre nueva no choca con el cupo del Entrenamiento
+    const free = await startSessionRequest(context!, cookie, { origin: "libre" });
+    expect(free.status).toBe(201);
+  });
+
+  test("completar el Plan devuelve conflicto con una Sesión activa originada y eliminar la Sesión lo desbloquea", async () => {
+    const { plan, training } = await planFixture();
+    const session = await startFromPlan(plan, training);
+
+    const blocked = await completePlanRequest(context!, cookie, plan.id, plan.revision);
+    expect(blocked.status).toBe(409);
+    const error = (blocked.body as { error: { code: string; message: string } }).error;
+    expect(error.code).toBe("TRANSITION_IMPOSSIBLE");
+    expect(error.message).toContain("Sesión activa");
+
+    // el día sigue pendiente y el Plan intacto
+    const unchanged = (await getPlan(context!, cookie, plan.id)).body as { plan: PlanDocument };
+    expect(unchanged.plan.weeks[0]!.trainings[0]!.status).toBe("pendiente");
+    expect(unchanged.plan.status).toBe("activo");
+
+    // eliminar la Sesión activa deja de bloquear el Plan
+    const deleted = await deleteSessionRequest(
+      context!, cookie, session.id, session.revision,
+    );
+    expect(deleted.status).toBe(200);
+
+    const completed = await completePlanRequest(context!, cookie, plan.id, plan.revision);
+    expect(completed.status).toBe(200);
+    const doc = (completed.body as { plan: PlanDocument }).plan;
+    expect(doc.status).toBe("completado");
+    expect(doc.weeks[0]!.trainings[0]!.status).toBe("omitido");
   });
 });
 

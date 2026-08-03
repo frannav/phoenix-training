@@ -53,7 +53,7 @@ function PlanCompletedView({ plan }: { plan: PlanItem }) {
                 )}
                 <span className={styles.completedStatus}>
                   <span className={styles.statusDot} aria-hidden="true" />
-                  Omitido
+                  {training.status === "realizado" ? "Realizado" : "Omitido"}
                 </span>
                 <span className={styles.completedContent}>
                   {training.source === "rutina"
