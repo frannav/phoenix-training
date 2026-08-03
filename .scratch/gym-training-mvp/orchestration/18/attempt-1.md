@@ -4,7 +4,7 @@
 - **Spec:** `.scratch/gym-training-mvp/spec.md`
 - **Fixed point:** `43cd144bf7630d44db7007d4ae42ee5bf448ece7`
 - **Branch:** `main`
-- **Commit:** `8b4bedb`
+- **Commit:** `0837e7e`
 - **Outcome:** succeeded
 
 ## Resumen
