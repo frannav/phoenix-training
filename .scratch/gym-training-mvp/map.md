@@ -38,6 +38,7 @@ Una especificación funcional, de experiencia y técnica del MVP lista para conv
 - [Definir el contrato API y la estrategia de guardado](issues/13-definir-contrato-api.md) — La API REST intercambia agregados completos con revisión optimista; cada escritura es transaccional, las entradas parciales viven en el navegador y las métricas se calculan al leer sin procesos derivados.
 - [Elegir la arquitectura del frontend React](issues/14-elegir-arquitectura-frontend.md) — El frontend Vite se organiza por funcionalidad y usa React Router, TanStack Query, React Hook Form, Zod, Recharts y CSS Modules sin store global, SSR, PWA ni capas genéricas.
 - [Recuperar credenciales y controlar sesiones](issues/17-recuperar-credenciales-controlar-sesiones.md) — La recuperación usa respuesta indistinguible, tokens de un solo uso y reenvío de verificación para Cuentas pendientes; los cambios de contraseña y el cierre total revocan todas las sesiones.
+- [Gestionar Ejercicios personalizados](issues/19-gestionar-ejercicios-personalizados.md) — Los Ejercicios personalizados son privados por Cuenta, editables solo mientras su Forma de registro sea compatible y combinados con el catálogo compartido en listados y selectores; archivar conserva las referencias existentes.
 
 ## Deferred to implementation planning
 
