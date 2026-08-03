@@ -2,7 +2,7 @@
 
 **What to build:** El inicio de una Sesión desde una Rutina o un Entrenamiento planificado, conservando su origen y haciendo independientes los objetivos desde el momento de empezar.
 
-**Blocked by:** 24 — Omitir, completar y duplicar Planes; 27 — Adaptar y finalizar una Sesión.
+**Blocked by:** 23 — Gestionar el ciclo de vida completo de un Plan; 27 — Adaptar y finalizar una Sesión.
 
 **Status:** ready-for-agent
 

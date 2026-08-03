@@ -2,7 +2,7 @@
 
 **What to build:** Los dos primeros bloques de Inicio para que el Deportista sepa qué hacer ahora y cómo avanza su Plan activo.
 
-**Blocked by:** 24 — Omitir, completar y duplicar Planes; 28 — Iniciar Sesiones desde Rutinas y Planes.
+**Blocked by:** 23 — Gestionar el ciclo de vida completo de un Plan; 28 — Iniciar Sesiones desde Rutinas y Planes.
 
 **Status:** ready-for-agent
 

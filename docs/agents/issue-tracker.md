@@ -10,6 +10,15 @@ Issues and specs (you may know a spec as a PRD) for this repo live as markdown f
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
 
+## Merged implementation issues
+
+When several implementation issues are combined into one delivery unit:
+
+- Choose one issue as the canonical implementation issue and move every acceptance criterion into it without weakening the original scope.
+- Keep each superseded issue file for traceability, set its `Status:` to `wontfix`, and replace its implementation checklist with an `## Answer` that links to the canonical issue.
+- Update every active `Blocked by:` reference to point at the canonical issue.
+- Do not rewrite historical orchestration reports or completed implementation records; they describe the state at the time they were produced.
+
 ## When a skill says "publish to the issue tracker"
 
 Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).

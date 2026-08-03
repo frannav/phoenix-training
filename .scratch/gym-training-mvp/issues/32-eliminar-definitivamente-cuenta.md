@@ -2,7 +2,7 @@
 
 **What to build:** La eliminación irreversible y transaccional de la Cuenta autenticada, sus credenciales, sesiones y todos sus datos privados.
 
-**Blocked by:** 17 — Recuperar credenciales y controlar sesiones; 20 — Mantener RM registrados; 24 — Omitir, completar y duplicar Planes; 29 — Consultar y corregir el Historial.
+**Blocked by:** 17 — Recuperar credenciales y controlar sesiones; 20 — Mantener RM registrados; 23 — Gestionar el ciclo de vida completo de un Plan; 29 — Consultar y corregir el Historial.
 
 **Status:** ready-for-agent
 
