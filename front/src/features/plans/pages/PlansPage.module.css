@@ -1,0 +1,163 @@
+.management {
+  max-width: 46rem;
+  margin-top: 2rem;
+}
+
+.newPlan {
+  display: inline-block;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.1rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+}
+
+.sectionHeading {
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+}
+
+.results {
+  max-width: 46rem;
+  margin-top: 2rem;
+}
+
+.status {
+  color: var(--color-ink-muted);
+}
+
+.error {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.emptyState {
+  border: 1px dashed var(--color-border);
+  border-radius: 0.9rem;
+  padding: 1.5rem;
+  display: grid;
+  gap: 0.9rem;
+  color: var(--color-ink-muted);
+}
+
+.emptyAction {
+  justify-self: start;
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.9rem;
+  padding: 0.9rem 1rem;
+  background: var(--color-surface);
+}
+
+.itemLink {
+  display: grid;
+  gap: 0.25rem;
+  text-decoration: none;
+  color: var(--color-ink);
+  min-width: 0;
+}
+
+.itemName {
+  font-weight: 700;
+}
+
+.itemMeta {
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+}
+
+.itemActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.itemActions a,
+.itemActions button {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  text-decoration: none;
+  color: var(--color-ink);
+  background: var(--color-surface);
+}
+
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(25 32 24 / 45%);
+  padding: 1rem;
+  z-index: 20;
+}
+
+.dialog {
+  max-width: 26rem;
+  width: 100%;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background: var(--color-surface);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dialog h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.dialog p {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+.dialogDanger {
+  border: 0;
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-danger);
+}
+
+.dialogCancel {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  background: var(--color-surface);
+}
+
+@media (min-width: 40rem) {
+  .list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -50,6 +50,13 @@
       "when": 1785783062306,
       "tag": "0006_pink_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1785785517149,
+      "tag": "0007_silky_domino",
+      "breakpoints": true
     }
   ]
 }

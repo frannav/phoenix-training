@@ -8,6 +8,7 @@ import {
   routineSeriesGoal,
   type RecordingMode,
 } from "../db/schema";
+import { allowedTargetFields, fieldKey, targetLimitMessage } from "../domain/series-goals";
 
 /** Ejercicio persistido tal como vive en la tabla compartida del catálogo y de los personalizados. */
 type ExerciseRow = typeof exercise.$inferSelect;
@@ -88,65 +89,15 @@ export type RoutineTransitionOutcome =
   | { ok: true }
   | { ok: false; reason: "not-found" };
 
-/** Objetivos admitidos por cada Forma de registro (spec «Series y Formas de registro»). */
-const allowedTargetFields: Record<RecordingMode, Array<"carga" | "repeticiones" | "duracion">> = {
-  fuerza_con_carga: ["carga", "repeticiones"],
-  repeticiones_sin_carga: ["repeticiones"],
-  tiempo_por_serie: ["duracion"],
-  cardio_continuo: ["duracion"],
-};
-
-export function createOpaqueRoutineId(): string {
-  return randomBytes(16).toString("hex");
-}
-
 /**
  * Clave de campo con rutas de hijo legibles (`exercises[0].series[1].carga`):
  * el contrato que el servidor devuelve en `fields` y que el cliente usa para
  * mostrar los errores junto al campo afectado.
  */
-export function routineFieldKey(...segments: Array<string | number>): string {
-  let key = "";
-  for (const segment of segments) {
-    if (typeof segment === "number" || /^\d+$/.test(segment)) {
-      key += `[${segment}]`;
-    } else {
-      key += key.length === 0 ? segment : `.${segment}`;
-    }
-  }
-  return key;
-}
+export const routineFieldKey = fieldKey;
 
-/**
- * Límites de dominio de cada objetivo (spec «Series y Formas de registro»):
- * la carga admite de 0 a 9999,99 kg con dos decimales como máximo; las
- * repeticiones, enteros de 1 a 9999; la duración, enteros de 1 a 359999
- * segundos. Devuelve el mensaje cuando el valor no cumple su límite.
- */
-function targetLimitMessage(target: "carga" | "repeticiones" | "duracion", value: number): string | null {
-  switch (target) {
-    case "carga":
-      if (!Number.isFinite(value)) {
-        return "La carga debe ser un número.";
-      }
-      if (value < 0 || value > 9999.99) {
-        return "La carga admite de 0 a 9999,99 kg.";
-      }
-      if (Number(value.toFixed(2)) !== value) {
-        return "La carga admite como máximo dos decimales.";
-      }
-      return null;
-    case "repeticiones":
-      if (!Number.isInteger(value) || value < 1 || value > 9999) {
-        return "Las repeticiones admiten enteros de 1 a 9999.";
-      }
-      return null;
-    case "duracion":
-      if (!Number.isInteger(value) || value < 1 || value > 359999) {
-        return "La duración admite enteros de 1 a 359999 segundos.";
-      }
-      return null;
-  }
+export function createOpaqueRoutineId(): string {
+  return randomBytes(16).toString("hex");
 }
 
 /**
@@ -609,4 +560,43 @@ export async function listRoutineDocuments(
     routineRows.map((row) => row.id),
   );
   return buildDocuments({ ...fetched, routineRows });
+}
+
+/**
+ * Resuelve la referencia viva de una Rutina para un consumidor (p. ej. un
+ * Entrenamiento planificado de un Plan): su identidad y su contenido actual,
+ * aunque la Rutina esté archivada. Solo resuelve Rutinas de la Cuenta: las
+ * ajenas se comportan como inexistentes sin inferir su presencia.
+ */
+export async function resolveRoutineReferences(
+  database: AppDatabase,
+  { accountId, routineIds }: { accountId: string; routineIds: string[] },
+): Promise<Map<string, { id: string; name: string; archived: boolean; exercises: RoutineExerciseDocument[] }>> {
+  if (routineIds.length === 0) {
+    return new Map();
+  }
+  const routineRows = await database
+    .select()
+    .from(routine)
+    .where(and(inArray(routine.id, routineIds), eq(routine.accountId, accountId)))
+    .all();
+  if (routineRows.length === 0) {
+    return new Map();
+  }
+  const fetched = await fetchRoutineAggregates(
+    database,
+    routineRows.map((row) => row.id),
+  );
+  const documents = buildDocuments({ ...fetched, routineRows });
+  return new Map(
+    documents.map((document) => [
+      document.id,
+      {
+        id: document.id,
+        name: document.name,
+        archived: document.archived,
+        exercises: document.exercises,
+      },
+    ]),
+  );
 }

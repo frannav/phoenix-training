@@ -17,6 +17,7 @@ import { opaqueCursorKey } from "./http/opaque-cursor";
 import { createExercisesRouter } from "./exercises/exercises-router";
 import { createSessionsRouter } from "./sessions/sessions-router";
 import { createRoutinesRouter } from "./routines/routines-router";
+import { createPlansRouter } from "./plans/plans-router";
 import type { MailAdapter } from "./mail/mail-adapter";
 
 export type AuthDependencies = {
@@ -401,6 +402,15 @@ export function createApp({
     app.route(
       "/api",
       createRoutinesRouter({
+        database,
+        authenticatedUserId,
+        now,
+      }),
+    );
+
+    app.route(
+      "/api",
+      createPlansRouter({
         database,
         authenticatedUserId,
         now,

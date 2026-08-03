@@ -194,6 +194,120 @@ export const routineExercise = sqliteTable(
  * duración se omiten de manera independiente y, cuando existen, cumplen
  * los límites de dominio de la Forma de registro correspondiente.
  */
+/**
+ * Plan de entrenamiento de una Cuenta. Un Plan tiene exactamente uno de
+ * tres estados: borrador, activo o completado. Un borrador tiene nombre, una
+ * o más semanas y al menos un Entrenamiento planificado, no tiene Fechas
+ * previstas ni afecta al calendario. La revisión entera habilita la
+ * concurrencia optimista: toda sustitución envía la revisión leída y recibe
+ * el documento canónico con la revisión incrementada.
+ */
+export const plan = sqliteTable(
+  "plan",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("borrador"),
+    revision: integer("revision").notNull().default(1),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("plan_account_idx").on(table.accountId)],
+);
+
+/**
+ * Semana de un Plan, en orden. La identidad es opaca y la conserva la
+ * sustitución que reutiliza la misma semana; las semanas nuevas reciben su
+ * identidad del servidor.
+ */
+export const planWeek = sqliteTable(
+  "plan_week",
+  {
+    id: text("id").primaryKey(),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => plan.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+  },
+  (table) => [index("plan_week_plan_idx").on(table.planId)],
+);
+
+/**
+ * Entrenamiento planificado de un Plan: ocupa un día concreto (0 = lunes …
+ * 6 = domingo) de una semana y usa una Rutina mediante referencia viva
+ * (`source = 'rutina'`) o un contenido específico independiente
+ * (`source = 'especifico'`) definido para ese día. Cada día de una semana
+ * contiene como máximo un Entrenamiento: la unicidad parcial por semana y
+ * día lo garantiza en la base de datos. Eliminar el Plan nunca elimina la
+ * Rutina referenciada: la clave foránea no propaga borrados.
+ */
+export const planTraining = sqliteTable(
+  "plan_training",
+  {
+    id: text("id").primaryKey(),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => plan.id, { onDelete: "cascade" }),
+    weekId: text("week_id")
+      .notNull()
+      .references(() => planWeek.id, { onDelete: "cascade" }),
+    day: integer("day").notNull(),
+    source: text("source").notNull(),
+    routineId: text("routine_id").references(() => routine.id),
+  },
+  (table) => [
+    index("plan_training_plan_idx").on(table.planId),
+    index("plan_training_week_idx").on(table.weekId),
+    uniqueIndex("plan_training_week_day_unique").on(table.weekId, table.day),
+  ],
+);
+
+/**
+ * Aparición de un Ejercicio dentro de un Entrenamiento específico, en orden.
+ * El contenido específico es independiente de cualquier Rutina: nace copiado
+ * de una Rutina al personalizar un día o se define directamente en el editor.
+ */
+export const planTrainingExercise = sqliteTable(
+  "plan_training_exercise",
+  {
+    id: text("id").primaryKey(),
+    planTrainingId: text("plan_training_id")
+      .notNull()
+      .references(() => planTraining.id, { onDelete: "cascade" }),
+    exerciseId: text("exercise_id")
+      .notNull()
+      .references(() => exercise.id),
+    position: integer("position").notNull(),
+  },
+  (table) => [index("plan_training_exercise_training_idx").on(table.planTrainingId)],
+);
+
+/**
+ * Objetivos de serie previstos de una aparición de un Entrenamiento
+ * específico: carga, repeticiones y duración se omiten de manera
+ * independiente y, cuando existen, cumplen los límites de dominio de la
+ * Forma de registro correspondiente.
+ */
+export const planTrainingSeriesGoal = sqliteTable(
+  "plan_training_series_goal",
+  {
+    id: text("id").primaryKey(),
+    planTrainingExerciseId: text("plan_training_exercise_id")
+      .notNull()
+      .references(() => planTrainingExercise.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    carga: real("carga"),
+    repeticiones: integer("repeticiones"),
+    duracion: integer("duracion"),
+  },
+  (table) => [
+    index("plan_training_series_goal_exercise_idx").on(table.planTrainingExerciseId),
+  ],
+);
+
 export const routineSeriesGoal = sqliteTable(
   "routine_series_goal",
   {
