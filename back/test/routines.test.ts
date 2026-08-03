@@ -641,6 +641,59 @@ describe("editar Rutinas con concurrencia optimista", () => {
     expect(current.routine.exercises[0]!.series[0]!.carga).toBe(70);
   });
 
+  test("dos escrituras concurrentes con la misma revisión no se sobrescriben: una gana y la otra recibe conflicto", async () => {
+    const created = await createRoutine(
+      context!,
+      cookieA,
+      routinePayload([{ exerciseId: press.id, series: [{ carga: 60, repeticiones: 10 }] }]),
+    );
+    const routine = (created.body as { routine: RoutineDocument }).routine;
+
+    // Dos PUT con la misma revisión leída se lanzan a la vez. Solo una puede
+    // sustituir el agregado: la perdedora llega con la revisión ya
+    // incrementada y debe recibir conflicto sin mezclar ni sobrescribir.
+    const [editA, editB] = await Promise.all([
+      replaceRoutine(routine.id, cookieA, {
+        revision: routine.revision,
+        name: "Edición A",
+        exercises: [{ exerciseId: press.id, series: [{ carga: 70, repeticiones: 8 }] }],
+      }),
+      replaceRoutine(routine.id, cookieA, {
+        revision: routine.revision,
+        name: "Edición B",
+        exercises: [{ exerciseId: dominada.id, series: [{ repeticiones: 5 }] }],
+      }),
+    ]);
+
+    expect([editA.status, editB.status].sort()).toEqual([200, 409]);
+    const conflict = editA.status === 409 ? editA : editB;
+    expect(conflict.body).toEqual({
+      error: {
+        code: "STALE_REVISION",
+        message: "La Rutina fue modificada por otra sesión. Carga la versión actual antes de guardar.",
+      },
+    });
+
+    // El estado final es exactamente la edición ganadora: ni nombre, ni
+    // hijos, ni Series de la perdedora, con la revisión incrementada una vez.
+    const winner = editA.status === 200 ? editA : editB;
+    const winnerDocument = (winner.body as { routine: RoutineDocument }).routine;
+    const current = (await (await context!.app.request(`/api/routines/${routine.id}`, {
+      headers: { Cookie: cookieA, Origin: origin },
+    })).json()) as { routine: RoutineDocument };
+    expect(current.routine.revision).toBe(2);
+    expect(current.routine.name).toBe(winnerDocument.name);
+    expect(current.routine.exercises).toHaveLength(1);
+    expect(current.routine.exercises[0]).toMatchObject({
+      exerciseId: winnerDocument.exercises[0]!.exerciseId,
+      series: winnerDocument.exercises[0]!.series.map((series) => ({
+        carga: series.carga,
+        repeticiones: series.repeticiones,
+        duracion: series.duracion,
+      })),
+    });
+  });
+
   test("editar la Rutina de otra Cuenta responde inexistente", async () => {
     const created = await createRoutine(
       context!,

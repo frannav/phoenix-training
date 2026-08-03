@@ -311,25 +311,59 @@ export async function replaceRoutine(
     now: Date;
   },
 ): Promise<RoutineReplaceOutcome> {
-  const current = await database
-    .select()
-    .from(routine)
-    .where(and(eq(routine.id, routineId), eq(routine.accountId, accountId)))
-    .get();
-  if (!current) {
-    return { ok: false, reason: "not-found" };
-  }
-  if (current.revision !== revision) {
-    return { ok: false, reason: "stale-revision", currentRevision: current.revision };
-  }
-
   const validation = await validateRoutineInput(database, { accountId, input });
   if (!validation.ok) {
     return { ok: false, reason: "validation" as const, fields: validation.fields };
   }
 
-  await database.transaction(async (tx) => {
-    const currentExercises = await tx
+  // La sustitución es una transacción síncrona y atómica: lee la revisión
+  // vigente dentro de la transacción, la compara con la enviada y escribe el
+  // agregado completo en una sola sección sin ceder el bucle de eventos. El
+  // callback debe ser síncrono: el driver bun-sqlite cierra la transacción en
+  // el primer `await` del callback. Así, dos escrituras concurrentes con la
+  // misma revisión se serializan: la segunda lee la revisión ya incrementada
+  // y devuelve conflicto sin mezclar ni sobrescribir los hijos.
+  let outcome: RoutineReplaceOutcome = { ok: false, reason: "not-found" };
+  await database.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(routine)
+      .where(and(eq(routine.id, routineId), eq(routine.accountId, accountId)))
+      .get();
+    if (!current) {
+      outcome = { ok: false, reason: "not-found" };
+      return;
+    }
+    if (current.revision !== revision) {
+      outcome = { ok: false, reason: "stale-revision", currentRevision: current.revision };
+      return;
+    }
+
+    // CAS de la cabecera dentro de la transacción: la actualización exige la
+    // revisión esperada y no solo el identificador. Si otra escritura ganó
+    // entre la lectura y esta actualización, no coincide y la sustitución se
+    // abandona antes de tocar los hijos: no hay nada que deshacer.
+    const updated = tx
+      .update(routine)
+      .set({ name: input.name, revision: current.revision + 1, updatedAt: now })
+      .where(and(eq(routine.id, routineId), eq(routine.revision, revision)))
+      .returning()
+      .get();
+    if (!updated) {
+      const fresh = tx
+        .select()
+        .from(routine)
+        .where(and(eq(routine.id, routineId), eq(routine.accountId, accountId)))
+        .get();
+      outcome = {
+        ok: false,
+        reason: "stale-revision",
+        currentRevision: fresh?.revision ?? revision,
+      };
+      return;
+    }
+
+    const currentExercises = tx
       .select()
       .from(routineExercise)
       .where(eq(routineExercise.routineId, routineId))
@@ -338,7 +372,7 @@ export async function replaceRoutine(
     const currentSeries =
       currentExercises.length === 0
         ? []
-        : await tx
+        : tx
             .select()
             .from(routineSeriesGoal)
             .where(
@@ -357,7 +391,7 @@ export async function replaceRoutine(
 
     // La edición sustituye el agregado completo: se borran los hijos y se
     // reinsertan con las identidades conservadas de los existentes.
-    await tx.delete(routineExercise).where(eq(routineExercise.routineId, routineId));
+    tx.delete(routineExercise).where(eq(routineExercise.routineId, routineId)).run();
 
     const usedExerciseIds = new Set<string>();
     const usedSeriesIds = new Set<string>();
@@ -372,12 +406,14 @@ export async function replaceRoutine(
         exerciseChildId = createOpaqueRoutineId();
       }
       usedExerciseIds.add(exerciseChildId);
-      await tx.insert(routineExercise).values({
-        id: exerciseChildId,
-        routineId,
-        exerciseId: entry.exerciseId,
-        position: position++,
-      });
+      tx.insert(routineExercise)
+        .values({
+          id: exerciseChildId,
+          routineId,
+          exerciseId: entry.exerciseId,
+          position: position++,
+        })
+        .run();
 
       const existingSeries = seriesByExerciseId.get(exerciseChildId) ?? new Set<string>();
       let seriesPosition = 0;
@@ -391,24 +427,23 @@ export async function replaceRoutine(
           seriesGoalId = createOpaqueRoutineId();
         }
         usedSeriesIds.add(seriesGoalId);
-        await tx.insert(routineSeriesGoal).values({
-          id: seriesGoalId,
-          routineExerciseId: exerciseChildId,
-          position: seriesPosition++,
-          carga: seriesInput.carga ?? null,
-          repeticiones: seriesInput.repeticiones ?? null,
-          duracion: seriesInput.duracion ?? null,
-        });
+        tx.insert(routineSeriesGoal)
+          .values({
+            id: seriesGoalId,
+            routineExerciseId: exerciseChildId,
+            position: seriesPosition++,
+            carga: seriesInput.carga ?? null,
+            repeticiones: seriesInput.repeticiones ?? null,
+            duracion: seriesInput.duracion ?? null,
+          })
+          .run();
       }
     }
 
-    await tx
-      .update(routine)
-      .set({ name: input.name, revision: current.revision + 1, updatedAt: now })
-      .where(eq(routine.id, routineId));
+    outcome = { ok: true };
   });
 
-  return { ok: true };
+  return outcome;
 }
 
 /**
