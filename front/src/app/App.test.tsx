@@ -49,6 +49,7 @@ describe("application navigation", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+        
         if (url === "/api/auth/get-session") {
           return Response.json(verifiedSession);
         }
@@ -74,6 +75,22 @@ describe("application navigation", () => {
               createdAt: "2025-08-01T10:00:00.000Z",
               updatedAt: "2025-08-01T10:00:00.000Z",
               exercises: [],
+            },
+          });
+        }
+        if (url === "/api/plans") {
+          return Response.json({ items: [] });
+        }
+        if (url === "/api/plans/plan-opaco") {
+                    return Response.json({
+            plan: {
+              id: "plan-opaco",
+              name: "Detalle del Plan",
+              status: "borrador",
+              revision: 1,
+              createdAt: "2025-08-01T10:00:00.000Z",
+              updatedAt: "2025-08-01T10:00:00.000Z",
+              weeks: [],
             },
           });
         }
