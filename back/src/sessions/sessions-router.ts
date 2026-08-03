@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { AppDatabase } from "../db/open-database";
 import { apiError } from "../http/api-error";
 import {
+  deleteActiveSession,
+  finalizeSession,
   getActiveSession,
   getSessionForAccount,
   replaceSession,
@@ -69,11 +71,22 @@ const replaceSessionSchema = z
   })
   .strict();
 
+const sessionRevisionSchema = z.object({
+  revision: z.number().int().min(1, "Indica la revisión leída de la Sesión."),
+});
+
+const sessionRevisionQuerySchema = z.object({
+  revision: z.coerce.number().int().min(1, "Indica la revisión leída de la Sesión."),
+});
+
 const unauthorizedMessage = "Debes iniciar sesión para gestionar tus Sesiones.";
 const notFoundMessage = "La Sesión solicitada no existe o no pertenece a tu Cuenta.";
 const activeSessionExistsMessage = "Ya tienes una Sesión activa.";
 const revisionConflictMessage =
   "La Sesión ha cambiado desde tu última lectura. Recarga la versión vigente antes de continuar.";
+const notActiveMessage = "Solo una Sesión activa admite esta acción.";
+const noCompletedSeriesMessage =
+  "Finalizar requiere al menos una Serie completada en la Sesión.";
 
 function validationError(error: z.ZodError): ReturnType<typeof apiError> {
   const fields: Record<string, string[]> = {};
@@ -197,6 +210,58 @@ export function createSessionsRouter({
       }
     }
     return context.json({ session: outcome.session });
+  });
+
+  router.post("/sessions/:sessionId/finalize", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = sessionRevisionSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
+    const outcome = await finalizeSession(database, {
+      accountId: context.get("accountId"),
+      sessionId: context.req.param("sessionId") ?? "",
+      expectedRevision: parsed.data.revision,
+      now: now(),
+    });
+    if (!outcome.ok) {
+      switch (outcome.reason) {
+        case "revision-conflict":
+          return context.json(apiError("REVISION_CONFLICT", revisionConflictMessage), 409);
+        case "not-active":
+          return context.json(apiError("SESSION_NOT_ACTIVE", notActiveMessage), 409);
+        case "no-completed-series":
+          return context.json(apiError("VALIDATION_ERROR", noCompletedSeriesMessage), 400);
+        default:
+          return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+      }
+    }
+    return context.json({ session: outcome.session });
+  });
+
+  router.delete("/sessions/:sessionId", async (context) => {
+    const parsed = sessionRevisionQuerySchema.safeParse(context.req.query());
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
+    const outcome = await deleteActiveSession(database, {
+      accountId: context.get("accountId"),
+      sessionId: context.req.param("sessionId") ?? "",
+      expectedRevision: parsed.data.revision,
+    });
+    if (!outcome.ok) {
+      switch (outcome.reason) {
+        case "revision-conflict":
+          return context.json(apiError("REVISION_CONFLICT", revisionConflictMessage), 409);
+        case "not-active":
+          return context.json(apiError("SESSION_NOT_ACTIVE", notActiveMessage), 409);
+        default:
+          return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+      }
+    }
+    return context.json({ deleted: true });
   });
 
   return router;

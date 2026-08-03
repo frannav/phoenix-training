@@ -113,19 +113,31 @@
 .completeButton:disabled,
 .omitButton:disabled,
 .restoreButton:disabled,
+.pendingButton:disabled,
+.deleteButton:disabled,
 .addSeriesButton:disabled {
   opacity: 0.55;
   cursor: wait;
 }
 
 .omitButton,
-.restoreButton {
+.restoreButton,
+.pendingButton,
+.deleteButton {
   border: 1px solid var(--color-border);
   border-radius: 0.6rem;
   padding: 0.55rem 0.8rem;
   background: var(--color-surface-muted);
   color: var(--color-ink);
   font-weight: 800;
+}
+
+.pendingButton {
+  background: var(--color-surface);
+}
+
+.deleteButton {
+  color: var(--color-danger-dark, #b42318);
 }
 
 .result,

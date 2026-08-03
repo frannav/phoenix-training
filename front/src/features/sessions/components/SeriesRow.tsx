@@ -17,7 +17,13 @@ type SeriesRowProps = {
   onDraftChange: (field: string, value: string) => void;
   onComplete: () => void;
   onOmit: () => void;
+  /** Omitir una Serie completada: elimina resultado y RPE y exige confirmación en la página. */
+  onOmitCompleted: () => void;
+  /** Devolver una Serie completada a pendiente: elimina resultado y RPE y exige confirmación. */
+  onReturnToPending: () => void;
   onRestore: () => void;
+  /** Eliminar una Serie añadida; la página confirma cuando contiene resultado. */
+  onDelete: () => void;
 };
 
 const statusLabels = {
@@ -79,7 +85,10 @@ export function SeriesRow({
   onDraftChange,
   onComplete,
   onOmit,
+  onOmitCompleted,
+  onReturnToPending,
   onRestore,
+  onDelete,
 }: SeriesRowProps) {
   const order = series.order + 1;
   const fields = seriesFieldsPerMode[mode];
@@ -102,6 +111,34 @@ export function SeriesRow({
           </span>
         </div>
         <p className={styles.result}>{resultText(series, mode)}</p>
+        <div className={styles.actions}>
+          <button
+            className={styles.omitButton}
+            type="button"
+            onClick={onOmitCompleted}
+            disabled={saving}
+          >
+            Omitir
+          </button>
+          <button
+            className={styles.pendingButton}
+            type="button"
+            onClick={onReturnToPending}
+            disabled={saving}
+          >
+            Volver a pendiente
+          </button>
+          {series.added && (
+            <button
+              className={styles.deleteButton}
+              type="button"
+              onClick={onDelete}
+              disabled={saving}
+            >
+              Eliminar
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -135,6 +172,16 @@ export function SeriesRow({
           >
             Restaurar
           </button>
+          {series.added && (
+            <button
+              className={styles.deleteButton}
+              type="button"
+              onClick={onDelete}
+              disabled={saving}
+            >
+              Eliminar
+            </button>
+          )}
         </div>
       </div>
     );
@@ -220,6 +267,16 @@ export function SeriesRow({
         >
           Omitir
         </button>
+        {series.added && (
+          <button
+            className={styles.deleteButton}
+            type="button"
+            onClick={onDelete}
+            disabled={saving}
+          >
+            Eliminar
+          </button>
+        )}
       </div>
     </div>
   );

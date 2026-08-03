@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiRequestError } from "../../../shared/http/api-client";
 import {
   listExercises,
@@ -9,12 +9,14 @@ import {
 } from "../../exercises/api/exercises-api";
 import {
   activeSessionQueryKey,
-  countSeriesByStatus,
+  deleteSession,
+  finalizeSession,
   getSession,
   occurrenceProgressLabel,
   saveSession,
   sessionDetailQueryKey,
   sessionProgressLabel,
+  sessionSeriesSummary,
   sessionTitle,
   type SessionDocument,
   type SessionExerciseDocument,
@@ -22,7 +24,9 @@ import {
   type SessionSeriesDocument,
 } from "../api/sessions-api";
 import {
+  draftFromMagnitudes,
   draftFromSeries,
+  emptyDraft,
   resultFromDraft,
   rpeFromDraft,
   validateCompletion,
@@ -32,6 +36,15 @@ import { SeriesRow } from "../components/SeriesRow";
 import styles from "./ActiveSessionPage.module.css";
 
 type SaveState = "saved" | "saving" | "error";
+
+/** Confirmación destructiva pendiente: cada acción indica qué se perderá. */
+type Confirmation =
+  | { kind: "omit-completed"; occurrence: SessionExerciseDocument; series: SessionSeriesDocument }
+  | { kind: "to-pending"; occurrence: SessionExerciseDocument; series: SessionSeriesDocument }
+  | { kind: "delete-series"; occurrence: SessionExerciseDocument; series: SessionSeriesDocument }
+  | { kind: "delete-exercise"; occurrence: SessionExerciseDocument }
+  | { kind: "finalize"; pendingCount: number }
+  | { kind: "delete-session" };
 
 function occurrenceIdFor(
   session: SessionDocument,
@@ -44,24 +57,19 @@ function occurrenceIdFor(
   return matches.length > 0 ? matches[matches.length - 1]!.id : null;
 }
 
-/** Resumen de Series de toda la Sesión para la cabecera del contenido. */
-function sessionSeriesSummary(session: SessionDocument): string {
-  const series = session.exercises.flatMap((occurrence) => occurrence.series);
-  if (series.length === 0) {
-    return "Sin Series";
-  }
-  const { completada, omitida, pendiente } = countSeriesByStatus(series);
-  const parts = [];
-  if (completada > 0) {
-    parts.push(`${completada} completadas`);
-  }
-  if (omitida > 0) {
-    parts.push(`${omitida} omitidas`);
-  }
-  if (pendiente > 0) {
-    parts.push(`${pendiente} pendientes`);
-  }
-  return parts.join(" · ");
+/** Borrador propuesto al añadir una Serie: los valores realmente hechos de la anterior, o sus Objetivos. */
+function proposedDraftFrom(previous: SessionSeriesDocument): SeriesDraft {
+  const source = previous.status === "completada" ? previous.result : previous.goal;
+  return draftFromMagnitudes(source);
+}
+
+/** ¿La Serie o la aparición contienen algún Resultado confirmado? */
+function seriesHasResult(series: SessionSeriesDocument): boolean {
+  return (
+    series.result.carga !== null ||
+    series.result.repeticiones !== null ||
+    series.result.duracion !== null
+  );
 }
 
 /** Entrada canónica del agregado completo desde el documento confirmado. */
@@ -90,12 +98,14 @@ function toAggregateInput(session: SessionDocument): SessionExerciseInput[] {
 export function ActiveSessionPage() {
   const { sesionId } = useParams<{ sesionId: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [session, setSession] = useState<SessionDocument | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [retryTarget, setRetryTarget] = useState<SessionExerciseInput[] | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
   const [drafts, setDrafts] = useState<Record<string, SeriesDraft>>({});
@@ -146,9 +156,11 @@ export function ActiveSessionPage() {
     enabled: pickerOpen,
   });
 
-  const persist = async (exercises: SessionExerciseInput[]) => {
+  const persist = async (
+    exercises: SessionExerciseInput[],
+  ): Promise<SessionDocument | null> => {
     if (!session) {
-      return;
+      return null;
     }
     setSaveState("saving");
     setSaveError(null);
@@ -157,7 +169,9 @@ export function ActiveSessionPage() {
       const { session: next } = await saveSession(session.id, session.revision, exercises);
       setSession(next);
       setSaveState("saved");
-      setPickerOpen(false);
+      // La Sesión vacía vuelve a abrir el selector para añadir un Ejercicio;
+      // con contenido, el selector se cierra tras cada acción confirmada.
+      setPickerOpen(next.exercises.length === 0);
       // Se conserva el Ejercicio desplegado mientras siga en la Sesión: la
       // confirmación no interrumpe el registro en curso.
       setExpandedId((current) =>
@@ -166,6 +180,7 @@ export function ActiveSessionPage() {
           : occurrenceIdFor(next, next.lastExerciseId),
       );
       void queryClient.setQueryData(activeSessionQueryKey, { session: next });
+      return next;
     } catch (error) {
       setSaveState("error");
       if (error instanceof ApiRequestError && error.code === "REVISION_CONFLICT") {
@@ -176,19 +191,11 @@ export function ActiveSessionPage() {
         setRetryTarget(null);
         setFieldErrors({});
         setDrafts({});
-        try {
-          // Lectura directa: la caché puede conservar el documento obsoleto
-          // dentro de su ventana de frescura.
-          const fresh = await getSession(session.id);
-          void queryClient.setQueryData(sessionDetailQueryKey(session.id), fresh);
-          setSession(fresh.session);
-          setExpandedId(occurrenceIdFor(fresh.session, fresh.session.lastExerciseId));
-        } catch {
-          // la versión vigente no pudo cargarse: se conserva la mostrada
-        }
+        await reloadCurrentSession();
       } else {
         setSaveError("No se pudo guardar. Inténtalo de nuevo.");
       }
+      return null;
     }
   };
 
@@ -277,34 +284,63 @@ export function ActiveSessionPage() {
     void persist(exercises);
   };
 
-  const addSeries = (occurrence: SessionExerciseDocument) => {
+  const removeSeries = (
+    occurrence: SessionExerciseDocument,
+    series: SessionSeriesDocument,
+  ) => {
+    if (!session) {
+      return;
+    }
+    const exercises = toAggregateInput(session).map((entry) =>
+      entry.id === occurrence.id
+        ? { ...entry, series: entry.series.filter((input) => input.id !== series.id) }
+        : entry,
+    );
+    void persist(exercises);
+  };
+
+  const removeExercise = (occurrence: SessionExerciseDocument) => {
+    if (!session) {
+      return;
+    }
+    const exercises = toAggregateInput(session).filter(
+      (entry) => entry.id !== occurrence.id,
+    );
+    void persist(exercises);
+  };
+
+  const addSeries = async (occurrence: SessionExerciseDocument) => {
     if (!session) {
       return;
     }
     // «Añadir una Serie propone como borrador los valores de la Serie
-    // anterior»: la Serie nueva nace pendiente con esos valores como
-    // Objetivos, y los Objetivos inicializan los campos del formulario sin
-    // completarla. De una Serie completada se proponen los valores realmente
-    // realizados (Resultado); de una pendiente u omitida, sus Objetivos.
+    // anterior»: la Serie nueva nace pendiente sin perseguir esos valores y
+    // el borrador se siembra en el navegador (se pierde al recargar). De una
+    // Serie completada se proponen los valores realmente realizados
+    // (Resultado); de una pendiente u omitida, sus Objetivos.
     const previous = occurrence.series[occurrence.series.length - 1];
-    const proposedGoal =
-      previous === undefined
-        ? null
-        : previous.status === "completada"
-          ? previous.result
-          : previous.goal;
+    const proposed = previous === undefined ? emptyDraft() : proposedDraftFrom(previous);
     const exercises = toAggregateInput(session).map((entry) =>
       entry.id === occurrence.id
         ? {
             ...entry,
             series: [
               ...entry.series,
-              { status: "pendiente" as const, goal: proposedGoal, result: null },
+              { status: "pendiente" as const, goal: null, result: null },
             ],
           }
         : entry,
     );
-    void persist(exercises);
+    const next = await persist(exercises);
+    if (next) {
+      // El identificador de la Serie nueva lo asigna el servidor: tras la
+      // respuesta se siembra su borrador con los valores propuestos.
+      const updated = next.exercises.find((entry) => entry.id === occurrence.id);
+      const created = updated?.series[updated.series.length - 1];
+      if (created) {
+        setDrafts((current) => ({ ...current, [created.id]: proposed }));
+      }
+    }
   };
 
   const addExercise = (exercise: ExerciseItem) => {
@@ -326,6 +362,108 @@ export function ActiveSessionPage() {
     }
   };
 
+  /** Carga la versión vigente de la Sesión tras un conflicto o una transición ajena. */
+  const reloadCurrentSession = async (): Promise<SessionDocument | null> => {
+    if (!session) {
+      return null;
+    }
+    try {
+      // Lectura directa: la caché puede conservar el documento obsoleto
+      // dentro de su ventana de frescura.
+      const fresh = await getSession(session.id);
+      void queryClient.setQueryData(sessionDetailQueryKey(session.id), fresh);
+      setSession(fresh.session);
+      setExpandedId(occurrenceIdFor(fresh.session, fresh.session.lastExerciseId));
+      return fresh.session;
+    } catch {
+      return null;
+    }
+  };
+
+  const requestFinalize = () => {
+    if (!session) {
+      return;
+    }
+    const allSeries = session.exercises.flatMap((occurrence) => occurrence.series);
+    const pendingCount = allSeries.filter((series) => series.status === "pendiente").length;
+    if (pendingCount > 0) {
+      setConfirmation({ kind: "finalize", pendingCount });
+      return;
+    }
+    void doFinalize();
+  };
+
+  const doFinalize = async () => {
+    if (!session) {
+      return;
+    }
+    setSaveState("saving");
+    setSaveError(null);
+    setRetryTarget(null);
+    setConfirmation(null);
+    try {
+      const { session: next } = await finalizeSession(session.id, session.revision);
+      setSession(next);
+      setSaveState("saved");
+      setDrafts({});
+      setFieldErrors({});
+      // La Sesión deja de aparecer como activa en Inicio y en el acceso persistente.
+      void queryClient.invalidateQueries({ queryKey: activeSessionQueryKey });
+    } catch (error) {
+      setSaveState("error");
+      if (error instanceof ApiRequestError && error.code === "REVISION_CONFLICT") {
+        setSaveError("La Sesión cambió en otra pestaña. Se cargó la versión vigente.");
+        setFieldErrors({});
+        setDrafts({});
+        await reloadCurrentSession();
+      } else if (error instanceof ApiRequestError && error.code === "SESSION_NOT_ACTIVE") {
+        // Otra pestaña ya la finalizó: se carga la versión vigente y se muestra el resumen.
+        setSaveError("La Sesión ya fue finalizada en otra pestaña.");
+        setFieldErrors({});
+        setDrafts({});
+        await reloadCurrentSession();
+      } else {
+        setSaveError("No se pudo finalizar la Sesión. Inténtalo de nuevo.");
+      }
+    }
+  };
+
+  const requestDeleteSession = () => {
+    setConfirmation({ kind: "delete-session" });
+  };
+
+  const doDeleteSession = async () => {
+    if (!session) {
+      return;
+    }
+    setSaveState("saving");
+    setSaveError(null);
+    setConfirmation(null);
+    try {
+      await deleteSession(session.id, session.revision);
+      void queryClient.invalidateQueries({ queryKey: activeSessionQueryKey });
+      void queryClient.removeQueries({ queryKey: sessionDetailQueryKey(session.id) });
+      navigate("/");
+    } catch (error) {
+      setSaveState("error");
+      if (
+        error instanceof ApiRequestError &&
+        (error.code === "REVISION_CONFLICT" || error.code === "SESSION_NOT_ACTIVE")
+      ) {
+        // Otra pestaña cambió o eliminó la Sesión: se carga la vigente o se
+        // vuelve a Inicio si ya no existe.
+        setSaveError("La Sesión cambió en otra pestaña. Se cargó la versión vigente.");
+        const fresh = await reloadCurrentSession();
+        if (!fresh) {
+          void queryClient.invalidateQueries({ queryKey: activeSessionQueryKey });
+          navigate("/");
+        }
+      } else {
+        setSaveError("No se pudo eliminar la Sesión. Inténtalo de nuevo.");
+      }
+    }
+  };
+
   const applySearch = (event: FormEvent) => {
     event.preventDefault();
     setQ(search.trim());
@@ -333,6 +471,99 @@ export function ActiveSessionPage() {
 
   const toggleExercise = (id: string) => {
     setExpandedId((current) => (current === id ? null : id));
+  };
+
+  /** Diálogo de confirmación destructiva: cada acción explica qué se perderá. */
+  const renderConfirmation = () => {
+    if (!confirmation) {
+      return null;
+    }
+    let title = "";
+    let text = "";
+    let confirmLabel = "Confirmar";
+    let onConfirm: () => void = () => {};
+
+    switch (confirmation.kind) {
+      case "omit-completed": {
+        title = "Omitir la Serie";
+        text = "Omitir la Serie eliminará su Resultado y su RPE.";
+        confirmLabel = "Omitir";
+        onConfirm = () => omitSeries(confirmation.occurrence, confirmation.series);
+        break;
+      }
+      case "to-pending": {
+        title = "Volver la Serie a pendiente";
+        text = "Volver la Serie a pendiente eliminará su Resultado y su RPE.";
+        confirmLabel = "Volver a pendiente";
+        onConfirm = () => restoreSeries(confirmation.occurrence, confirmation.series);
+        break;
+      }
+      case "delete-series": {
+        title = "Eliminar la Serie añadida";
+        text = "Eliminar la Serie añadida eliminará su Resultado y su RPE.";
+        confirmLabel = "Eliminar";
+        onConfirm = () => removeSeries(confirmation.occurrence, confirmation.series);
+        break;
+      }
+      case "delete-exercise": {
+        title = `Eliminar «${confirmation.occurrence.exercise.name}»`;
+        text =
+          "Eliminar el Ejercicio eliminará esta aparición y sus Series con sus resultados.";
+        confirmLabel = "Eliminar";
+        onConfirm = () => removeExercise(confirmation.occurrence);
+        break;
+      }
+      case "finalize": {
+        title = "Finalizar la Sesión";
+        text =
+          confirmation.pendingCount === 1
+            ? "1 Serie pendiente pasará a omitida al finalizar."
+            : `${confirmation.pendingCount} Series pendientes pasarán a omitidas al finalizar.`;
+        confirmLabel = "Finalizar";
+        onConfirm = () => void doFinalize();
+        break;
+      }
+      case "delete-session": {
+        title = "Eliminar la Sesión activa";
+        text = "Se eliminará la Sesión y todo su registro. Esta acción no se puede deshacer.";
+        confirmLabel = "Eliminar sesión";
+        onConfirm = () => void doDeleteSession();
+        break;
+      }
+    }
+
+    return (
+      <div
+        className={styles.dialogOverlay}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirmacion-sesion-titulo"
+        aria-describedby="confirmacion-sesion-texto"
+      >
+        <div className={styles.dialog}>
+          <h2 id="confirmacion-sesion-titulo">{title}</h2>
+          <p id="confirmacion-sesion-texto">{text}</p>
+          <div className={styles.dialogActions}>
+            <button
+              className={styles.dialogDanger}
+              type="button"
+              onClick={onConfirm}
+              disabled={saveState === "saving"}
+            >
+              {confirmLabel}
+            </button>
+            <button
+              className={styles.dialogCancel}
+              type="button"
+              onClick={() => setConfirmation(null)}
+              disabled={saveState === "saving"}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const loading = sessionQuery.isPending && session === null;
@@ -368,7 +599,9 @@ export function ActiveSessionPage() {
             )}
           </div>
         </div>
-        <h1 className={styles.title}>Sesión activa</h1>
+        <h1 className={styles.title}>
+          {session?.status === "finalizada" ? "Sesión finalizada" : "Sesión activa"}
+        </h1>
         <p className={styles.origin}>{session ? sessionTitle(session) : "Sesión libre"}</p>
       </header>
 
@@ -385,7 +618,35 @@ export function ActiveSessionPage() {
           </section>
         )}
 
-        {!loading && !failed && session && (
+        {!loading && !failed && session && session.status === "finalizada" && (
+          <section className={styles.finalized} aria-labelledby="resumen-finalizado-titulo">
+            <h2 id="resumen-finalizado-titulo">Resumen de la Sesión</h2>
+            <p className={styles.finalizedDate}>{session.datePerformed}</p>
+            <p className={styles.summary} role="status">
+              {sessionSeriesSummary(session)}
+            </p>
+            <ul className={styles.finalizedList} aria-label="Ejercicios finalizados">
+              {session.exercises.map((occurrence) => (
+                <li key={occurrence.id} className={styles.finalizedExercise}>
+                  <span className={styles.exerciseName}>
+                    {occurrence.exercise.name}
+                  </span>
+                  <span className={styles.exerciseMeta}>
+                    {occurrenceProgressLabel(occurrence)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className={styles.finalizedNote}>
+              La Sesión quedó sin Series pendientes y ya no aparece como activa.
+            </p>
+            <Link className={styles.homeLink} to="/">
+              Volver a Inicio
+            </Link>
+          </section>
+        )}
+
+        {!loading && !failed && session && session.status === "activa" && (
           <>
             <p className={styles.progress} role="status">
               {sessionProgressLabel(session)}
@@ -494,11 +755,28 @@ export function ActiveSessionPage() {
                           <span className={styles.exerciseProgress}>
                             {occurrenceProgressLabel(occurrence)}
                           </span>
-                          {session.lastExerciseId === occurrence.exerciseId && (
-                            <span className={styles.lastUsed}>
-                              Último Ejercicio utilizado
-                            </span>
-                          )}
+                          <span className={styles.exerciseDetailsActions}>
+                            {session.lastExerciseId === occurrence.exerciseId && (
+                              <span className={styles.lastUsed}>
+                                Último Ejercicio utilizado
+                              </span>
+                            )}
+                            <button
+                              className={styles.deleteExerciseButton}
+                              type="button"
+                              onClick={() => {
+                                const hasResult = occurrence.series.some(seriesHasResult);
+                                if (hasResult) {
+                                  setConfirmation({ kind: "delete-exercise", occurrence });
+                                } else {
+                                  removeExercise(occurrence);
+                                }
+                              }}
+                              disabled={saveState === "saving"}
+                            >
+                              Eliminar ejercicio
+                            </button>
+                          </span>
                         </div>
 
                         {occurrence.series.length === 0 ? (
@@ -529,7 +807,32 @@ export function ActiveSessionPage() {
                                   }
                                   onComplete={() => completeSeries(occurrence, series)}
                                   onOmit={() => omitSeries(occurrence, series)}
+                                  onOmitCompleted={() =>
+                                    setConfirmation({
+                                      kind: "omit-completed",
+                                      occurrence,
+                                      series,
+                                    })
+                                  }
+                                  onReturnToPending={() =>
+                                    setConfirmation({
+                                      kind: "to-pending",
+                                      occurrence,
+                                      series,
+                                    })
+                                  }
                                   onRestore={() => restoreSeries(occurrence, series)}
+                                  onDelete={() => {
+                                    if (seriesHasResult(series)) {
+                                      setConfirmation({
+                                        kind: "delete-series",
+                                        occurrence,
+                                        series,
+                                      });
+                                    } else {
+                                      removeSeries(occurrence, series);
+                                    }
+                                  }}
                                 />
                               </li>
                             ))}
@@ -571,6 +874,36 @@ export function ActiveSessionPage() {
           </p>
         )}
       </main>
+
+      {session && session.status === "activa" && (
+        <div className={styles.footer}>
+          <button
+            className={styles.deleteSessionButton}
+            type="button"
+            onClick={requestDeleteSession}
+            disabled={saveState === "saving"}
+          >
+            Eliminar sesión
+          </button>
+          <button
+            className={styles.finalizeButton}
+            type="button"
+            onClick={requestFinalize}
+            disabled={saveState === "saving" || !sessionHasCompletedSeries(session)}
+          >
+            Finalizar
+          </button>
+        </div>
+      )}
+
+      {confirmation && renderConfirmation()}
     </div>
+  );
+}
+
+/** ¿La Sesión contiene al menos una Serie completada? (invariante para finalizar). */
+function sessionHasCompletedSeries(session: SessionDocument): boolean {
+  return session.exercises.some((occurrence) =>
+    occurrence.series.some((series) => series.status === "completada"),
   );
 }
