@@ -13,6 +13,18 @@ const verifiedSession = {
   },
 };
 
+const emptySession = {
+  id: "sesion-opaca",
+  revision: 1,
+  origin: "libre",
+  status: "activa",
+  datePerformed: "2025-03-10",
+  lastExerciseId: null,
+  exercises: [],
+  startedAt: "2025-03-10T09:30:00.000Z",
+  updatedAt: "2025-03-10T09:30:00.000Z",
+};
+
 describe("application navigation", () => {
   const agreedDestinations = [
     ["/registro", "Crear cuenta"],
@@ -36,13 +48,23 @@ describe("application navigation", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        if (String(input) === "/api/auth/get-session") {
+        const url = String(input);
+        if (url === "/api/auth/get-session") {
           return Response.json(verifiedSession);
         }
-        if (String(input) === "/api/routines") {
+        if (url === "/api/sessions/active") {
+          return Response.json({ session: null });
+        }
+        if (url === "/api/sessions/sesion-opaca") {
+          return Response.json({ session: emptySession });
+        }
+        if (url.startsWith("/api/exercises")) {
+          return Response.json({ items: [], nextCursor: null });
+        }
+        if (url === "/api/routines") {
           return Response.json({ items: [] });
         }
-        if (String(input) === "/api/routines/rutina-opaca") {
+        if (url === "/api/routines/rutina-opaca") {
           return Response.json({
             routine: {
               id: "rutina-opaca",

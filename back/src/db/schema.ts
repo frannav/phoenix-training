@@ -258,6 +258,61 @@ export const recordedMax = sqliteTable(
   ],
 );
 
+/**
+ * Sesión de entrenamiento del dominio. Una Sesión libre comienza sin origen;
+ * más adelante podrá originarse en un Entrenamiento planificado o una Rutina.
+ * Cada Cuenta puede tener como máximo una Sesión activa: el índice parcial de
+ * unicidad lo garantiza en la base de datos y la transición de inicio lo
+ * comprueba dentro de la misma transacción.
+ */
+export const trainingSession = sqliteTable(
+  "training_session",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    origin: text("origin").notNull(),
+    status: text("status").notNull().default("activa"),
+    revision: integer("revision").notNull().default(1),
+    datePerformed: text("date_performed").notNull(),
+    lastExerciseId: text("last_exercise_id").references(() => exercise.id),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("training_session_single_active_idx")
+      .on(table.accountId)
+      .where(sql`${table.status} = 'activa'`),
+  ],
+);
+
+/**
+ * Aparición de un Ejercicio dentro de una Sesión. Cada aparición conserva la
+ * identidad del Ejercicio añadido; las Series (tickets siguientes) colgarán
+ * de la aparición. Una Sesión libre comienza sin apariciones.
+ */
+export const trainingSessionExercise = sqliteTable(
+  "training_session_exercise",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => trainingSession.id, { onDelete: "cascade" }),
+    exerciseId: text("exercise_id")
+      .notNull()
+      .references(() => exercise.id),
+    sortOrder: integer("sort_order").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("training_session_exercise_session_order_idx").on(
+      table.sessionId,
+      table.sortOrder,
+    ),
+  ],
+);
+
 export const catalogManifest = sqliteTable("catalog_manifest", {
   id: text("id").primaryKey(),
   source: text("source").notNull(),

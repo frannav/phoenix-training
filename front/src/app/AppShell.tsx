@@ -1,5 +1,12 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
+import {
+  activeSessionQueryKey,
+  getActiveSession,
+  sessionProgressLabel,
+  sessionTitle,
+} from "../features/sessions/api/sessions-api";
 import styles from "./AppShell.module.css";
 
 const mobileDestinations = [
@@ -32,6 +39,12 @@ const desktopGroups = [
 
 export function AppShell() {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const activeSession = useQuery({
+    queryKey: activeSessionQueryKey,
+    queryFn: getActiveSession,
+    retry: false,
+  });
+  const session = activeSession.data?.session ?? null;
 
   return (
     <div className={styles.appShell}>
@@ -55,6 +68,17 @@ export function AppShell() {
       </aside>
       <div>
         <main className={styles.pageContent}>
+          {session && (
+            <section className={styles.sessionAccess} aria-label="Sesión activa">
+              <span className={styles.sessionAccessName}>{sessionTitle(session)}</span>
+              <span className={styles.sessionAccessProgress}>
+                {sessionProgressLabel(session)}
+              </span>
+              <Link className={styles.sessionAccessContinue} to={`/sesion/${session.id}`}>
+                Continuar
+              </Link>
+            </section>
+          )}
           <Outlet />
         </main>
       </div>

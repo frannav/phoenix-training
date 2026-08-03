@@ -54,6 +54,46 @@
   box-shadow: 0 1.25rem 3rem rgba(25, 32, 24, 0.18);
 }
 
+/* Acceso persistente a la Sesión activa: en móvil se acopla sobre la
+   navegación inferior y en escritorio aparece como una franja sobre el
+   contenido (media query inferior). */
+.sessionAccess {
+  position: fixed;
+  z-index: 1;
+  right: 0.75rem;
+  bottom: 4.75rem;
+  left: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--color-surface);
+  box-shadow: 0 0.5rem 1.5rem rgba(25, 32, 24, 0.14);
+}
+
+.sessionAccessName {
+  font-weight: 800;
+}
+
+.sessionAccessProgress {
+  margin-left: auto;
+  color: var(--color-ink-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.sessionAccessContinue {
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.9rem;
+  background: var(--color-success);
+  color: var(--color-surface);
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .moreHeader {
   display: flex;
   align-items: center;
@@ -150,6 +190,12 @@
 
   .pageContent {
     padding: 3.5rem;
+  }
+
+  .sessionAccess {
+    position: static;
+    margin-bottom: 1.5rem;
+    box-shadow: none;
   }
 
   .mobileNavigation,
