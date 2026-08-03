@@ -15,7 +15,6 @@ import {
   planStatusLabels,
   restoreTraining,
   type PlanItem,
-  type PlanTraining,
 } from "../api/plans-api";
 import { ActivatePlanPanel } from "../components/ActivatePlanPanel";
 import { PlanEditor } from "../components/PlanEditor";
@@ -133,10 +132,25 @@ export function PlanDetailPage() {
   };
 
   const handleDuplicate = () => {
-    void runAction(
-      () => duplicatePlan(plan.id),
-      (duplicated) => navigate(`/planes/${duplicated.id}`),
-    );
+    // duplicar crea un recurso nuevo: no se reescribe la caché del Plan
+    // actual (el servidor devuelve el borrador copia bajo otra identidad).
+    setIsActing(true);
+    setActionError(null);
+    duplicatePlan(plan.id)
+      .then((result) => {
+        void queryClient.invalidateQueries({ queryKey: ["plans"] });
+        navigate(`/planes/${result.plan.id}`);
+      })
+      .catch((error: unknown) => {
+        setActionError(
+          error instanceof ApiRequestError
+            ? error.message
+            : "No se pudo completar la acción. Inténtalo de nuevo.",
+        );
+      })
+      .finally(() => {
+        setIsActing(false);
+      });
   };
 
   const calendarRange = planCalendarRange(plan);
