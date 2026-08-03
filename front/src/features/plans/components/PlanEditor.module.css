@@ -1,0 +1,445 @@
+.form {
+  max-width: 46rem;
+  margin-top: 2rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.input,
+.select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  font: inherit;
+  background: var(--color-surface);
+}
+
+.weeksSection {
+  display: grid;
+  gap: 1rem;
+}
+
+.sectionHeading {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.weekCard {
+  border: 1px solid var(--color-border);
+  border-radius: 0.9rem;
+  padding: 1rem;
+  background: var(--color-surface);
+  display: grid;
+  gap: 0.9rem;
+}
+
+.weekHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.weekTitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.removeWeek {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--color-surface);
+  color: var(--color-danger);
+}
+
+.removeWeek:disabled {
+  color: var(--color-ink-muted);
+}
+
+.emptyTrainings {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.trainingCard {
+  border: 1px solid var(--color-border);
+  border-radius: 0.85rem;
+  padding: 1rem;
+  background: var(--color-surface-muted);
+  display: grid;
+  gap: 0.9rem;
+}
+
+.trainingHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.trainingPlacement {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.placementField {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 9rem;
+}
+
+.placementLabel {
+  color: var(--color-ink-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.removeTraining {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--color-surface);
+  color: var(--color-danger);
+  align-self: flex-start;
+}
+
+.sourceToggle {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sourceOption {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+
+.routineBlock,
+.specificBlock {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.routinePreview {
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--color-surface);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.routineName {
+  margin: 0;
+  font-weight: 700;
+}
+
+.archivedNote {
+  color: var(--color-ink-muted);
+  font-weight: 400;
+}
+
+.routineContent {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+}
+
+.personalize {
+  justify-self: start;
+  border: 1px solid var(--color-accent);
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  background: var(--color-surface);
+  font-weight: 700;
+  color: var(--color-accent-strong);
+}
+
+.emptySpecific {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.specificExercise {
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  padding: 0.85rem;
+  background: var(--color-surface);
+  display: grid;
+  gap: 0.7rem;
+}
+
+.specificExerciseHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.specificExerciseName {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.specificExerciseMeta {
+  margin: 0.15rem 0 0;
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+}
+
+.specificExerciseOrder {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.specificExerciseOrder button {
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  background: var(--color-surface);
+}
+
+.orderBadge {
+  min-width: 1.6rem;
+  text-align: center;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+}
+
+.seriesHeading {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-ink-muted);
+}
+
+.cardioNote {
+  font-weight: 400;
+}
+
+.seriesList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.seriesRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.7rem;
+  background: var(--color-surface-muted);
+}
+
+.seriesNumber {
+  align-self: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-ink-muted);
+}
+
+.seriesTarget {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 8rem;
+  flex: 1;
+}
+
+.seriesTargetLabel {
+  color: var(--color-ink-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.removeSeries {
+  align-self: center;
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--color-surface);
+}
+
+.addSeries,
+.addExercise,
+.addTraining,
+.addWeek {
+  justify-self: start;
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  background: var(--color-surface);
+  font-weight: 700;
+}
+
+.removeExercise {
+  justify-self: end;
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--color-surface);
+  color: var(--color-danger);
+}
+
+.pickerPanel {
+  border: 1px solid var(--color-accent);
+  border-radius: 0.9rem;
+  padding: 1rem;
+  background: var(--color-surface-muted);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pickerSearch {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pickerInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  font: inherit;
+  background: var(--color-surface);
+}
+
+.pickerButton {
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+}
+
+.pickerStatus {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.pickerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.pickerItem {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--color-surface);
+}
+
+.pickerName {
+  font-weight: 700;
+  min-width: 0;
+}
+
+.pickerMeta {
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.pickerAdd {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--color-surface);
+  font-weight: 700;
+}
+
+.pickerClose {
+  justify-self: start;
+  border: 0;
+  padding: 0.3rem 0.4rem;
+  background: transparent;
+  color: var(--color-ink-muted);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.conflict {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  border: 1px solid var(--color-danger);
+  border-radius: 0.75rem;
+  padding: 0.8rem 1rem;
+  background: var(--color-surface-muted);
+  color: var(--color-danger);
+}
+
+.conflictButton {
+  border: 1px solid var(--color-danger);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--color-surface);
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.formError {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.submit {
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.7rem 1.1rem;
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+}
+
+.cancel {
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.7rem 1.1rem;
+  background: var(--color-surface);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
