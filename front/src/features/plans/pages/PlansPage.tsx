@@ -4,7 +4,9 @@ import { Link } from "react-router-dom";
 import { PageIntro } from "../../../shared/ui/PageIntro";
 import {
   deletePlan,
+  duplicatePlan,
   listPlans,
+  planCalendarRange,
   planStatusLabels,
   type PlanItem,
 } from "../api/plans-api";
@@ -32,6 +34,13 @@ export function PlansPage() {
     mutationFn: deletePlan,
     onSuccess: () => {
       setDeleteTarget(null);
+      void queryClient.invalidateQueries({ queryKey: ["plans"] });
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: (id: string) => duplicatePlan(id),
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["plans"] });
     },
   });
@@ -112,30 +121,55 @@ export function PlansPage() {
 
         {plans.length > 0 && (
           <ul className={styles.list}>
-            {plans.map((plan) => (
-              <li key={plan.id} className={styles.item}>
-                <Link className={styles.itemLink} to={`/planes/${plan.id}`}>
-                  <span className={styles.itemName}>{plan.name}</span>
-                  <span className={styles.itemMeta}>
-                    {planStatusLabels[plan.status]} · {planSummary(plan)}
-                  </span>
-                </Link>
-                <div className={styles.itemActions}>
-                  <Link className={styles.viewLink} to={`/planes/${plan.id}`}>
-                    Editar
+            {plans.map((plan) => {
+              const calendarRange = planCalendarRange(plan);
+              const editLabel = plan.status === "completado" ? "Ver" : "Editar";
+              return (
+                <li key={plan.id} className={styles.item}>
+                  <Link className={styles.itemLink} to={`/planes/${plan.id}`}>
+                    <span className={styles.itemName}>{plan.name}</span>
+                    <span className={styles.itemMeta}>
+                      <span
+                        className={styles.statusBadge}
+                        data-status={plan.status}
+                        aria-label={`Plan ${planStatusLabels[plan.status]}`}
+                      >
+                        <span className={styles.statusDot} aria-hidden="true" />
+                        {planStatusLabels[plan.status]}
+                      </span>
+                      <span className={styles.itemSummary}>
+                        {planSummary(plan)}
+                        {calendarRange !== null && (
+                          <span className={styles.itemRange}> · {calendarRange}</span>
+                        )}
+                      </span>
+                    </span>
                   </Link>
-                  {plan.status === "borrador" && (
+                  <div className={styles.itemActions}>
+                    <Link className={styles.viewLink} to={`/planes/${plan.id}`}>
+                      {editLabel}
+                    </Link>
                     <button
                       type="button"
-                      aria-label={`Eliminar ${plan.name}`}
-                      onClick={() => setDeleteTarget(plan)}
+                      aria-label={`Duplicar ${plan.name}`}
+                      disabled={duplicateMutation.isPending}
+                      onClick={() => duplicateMutation.mutate(plan.id)}
                     >
-                      Eliminar
+                      Duplicar
                     </button>
-                  )}
-                </div>
-              </li>
-            ))}
+                    {plan.status === "borrador" && (
+                      <button
+                        type="button"
+                        aria-label={`Eliminar ${plan.name}`}
+                        onClick={() => setDeleteTarget(plan)}
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

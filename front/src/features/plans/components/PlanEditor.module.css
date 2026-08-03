@@ -107,6 +107,75 @@
   align-self: flex-start;
 }
 
+.omitTraining,
+.restoreTraining {
+  justify-self: start;
+  border: 1px solid var(--color-accent);
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  background: var(--color-surface);
+  font-weight: 700;
+  color: var(--color-accent-strong);
+}
+
+.closedTraining {
+  border: 1px dashed var(--color-border);
+  border-radius: 0.85rem;
+  padding: 0.9rem 1rem;
+  background: var(--color-surface-muted);
+  display: grid;
+  gap: 0.5rem;
+}
+
+.closedTrainingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.closedTrainingDay {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.closedDayLabel {
+  font-weight: 700;
+}
+
+.closedDate {
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+}
+
+.closedStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+}
+
+.statusDot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--color-ink-muted);
+}
+
+.closedContent {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+}
+
 .sourceToggle {
   display: flex;
   gap: 1rem;
@@ -442,4 +511,35 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Panel de activación de un borrador */
+.activatePanel {
+  max-width: 46rem;
+  margin-top: 2rem;
+  border: 1px solid var(--color-accent);
+  border-radius: 0.9rem;
+  padding: 1rem;
+  background: var(--color-surface-muted);
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+
+.activateHint {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.activateButton {
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.7rem 1.1rem;
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+}
+
+.activateButton:disabled {
+  opacity: 0.6;
 }
