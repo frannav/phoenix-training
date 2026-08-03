@@ -1,0 +1,172 @@
+import { Hono, type Context } from "hono";
+import { z } from "zod";
+import type { AppDatabase } from "../db/open-database";
+import { apiError } from "../http/api-error";
+import {
+  getActiveSession,
+  getSessionForAccount,
+  replaceSession,
+  startFreeSession,
+} from "./sessions";
+
+export type SessionsRouterDependencies = {
+  database: AppDatabase;
+  authenticatedUserId: (request: Request) => Promise<string | null>;
+  now: () => Date;
+};
+
+type SessionsRouterEnv = { Variables: { accountId: string } };
+
+const startSessionSchema = z
+  .object({
+    origin: z.literal("libre", {
+      message: "El único origen disponible por ahora es «libre».",
+    }),
+  })
+  .strict();
+
+const replaceSessionSchema = z
+  .object({
+    revision: z.number().int().min(1, "Indica la revisión leída de la Sesión."),
+    exercises: z
+      .array(
+        z.object({
+          id: z.string().optional(),
+          exerciseId: z
+            .string()
+            .min(1, "Indica el Ejercicio que se añade a la Sesión.")
+            .max(200, "El identificador del Ejercicio no es válido."),
+        }),
+      )
+      .max(100, "Una Sesión no puede contener más de 100 Ejercicios."),
+  })
+  .strict();
+
+const unauthorizedMessage = "Debes iniciar sesión para gestionar tus Sesiones.";
+const notFoundMessage = "La Sesión solicitada no existe o no pertenece a tu Cuenta.";
+const activeSessionExistsMessage = "Ya tienes una Sesión activa.";
+const revisionConflictMessage =
+  "La Sesión ha cambiado desde tu última lectura. Recarga la versión vigente antes de continuar.";
+
+function validationError(error: z.ZodError): ReturnType<typeof apiError> {
+  const flattened = z.flattenError(error);
+  const fieldErrors = flattened.fieldErrors as Record<string, string[] | undefined>;
+  const fields: Record<string, string[]> = {};
+  for (const [key, messages] of Object.entries(fieldErrors)) {
+    if (messages && messages.length > 0) {
+      fields[key] = messages;
+    }
+  }
+  return apiError("VALIDATION_ERROR", "La petición no es válida.", fields);
+}
+
+export function createSessionsRouter({
+  database,
+  authenticatedUserId,
+  now,
+}: SessionsRouterDependencies): Hono<SessionsRouterEnv> {
+  const router = new Hono<SessionsRouterEnv>();
+
+  // Toda la API de Sesiones exige una Cuenta autenticada. La Cuenta se
+  // obtiene de la sesión de autenticación, nunca de un identificador enviado
+  // por el cliente; sin sesión la respuesta es 401 antes de tocar el dominio.
+  // Los patrones limitan el middleware a los destinos del módulo (la raíz y
+  // sus subrutas) para no interceptar otros sub-enrutadores montados en /api.
+  const requireAccount = async (context: Context<SessionsRouterEnv>, next: () => Promise<void>) => {
+    const userId = await authenticatedUserId(context.req.raw);
+    if (!userId) {
+      return context.json(apiError("UNAUTHORIZED", unauthorizedMessage), 401);
+    }
+    context.set("accountId", userId);
+    await next();
+  };
+  router.use("/sessions", requireAccount);
+  router.use("/sessions/*", requireAccount);
+
+  router.post("/sessions", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = startSessionSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
+    const outcome = await startFreeSession(database, {
+      accountId: context.get("accountId"),
+      now: now(),
+    });
+    if (!outcome.ok) {
+      // Conflicto recuperable: la Cuenta ya tiene una Sesión activa y la
+      // respuesta entrega su identificador para que la interfaz la abra.
+      return context.json(
+        {
+          error: {
+            code: "ACTIVE_SESSION_EXISTS",
+            message: activeSessionExistsMessage,
+            sessionId: outcome.sessionId,
+          },
+        },
+        409,
+      );
+    }
+    return context.json({ session: outcome.session }, 201);
+  });
+
+  router.get("/sessions/active", async (context) => {
+    const session = await getActiveSession(database, {
+      accountId: context.get("accountId"),
+    });
+    return context.json({ session });
+  });
+
+  router.get("/sessions/:sessionId", async (context) => {
+    const session = await getSessionForAccount(database, {
+      accountId: context.get("accountId"),
+      sessionId: context.req.param("sessionId") ?? "",
+    });
+    if (!session) {
+      return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+    }
+    return context.json({ session });
+  });
+
+  router.put("/sessions/:sessionId", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = replaceSessionSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
+    const outcome = await replaceSession(database, {
+      accountId: context.get("accountId"),
+      sessionId: context.req.param("sessionId") ?? "",
+      expectedRevision: parsed.data.revision,
+      exercises: parsed.data.exercises,
+      now: now(),
+    });
+    if (!outcome.ok) {
+      switch (outcome.reason) {
+        case "revision-conflict":
+          return context.json(apiError("REVISION_CONFLICT", revisionConflictMessage), 409);
+        case "invalid-exercises":
+          return context.json(
+            apiError("VALIDATION_ERROR", "La petición no es válida.", {
+              exercises: [outcome.message ?? "Los Ejercicios indicados no son válidos."],
+            }),
+            400,
+          );
+        case "unknown-child":
+          return context.json(
+            apiError("VALIDATION_ERROR", "La petición no es válida.", {
+              exercises: ["La Sesión no contiene uno de los Ejercicios indicados."],
+            }),
+            400,
+          );
+        default:
+          return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+      }
+    }
+    return context.json({ session: outcome.session });
+  });
+
+  return router;
+}

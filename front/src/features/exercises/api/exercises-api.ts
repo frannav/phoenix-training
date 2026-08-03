@@ -39,6 +39,7 @@ export type ExerciseListParams = {
   recordingMode?: RecordingMode | "";
   category?: string;
   cursor?: string | null;
+  limit?: number;
 };
 
 export type ExerciseFormValues = {
@@ -58,6 +59,7 @@ export async function listExercises(
   if (params.recordingMode) search.set("recordingMode", params.recordingMode);
   if (params.category) search.set("category", params.category);
   if (params.cursor) search.set("cursor", params.cursor);
+  if (params.limit) search.set("limit", String(params.limit));
   const query = search.toString();
   return apiGet<ExerciseListResponse>(`/api/exercises${query ? `?${query}` : ""}`);
 }

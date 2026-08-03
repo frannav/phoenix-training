@@ -124,16 +124,18 @@ export function createExercisesRouter({
   // Toda la API de Ejercicios exige una Cuenta autenticada: la sesión se
   // obtiene del sistema de autenticación, nunca de un identificador del
   // cliente, y la ausencia de sesión responde 401 antes de tocar el dominio.
-  // El sub-enrutador solo recibe rutas /exercises (montado bajo /api), así
-  // que el middleware sin patrón cubre exactamente los destinos del módulo.
-  router.use(async (context, next) => {
+  // Los patrones limitan el middleware a los destinos del módulo (la raíz y
+  // sus subrutas) para no interceptar otros sub-enrutadores montados en /api.
+  const requireAccount = async (context: Context<ExercisesRouterEnv>, next: () => Promise<void>) => {
     const userId = await authenticatedUserId(context.req.raw);
     if (!userId) {
       return context.json(apiError("UNAUTHORIZED", unauthorizedMessage), 401);
     }
     context.set("accountId", userId);
     await next();
-  });
+  };
+  router.use("/exercises", requireAccount);
+  router.use("/exercises/*", requireAccount);
 
   router.get("/exercises", async (context) => {
     const userId = context.get("accountId");
