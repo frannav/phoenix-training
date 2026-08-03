@@ -136,7 +136,7 @@ export function PlanDetailPage() {
     // actual (el servidor devuelve el borrador copia bajo otra identidad).
     setIsActing(true);
     setActionError(null);
-    duplicatePlan(plan.id)
+    duplicatePlan(plan.id, plan.revision)
       .then((result) => {
         void queryClient.invalidateQueries({ queryKey: ["plans"] });
         navigate(`/planes/${result.plan.id}`);
@@ -174,7 +174,7 @@ export function PlanDetailPage() {
           <ActivatePlanPanel
             pending={isActing}
             onActivate={(startDate) => {
-              void runAction(() => activatePlan(plan.id, startDate));
+              void runAction(() => activatePlan(plan.id, plan.revision, startDate));
             }}
           />
           <PlanEditor
@@ -215,7 +215,7 @@ export function PlanDetailPage() {
             onConflict={reloadCurrent}
             onRequestOmit={(training) => setConfirmTarget({ type: "omit", training })}
             onRequestRestore={(training) => {
-              void runAction(() => restoreTraining(plan.id, training.id));
+              void runAction(() => restoreTraining(plan.id, training.id, plan.revision));
             }}
           />
           <div className={styles.planActions}>
@@ -285,9 +285,9 @@ export function PlanDetailPage() {
                 disabled={isActing}
                 onClick={() => {
                   if (confirmTarget.type === "complete") {
-                    void runAction(() => completePlan(plan.id));
+                    void runAction(() => completePlan(plan.id, plan.revision));
                   } else {
-                    void runAction(() => omitTraining(plan.id, confirmTarget.training.id));
+                    void runAction(() => omitTraining(plan.id, confirmTarget.training.id, plan.revision));
                   }
                 }}
               >

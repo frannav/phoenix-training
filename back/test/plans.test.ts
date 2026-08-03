@@ -300,14 +300,44 @@ async function activatePlan(
   context: TestContext,
   id: string,
   cookie: string,
+  revision: number,
   body: Record<string, unknown>,
 ): Promise<{ status: number; body: unknown }> {
   const response = await context.app.request(`/api/plans/${id}/activate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ revision, ...body }),
   });
   return { status: response.status, body: (await response.json()) as unknown };
+}
+
+/** Entrada completa de sustitución a partir del documento canónico de un Plan. */
+function toInput(plan: PlanDocument): Record<string, unknown> {
+  return {
+    name: plan.name,
+    weeks: plan.weeks.map((week) => ({
+      id: week.id,
+      trainings: week.trainings.map((training) => ({
+        id: training.id,
+        day: training.day,
+        source: training.source,
+        routineId: training.routineId,
+        specific:
+          training.source === "especifico"
+            ? training.content.map((entry) => ({
+                id: entry.id,
+                exerciseId: entry.exerciseId,
+                series: entry.series.map((series) => ({
+                  id: series.id,
+                  carga: series.carga,
+                  repeticiones: series.repeticiones,
+                  duracion: series.duracion,
+                })),
+              }))
+            : [],
+      })),
+    })),
+  };
 }
 
 describe("crear Planes borrador", () => {
@@ -1432,7 +1462,7 @@ describe("activar Planes en el calendario", () => {
       }
     }
 
-    const { status, body } = await activatePlan(context!, draft.id, cookie, {
+    const { status, body } = await activatePlan(context!, draft.id, cookie, draft.revision, {
       startDate: "2025-08-04",
     });
     expect(status).toBe(200);
@@ -1481,16 +1511,21 @@ describe("activar Planes en el calendario", () => {
         },
       ]),
     );
-    const id = (created.body as { plan: PlanDocument }).plan.id;
+    const draft = (created.body as { plan: PlanDocument }).plan;
+    const id = draft.id;
 
-    const notMonday = await activatePlan(context!, id, cookie, { startDate: "2025-08-05" });
+    const notMonday = await activatePlan(context!, id, cookie, draft.revision, {
+      startDate: "2025-08-05",
+    });
     expect(notMonday.status).toBe(400);
     expect(
       (notMonday.body as { error: { fields?: Record<string, string[]> } }).error.fields
         ?.startDate,
     ).toBeDefined();
 
-    const badFormat = await activatePlan(context!, id, cookie, { startDate: "04-08-2025" });
+    const badFormat = await activatePlan(context!, id, cookie, draft.revision, {
+      startDate: "04-08-2025",
+    });
     expect(badFormat.status).toBe(400);
     expect(
       (badFormat.body as { error: { fields?: Record<string, string[]> } }).error.fields
@@ -1524,8 +1559,9 @@ describe("activar Planes en el calendario", () => {
         { name: "Primero" },
       ),
     );
-    const firstId = (first.body as { plan: PlanDocument }).plan.id;
-    const firstActivation = await activatePlan(context!, firstId, cookie, {
+    const firstPlan = (first.body as { plan: PlanDocument }).plan;
+    const firstId = firstPlan.id;
+    const firstActivation = await activatePlan(context!, firstId, cookie, firstPlan.revision, {
       startDate: "2025-08-04",
     });
     expect(firstActivation.status).toBe(200);
@@ -1548,8 +1584,9 @@ describe("activar Planes en el calendario", () => {
         { name: "Segundo" },
       ),
     );
-    const secondId = (second.body as { plan: PlanDocument }).plan.id;
-    const secondActivation = await activatePlan(context!, secondId, cookie, {
+    const secondPlan = (second.body as { plan: PlanDocument }).plan;
+    const secondId = secondPlan.id;
+    const secondActivation = await activatePlan(context!, secondId, cookie, secondPlan.revision, {
       startDate: "2025-08-11",
     });
     expect(secondActivation.status).toBe(409);
@@ -1590,17 +1627,23 @@ describe("activar Planes en el calendario", () => {
         },
       ]),
     );
-    const id = (created.body as { plan: PlanDocument }).plan.id;
-    await activatePlan(context!, id, cookie, { startDate: "2025-08-04" });
+    const draft = (created.body as { plan: PlanDocument }).plan;
+    const id = draft.id;
+    const activated = await activatePlan(context!, id, cookie, draft.revision, {
+      startDate: "2025-08-04",
+    });
+    const active = (activated.body as { plan: PlanDocument }).plan;
 
-    const again = await activatePlan(context!, id, cookie, { startDate: "2025-08-11" });
+    const again = await activatePlan(context!, id, cookie, active.revision, {
+      startDate: "2025-08-11",
+    });
     expect(again.status).toBe(409);
     expect((again.body as { error: { code: string } }).error.code).toBe(
       "TRANSITION_IMPOSSIBLE",
     );
 
     const cookieB = await registerVerified(context!, "otra@example.com");
-    const foreign = await activatePlan(context!, id, cookieB, { startDate: "2025-08-04" });
+    const foreign = await activatePlan(context!, id, cookieB, 1, { startDate: "2025-08-04" });
     expect(foreign.status).toBe(404);
   });
 
@@ -1624,7 +1667,7 @@ describe("activar Planes en el calendario", () => {
     const response = await context!.app.request(`/api/plans/${id}/activate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startDate: "2025-08-04" }),
+      body: JSON.stringify({ revision: 1, startDate: "2025-08-04" }),
     });
     expect(response.status).toBe(401);
   });
@@ -1649,34 +1692,6 @@ describe("editar un Plan activo", () => {
     context?.connection.close();
   });
 
-  function toInput(plan: PlanDocument): Record<string, unknown> {
-    return {
-      name: plan.name,
-      weeks: plan.weeks.map((week) => ({
-        id: week.id,
-        trainings: week.trainings.map((training) => ({
-          id: training.id,
-          day: training.day,
-          source: training.source,
-          routineId: training.routineId,
-          specific:
-            training.source === "especifico"
-              ? training.content.map((entry) => ({
-                  id: entry.id,
-                  exerciseId: entry.exerciseId,
-                  series: entry.series.map((series) => ({
-                    id: series.id,
-                    carga: series.carga,
-                    repeticiones: series.repeticiones,
-                    duracion: series.duracion,
-                  })),
-                }))
-              : [],
-        })),
-      })),
-    };
-  }
-
   async function activePlanFixture(): Promise<PlanDocument> {
     const routine = await createRoutine(context!, cookie, {
       name: "Día de empuje",
@@ -1700,7 +1715,9 @@ describe("editar un Plan activo", () => {
       ]),
     );
     const draft = (created.body as { plan: PlanDocument }).plan;
-    const activated = await activatePlan(context!, draft.id, cookie, { startDate: "2025-08-04" });
+    const activated = await activatePlan(context!, draft.id, cookie, draft.revision, {
+      startDate: "2025-08-04",
+    });
     expect(activated.status).toBe(200);
     return (activated.body as { plan: PlanDocument }).plan;
   }
@@ -1853,10 +1870,12 @@ async function omitTraining(
   planId: string,
   trainingId: string,
   cookie: string,
+  revision: number,
 ): Promise<{ status: number; body: unknown }> {
   const response = await context.app.request(`/api/plans/${planId}/trainings/${trainingId}/omit`, {
     method: "POST",
-    headers: { Cookie: cookie, Origin: origin },
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify({ revision }),
   });
   return { status: response.status, body: (await response.json()) as unknown };
 }
@@ -1866,10 +1885,11 @@ async function restoreTraining(
   planId: string,
   trainingId: string,
   cookie: string,
+  revision: number,
 ): Promise<{ status: number; body: unknown }> {
   const response = await context.app.request(
     `/api/plans/${planId}/trainings/${trainingId}/restore`,
-    { method: "POST", headers: { Cookie: cookie, Origin: origin } },
+    { method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin }, body: JSON.stringify({ revision }) },
   );
   return { status: response.status, body: (await response.json()) as unknown };
 }
@@ -1878,10 +1898,12 @@ async function completePlan(
   context: TestContext,
   planId: string,
   cookie: string,
+  revision: number,
 ): Promise<{ status: number; body: unknown }> {
   const response = await context.app.request(`/api/plans/${planId}/complete`, {
     method: "POST",
-    headers: { Cookie: cookie, Origin: origin },
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify({ revision }),
   });
   return { status: response.status, body: (await response.json()) as unknown };
 }
@@ -1890,12 +1912,13 @@ async function duplicatePlan(
   context: TestContext,
   planId: string,
   cookie: string,
+  revision: number,
   body: Record<string, unknown> = {},
 ): Promise<{ status: number; body: unknown }> {
   const response = await context.app.request(`/api/plans/${planId}/duplicate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ revision, ...body }),
   });
   return { status: response.status, body: (await response.json()) as unknown };
 }
@@ -1941,7 +1964,9 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
       ]),
     );
     const draft = (created.body as { plan: PlanDocument }).plan;
-    const activated = await activatePlan(context!, draft.id, cookie, { startDate: "2025-08-04" });
+    const activated = await activatePlan(context!, draft.id, cookie, draft.revision, {
+      startDate: "2025-08-04",
+    });
     expect(activated.status).toBe(200);
     return (activated.body as { plan: PlanDocument }).plan;
   }
@@ -1951,7 +1976,7 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
     const trainingId = plan.weeks[0]!.trainings[0]!.id;
 
     // omitir: el Entrenamiento conserva su Fecha prevista
-    const omitted = await omitTraining(context!, plan.id, trainingId, cookie);
+    const omitted = await omitTraining(context!, plan.id, trainingId, cookie, plan.revision);
     expect(omitted.status).toBe(200);
     const afterOmit = (omitted.body as { plan: PlanDocument }).plan;
     expect(afterOmit.weeks[0]!.trainings[0]!.status).toBe("omitido");
@@ -1961,7 +1986,7 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
     expect(afterOmit.revision).toBe(plan.revision + 1);
 
     // repetir la omisión es una transición imposible
-    const again = await omitTraining(context!, plan.id, trainingId, cookie);
+    const again = await omitTraining(context!, plan.id, trainingId, cookie, afterOmit.revision);
     expect(again.status).toBe(409);
     expect(again.body).toEqual({
       error: {
@@ -1971,14 +1996,15 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
     });
 
     // devolver a pendiente mientras el Plan siga activo
-    const restored = await restoreTraining(context!, plan.id, trainingId, cookie);
+    const restored = await restoreTraining(context!, plan.id, trainingId, cookie, afterOmit.revision);
     expect(restored.status).toBe(200);
-    expect((restored.body as { plan: PlanDocument }).plan.weeks[0]!.trainings[0]!.status).toBe(
+    const afterRestore = (restored.body as { plan: PlanDocument }).plan;
+    expect(afterRestore.weeks[0]!.trainings[0]!.status).toBe(
       "pendiente",
     );
 
     // devolver un Entrenamiento que no está omitido es imposible
-    const restorePending = await restoreTraining(context!, plan.id, trainingId, cookie);
+    const restorePending = await restoreTraining(context!, plan.id, trainingId, cookie, afterRestore.revision);
     expect(restorePending.status).toBe(409);
     expect(restorePending.body).toEqual({
       error: {
@@ -2000,7 +2026,7 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
       planPayload([{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }]),
     );
     const draft = (draftCreated.body as { plan: PlanDocument }).plan;
-    const omitDraft = await omitTraining(context!, draft.id, draft.weeks[0]!.trainings[0]!.id, cookie);
+    const omitDraft = await omitTraining(context!, draft.id, draft.weeks[0]!.trainings[0]!.id, cookie, draft.revision);
     expect(omitDraft.status).toBe(409);
     expect((omitDraft.body as { error: { message: string } }).error.message).toBe(
       "Solo un Plan activo permite omitir Entrenamientos.",
@@ -2013,13 +2039,16 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
       plan.id,
       "ffffffffffffffffffffffffffffffff",
       cookie,
+      plan.revision,
     );
     expect(unknownTraining.status).toBe(404);
 
     // un Plan completado no devuelve Entrenamientos a pendiente
-    await completePlan(context!, plan.id, cookie);
+    const completedDoc = (await completePlan(context!, plan.id, cookie, plan.revision)).body as {
+      plan: PlanDocument;
+    };
     const trainingId = plan.weeks[0]!.trainings[0]!.id;
-    const restoreCompleted = await restoreTraining(context!, plan.id, trainingId, cookie);
+    const restoreCompleted = await restoreTraining(context!, plan.id, trainingId, cookie, completedDoc.plan.revision);
     expect(restoreCompleted.status).toBe(409);
     expect((restoreCompleted.body as { error: { message: string } }).error.message).toBe(
       "Solo un Plan activo permite devolver un Entrenamiento a pendiente.",
@@ -2030,10 +2059,11 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
     const plan = await activeFixture();
     // un día queda omitido expresamente; el otro sigue pendiente
     const trainingId = plan.weeks[0]!.trainings[1]!.id;
-    const omitted = await omitTraining(context!, plan.id, trainingId, cookie);
+    const omitted = await omitTraining(context!, plan.id, trainingId, cookie, plan.revision);
     expect(omitted.status).toBe(200);
+    const afterOmit = (omitted.body as { plan: PlanDocument }).plan;
 
-    const completed = await completePlan(context!, plan.id, cookie);
+    const completed = await completePlan(context!, plan.id, cookie, afterOmit.revision);
     expect(completed.status).toBe(200);
     const doc = (completed.body as { plan: PlanDocument }).plan;
     expect(doc.status).toBe("completado");
@@ -2047,12 +2077,14 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
     }
 
     // completar de nuevo es imposible y un completado no se reactiva
-    const again = await completePlan(context!, plan.id, cookie);
+    const again = await completePlan(context!, plan.id, cookie, doc.revision);
     expect(again.status).toBe(409);
     expect((again.body as { error: { message: string } }).error.message).toBe(
       "Solo un Plan activo puede completarse.",
     );
-    const reactivate = await activatePlan(context!, plan.id, cookie, { startDate: "2025-08-11" });
+    const reactivate = await activatePlan(context!, plan.id, cookie, doc.revision, {
+      startDate: "2025-08-11",
+    });
     expect(reactivate.status).toBe(409);
 
     // completar libera el cupo de Plan activo: otro Plan puede activarse
@@ -2071,8 +2103,9 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
         },
       ]),
     );
-    const secondId = (second.body as { plan: PlanDocument }).plan.id;
-    const secondActivation = await activatePlan(context!, secondId, cookie, {
+    const secondPlan = (second.body as { plan: PlanDocument }).plan;
+    const secondId = secondPlan.id;
+    const secondActivation = await activatePlan(context!, secondId, cookie, secondPlan.revision, {
       startDate: "2025-08-11",
     });
     expect(secondActivation.status).toBe(200);
@@ -2083,9 +2116,9 @@ describe("omitir, devolver a pendiente y completar Planes", () => {
     const cookieB = await registerVerified(context!, "otra@example.com");
     const trainingId = plan.weeks[0]!.trainings[0]!.id;
 
-    expect((await omitTraining(context!, plan.id, trainingId, cookieB)).status).toBe(404);
-    expect((await restoreTraining(context!, plan.id, trainingId, cookieB)).status).toBe(404);
-    expect((await completePlan(context!, plan.id, cookieB)).status).toBe(404);
+    expect((await omitTraining(context!, plan.id, trainingId, cookieB, plan.revision)).status).toBe(404);
+    expect((await restoreTraining(context!, plan.id, trainingId, cookieB, plan.revision)).status).toBe(404);
+    expect((await completePlan(context!, plan.id, cookieB, plan.revision)).status).toBe(404);
   });
 });
 
@@ -2136,12 +2169,14 @@ describe("duplicar Planes", () => {
     );
     let plan = (created.body as { plan: PlanDocument }).plan;
     if (status !== "borrador") {
-      const activated = await activatePlan(context!, plan.id, cookieA, { startDate: "2025-08-04" });
+      const activated = await activatePlan(context!, plan.id, cookieA, plan.revision, {
+        startDate: "2025-08-04",
+      });
       expect(activated.status).toBe(200);
       plan = (activated.body as { plan: PlanDocument }).plan;
     }
     if (status === "completado") {
-      const completed = await completePlan(context!, plan.id, cookieA);
+      const completed = await completePlan(context!, plan.id, cookieA, plan.revision);
       expect(completed.status).toBe(200);
       plan = (completed.body as { plan: PlanDocument }).plan;
     }
@@ -2153,7 +2188,7 @@ describe("duplicar Planes", () => {
     const originalSpecific = plan.weeks[0]!.trainings[1]!;
     const originalEntries = originalSpecific.content;
 
-    const duplicated = await duplicatePlan(context!, plan.id, cookieA);
+    const duplicated = await duplicatePlan(context!, plan.id, cookieA, plan.revision);
     expect(duplicated.status).toBe(201);
     const copy = (duplicated.body as { plan: PlanDocument }).plan;
 
@@ -2199,7 +2234,7 @@ describe("duplicar Planes", () => {
     expect(first.series[1]!.id).not.toBe(originalEntries[0]!.series[1]!.id);
 
     // el nombre se puede decidir al duplicar
-    const named = await duplicatePlan(context!, plan.id, cookieA, { name: "Ciclo nuevo" });
+    const named = await duplicatePlan(context!, plan.id, cookieA, plan.revision, { name: "Ciclo nuevo" });
     expect(named.status).toBe(201);
     expect((named.body as { plan: PlanDocument }).plan.name).toBe("Ciclo nuevo");
   });
@@ -2208,7 +2243,7 @@ describe("duplicar Planes", () => {
     // el completado se procesa primero: completar libera el cupo de Plan activo
     for (const status of ["completado", "activo"] as const) {
       const { plan } = await sourcePlanFixture(status);
-      const duplicated = await duplicatePlan(context!, plan.id, cookieA);
+      const duplicated = await duplicatePlan(context!, plan.id, cookieA, plan.revision);
       expect(duplicated.status).toBe(201);
       const copy = (duplicated.body as { plan: PlanDocument }).plan;
 
@@ -2231,14 +2266,410 @@ describe("duplicar Planes", () => {
 
   test("duplicar un Plan de otra Cuenta o inexistente responde inexistente", async () => {
     const { plan } = await sourcePlanFixture("activo");
-    const foreign = await duplicatePlan(context!, plan.id, cookieB);
+    const foreign = await duplicatePlan(context!, plan.id, cookieB, plan.revision);
     expect(foreign.status).toBe(404);
 
     const unknown = await duplicatePlan(
       context!,
       "ffffffffffffffffffffffffffffffff",
       cookieA,
+      1,
     );
     expect(unknown.status).toBe(404);
+  });
+});
+
+describe("acciones del ciclo de vida con revisión", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+  let press: ExerciseItem;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+    press = await exerciseOfMode(context, cookie, "fuerza_con_carga");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function singleTrainingPlan(): Promise<PlanDocument> {
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            {
+              day: 0,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    return (created.body as { plan: PlanDocument }).plan;
+  }
+
+  async function activateFixture(): Promise<PlanDocument> {
+    const draft = await singleTrainingPlan();
+    const activated = await activatePlan(context!, draft.id, cookie, draft.revision, {
+      startDate: "2025-08-04",
+    });
+    expect(activated.status).toBe(200);
+    return (activated.body as { plan: PlanDocument }).plan;
+  }
+
+  test("activar con una revisión obsoleta devuelve conflicto sin cambios parciales", async () => {
+    const draft = await singleTrainingPlan();
+    // la sustitución incrementa la revisión sin salir del borrador
+    const renamed = await replacePlan(context!, draft.id, cookie, {
+      revision: draft.revision,
+      name: "Renombrado",
+      weeks: (toInput(draft) as { weeks: unknown }).weeks,
+    });
+    expect(renamed.status).toBe(200);
+    expect((renamed.body as { plan: PlanDocument }).plan.revision).toBe(2);
+
+    const stale = await activatePlan(context!, draft.id, cookie, draft.revision, {
+      startDate: "2025-08-04",
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.body).toEqual({
+      error: {
+        code: "STALE_REVISION",
+        message: "El Plan fue modificado por otra sesión. Carga la versión actual antes de guardar.",
+      },
+    });
+
+    // sin cambios parciales: sigue siendo borrador sin Fechas previstas
+    const after = (await getPlan(context!, draft.id, cookie)).body as { plan: PlanDocument };
+    expect(after.plan.status).toBe("borrador");
+    expect(after.plan.startDate).toBeNull();
+    expect(after.plan.revision).toBe(2);
+    expect(after.plan.weeks[0]!.trainings[0]!.plannedDate).toBeNull();
+  });
+
+  test("completar con una revisión obsoleta devuelve conflicto", async () => {
+    const active = await activateFixture();
+    const renamed = await replacePlan(context!, active.id, cookie, {
+      revision: active.revision,
+      name: "Renombrado",
+      weeks: (toInput(active) as { weeks: unknown }).weeks,
+    });
+    expect(renamed.status).toBe(200);
+
+    const stale = await completePlan(context!, active.id, cookie, active.revision);
+    expect(stale.status).toBe(409);
+    expect(stale.body).toEqual({
+      error: {
+        code: "STALE_REVISION",
+        message: "El Plan fue modificado por otra sesión. Carga la versión actual antes de guardar.",
+      },
+    });
+
+    const after = (await getPlan(context!, active.id, cookie)).body as { plan: PlanDocument };
+    expect(after.plan.status).toBe("activo");
+    expect(after.plan.weeks[0]!.trainings[0]!.status).toBe("pendiente");
+  });
+
+  test("omitir y devolver a pendiente con una revisión obsoleta devuelven conflicto", async () => {
+    const active = await activateFixture();
+    const trainingId = active.weeks[0]!.trainings[0]!.id;
+    const renamed = await replacePlan(context!, active.id, cookie, {
+      revision: active.revision,
+      name: "Renombrado",
+      weeks: (toInput(active) as { weeks: unknown }).weeks,
+    });
+    expect(renamed.status).toBe(200);
+
+    const staleOmit = await omitTraining(context!, active.id, trainingId, cookie, active.revision);
+    expect(staleOmit.status).toBe(409);
+    expect((staleOmit.body as { error: { code: string } }).error.code).toBe("STALE_REVISION");
+
+    const staleRestore = await restoreTraining(
+      context!,
+      active.id,
+      trainingId,
+      cookie,
+      active.revision,
+    );
+    expect(staleRestore.status).toBe(409);
+    expect((staleRestore.body as { error: { code: string } }).error.code).toBe("STALE_REVISION");
+
+    const after = (await getPlan(context!, active.id, cookie)).body as { plan: PlanDocument };
+    expect(after.plan.weeks[0]!.trainings[0]!.status).toBe("pendiente");
+  });
+
+  test("duplicar con una revisión obsoleta devuelve conflicto", async () => {
+    const plan = await singleTrainingPlan();
+    const renamed = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: "Renombrado",
+      weeks: (toInput(plan) as { weeks: unknown }).weeks,
+    });
+    expect(renamed.status).toBe(200);
+
+    const stale = await duplicatePlan(context!, plan.id, cookie, plan.revision);
+    expect(stale.status).toBe(409);
+    expect(stale.body).toEqual({
+      error: {
+        code: "STALE_REVISION",
+        message: "El Plan fue modificado por otra sesión. Carga la versión actual antes de guardar.",
+      },
+    });
+  });
+
+  test("las acciones exigen la revisión del Plan en el cuerpo", async () => {
+    const plan = await singleTrainingPlan();
+    const activateResponse = await context!.app.request(`/api/plans/${plan.id}/activate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({ startDate: "2025-08-04" }),
+    });
+    expect(activateResponse.status).toBe(400);
+    expect(
+      ((await activateResponse.json()) as { error: { fields?: Record<string, string[]> } })
+        .error.fields?.revision,
+    ).toBeDefined();
+
+    const completeResponse = await context!.app.request(`/api/plans/${plan.id}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({}),
+    });
+    expect(completeResponse.status).toBe(400);
+    expect(
+      ((await completeResponse.json()) as { error: { fields?: Record<string, string[]> } })
+        .error.fields?.revision,
+    ).toBeDefined();
+
+    const duplicateResponse = await context!.app.request(`/api/plans/${plan.id}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({}),
+    });
+    expect(duplicateResponse.status).toBe(400);
+    expect(
+      ((await duplicateResponse.json()) as { error: { fields?: Record<string, string[]> } })
+        .error.fields?.revision,
+    ).toBeDefined();
+  });
+});
+describe("editar un Plan con una Rutina archivada", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+  let press: ExerciseItem;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+    press = await exerciseOfMode(context, cookie, "fuerza_con_carga");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function routineFixture(): Promise<RoutineDocument> {
+    return createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press.id, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+  }
+
+  async function archiveRoutine(routineId: string): Promise<void> {
+    const archived = await context!.app.request(`/api/routines/${routineId}/archive`, {
+      method: "POST",
+      headers: { Cookie: cookie, Origin: origin },
+    });
+    expect(archived.status).toBe(200);
+  }
+
+  test("un Plan activo conserva la referencia archivada y permite renombrar y editar otro día pendiente", async () => {
+    const routine = await routineFixture();
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            { day: 0, source: "rutina", routineId: routine.id },
+            {
+              day: 3,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 8 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const draft = (created.body as { plan: PlanDocument }).plan;
+    const activated = await activatePlan(context!, draft.id, cookie, draft.revision, {
+      startDate: "2025-08-04",
+    });
+    expect(activated.status).toBe(200);
+    const plan = (activated.body as { plan: PlanDocument }).plan;
+
+    // la Rutina se archiva después de activar el Plan: la referencia es viva
+    await archiveRoutine(routine.id);
+
+    // renombrar sigue permitido: la referencia archivada ya establecida no bloquea la edición
+    const renamed = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: "Ciclo activo renombrado",
+      weeks: (toInput(plan) as { weeks: unknown }).weeks,
+    });
+    expect(renamed.status).toBe(200);
+    const renamedPlan = (renamed.body as { plan: PlanDocument }).plan;
+    expect(renamedPlan.name).toBe("Ciclo activo renombrado");
+    expect(renamedPlan.revision).toBe(plan.revision + 1);
+
+    // la referencia viva sigue resolviendo la Rutina archivada con su contenido actual
+    const keptDay = renamedPlan.weeks[0]!.trainings[0]!;
+    expect(keptDay).toMatchObject({
+      source: "rutina",
+      routineId: routine.id,
+      routine: { id: routine.id, name: "Día de empuje", archived: true },
+    });
+    expect(keptDay.content[0]).toMatchObject({
+      exerciseId: press.id,
+      series: [{ order: 0, carga: 60, repeticiones: 10 }],
+    });
+
+    // editar otro día pendiente (moverlo de día) sigue permitido
+    const input = toInput(renamedPlan) as { weeks: Array<Record<string, unknown>> };
+    const week = input.weeks[0] as { trainings: Array<Record<string, unknown>> };
+    const pendingDay = week.trainings[1] as Record<string, unknown>;
+    const movedDay = { ...pendingDay, day: 4 };
+    const moved = await replacePlan(context!, plan.id, cookie, {
+      revision: renamedPlan.revision,
+      name: "Ciclo activo renombrado",
+      weeks: [
+        { id: renamedPlan.weeks[0]!.id, trainings: [week.trainings[0]!, movedDay] },
+      ],
+    });
+    expect(moved.status).toBe(200);
+    const movedPlan = (moved.body as { plan: PlanDocument }).plan;
+    expect(movedPlan.weeks[0]!.trainings[1]).toMatchObject({
+      day: 4,
+      plannedDate: "2025-08-08",
+      status: "pendiente",
+    });
+  });
+
+  test("una referencia nueva a una Rutina archivada se rechaza al editar un Plan", async () => {
+    const routine = await routineFixture();
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            {
+              day: 0,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const draft = (created.body as { plan: PlanDocument }).plan;
+    const activated = await activatePlan(context!, draft.id, cookie, draft.revision, {
+      startDate: "2025-08-04",
+    });
+    expect(activated.status).toBe(200);
+    const plan = (activated.body as { plan: PlanDocument }).plan;
+
+    await archiveRoutine(routine.id);
+
+    // añadir un Entrenamiento nuevo que usa la Rutina archivada es un uso nuevo
+    const input = toInput(plan) as { weeks: Array<Record<string, unknown>> };
+    const week = input.weeks[0] as { trainings: Array<Record<string, unknown>> };
+    const rejected = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: plan.name,
+      weeks: [
+        {
+          id: plan.weeks[0]!.id,
+          trainings: [
+            ...week.trainings,
+            { day: 1, source: "rutina", routineId: routine.id, specific: [] },
+          ],
+        },
+      ],
+    });
+    expect(rejected.status).toBe(400);
+    expect(
+      (rejected.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "weeks[0].trainings[1].routineId"
+      ],
+    ).toBeDefined();
+
+    // cambiar la referencia de un día existente a la Rutina archivada también se rechaza
+    const changedReference = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: plan.name,
+      weeks: [
+        {
+          id: plan.weeks[0]!.id,
+          trainings: [
+            {
+              id: plan.weeks[0]!.trainings[0]!.id,
+              day: 0,
+              source: "rutina",
+              routineId: routine.id,
+              specific: [],
+            },
+          ],
+        },
+      ],
+    });
+    expect(changedReference.status).toBe(400);
+    expect(
+      (changedReference.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "weeks[0].trainings[0].routineId"
+      ],
+    ).toBeDefined();
+
+    // sin cambios parciales: el Plan conserva su estado y revisión
+    const after = (await getPlan(context!, plan.id, cookie)).body as { plan: PlanDocument };
+    expect(after.plan.revision).toBe(plan.revision);
+    expect(after.plan.name).toBe(plan.name);
+    expect(after.plan.weeks[0]!.trainings).toHaveLength(1);
+  });
+
+  test("un borrador conserva la referencia archivada al editarse", async () => {
+    const routine = await routineFixture();
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }]),
+    );
+    const draft = (created.body as { plan: PlanDocument }).plan;
+
+    await archiveRoutine(routine.id);
+
+    // renombrar el borrador conserva la referencia ya establecida
+    const renamed = await replacePlan(context!, draft.id, cookie, {
+      revision: draft.revision,
+      name: "Borrador renombrado",
+      weeks: (toInput(draft) as { weeks: unknown }).weeks,
+    });
+    expect(renamed.status).toBe(200);
+    const updated = (renamed.body as { plan: PlanDocument }).plan;
+    expect(updated.name).toBe("Borrador renombrado");
+    expect(updated.weeks[0]!.trainings[0]!.routineId).toBe(routine.id);
+    expect(updated.weeks[0]!.trainings[0]!.routine).toMatchObject({
+      id: routine.id,
+      archived: true,
+    });
   });
 });

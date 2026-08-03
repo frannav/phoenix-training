@@ -97,11 +97,11 @@ type PlansHandlers = {
   create?: (body: unknown) => PlanItem;
   replace?: (id: string, body: unknown) => { status: number; body: unknown };
   delete?: (id: string) => void;
-  activate?: (id: string, startDate: string) => PlanItem;
-  complete?: (id: string) => PlanItem;
-  omit?: (id: string, trainingId: string) => PlanItem;
-  restore?: (id: string, trainingId: string) => PlanItem;
-  duplicate?: (id: string, body: unknown) => PlanItem;
+  activate?: (id: string, body: { revision: number; startDate: string }) => PlanItem;
+  complete?: (id: string, body: { revision: number }) => PlanItem;
+  omit?: (id: string, trainingId: string, body: { revision: number }) => PlanItem;
+  restore?: (id: string, trainingId: string, body: { revision: number }) => PlanItem;
+  duplicate?: (id: string, body: { revision: number; name?: string }) => PlanItem;
   routines?: () => RoutineItem[];
   availableExercises?: () => ExerciseItem[];
 };
@@ -131,30 +131,57 @@ function stubPlans(handlers: PlansHandlers) {
     }
     const activateMatch = parsed.pathname.match(/^\/api\/plans\/([0-9a-f]+)\/activate$/);
     if (activateMatch && method === "POST") {
-      const startDate = (body as { startDate: string }).startDate;
-      return { status: 200, body: { plan: handlers.activate!(activateMatch[1]!, startDate) } };
+      return {
+        status: 200,
+        body: {
+          plan: handlers.activate!(
+            activateMatch[1]!,
+            body as { revision: number; startDate: string },
+          ),
+        },
+      };
     }
     const completeMatch = parsed.pathname.match(/^\/api\/plans\/([0-9a-f]+)\/complete$/);
     if (completeMatch && method === "POST") {
-      return { status: 200, body: { plan: handlers.complete!(completeMatch[1]!) } };
+      return {
+        status: 200,
+        body: {
+          plan: handlers.complete!(completeMatch[1]!, body as { revision: number }),
+        },
+      };
     }
     const omitMatch = parsed.pathname.match(
       /^\/api\/plans\/([0-9a-f]+)\/trainings\/([0-9a-f]+)\/omit$/,
     );
     if (omitMatch && method === "POST") {
-      return { status: 200, body: { plan: handlers.omit!(omitMatch[1]!, omitMatch[2]!) } };
+      return {
+        status: 200,
+        body: {
+          plan: handlers.omit!(omitMatch[1]!, omitMatch[2]!, body as { revision: number }),
+        },
+      };
     }
     const restoreMatch = parsed.pathname.match(
       /^\/api\/plans\/([0-9a-f]+)\/trainings\/([0-9a-f]+)\/restore$/,
     );
     if (restoreMatch && method === "POST") {
-      return { status: 200, body: { plan: handlers.restore!(restoreMatch[1]!, restoreMatch[2]!) } };
+      return {
+        status: 200,
+        body: {
+          plan: handlers.restore!(restoreMatch[1]!, restoreMatch[2]!, body as { revision: number }),
+        },
+      };
     }
     const duplicateMatch = parsed.pathname.match(/^\/api\/plans\/([0-9a-f]+)\/duplicate$/);
     if (duplicateMatch && method === "POST") {
       return {
         status: 201,
-        body: { plan: handlers.duplicate!(duplicateMatch[1]!, body) },
+        body: {
+          plan: handlers.duplicate!(
+            duplicateMatch[1]!,
+            body as { revision: number; name?: string },
+          ),
+        },
       };
     }
     if (parsed.pathname === "/api/routines" && method === "GET") {
@@ -595,7 +622,10 @@ describe("ciclo de vida en el listado", () => {
 
     await user.click(await screen.findByRole("button", { name: "Duplicar Ciclo base" }));
     await waitFor(() => expect(requests).toHaveLength(1));
-    expect(requests[0]).toEqual({ id: "44444444444444444444444444444444", body: {} });
+    expect(requests[0]).toEqual({
+      id: "44444444444444444444444444444444",
+      body: { revision: 1 },
+    });
     expect(await screen.findByText("Ciclo base (copia)")).toBeInTheDocument();
   });
 });
@@ -613,12 +643,12 @@ describe("activar un Plan borrador", () => {
   test("pide el lunes de la primera semana y activa con la Fecha prevista calculada", async () => {
     const user = userEvent.setup();
     const plan = planFixture();
-    const requests: Array<{ id: string; startDate: string }> = [];
+    const requests: Array<{ id: string; body: { revision: number; startDate: string } }> = [];
     stubPlans({
       list: () => [plan],
       get: () => plan,
-      activate: (id, startDate) => {
-        requests.push({ id, startDate });
+      activate: (id, body) => {
+        requests.push({ id, body });
         return {
           ...activePlanFixture(),
           id: plan.id,
@@ -654,7 +684,10 @@ describe("activar un Plan borrador", () => {
 
     await user.click(activateButton);
     await waitFor(() => expect(requests).toHaveLength(1));
-    expect(requests[0]).toEqual({ id: plan.id, startDate: "2025-08-04" });
+    expect(requests[0]).toEqual({
+      id: plan.id,
+      body: { revision: 1, startDate: "2025-08-04" },
+    });
 
     // el estado activo se refleja y el panel de activación desaparece
     expect(await screen.findByRole("button", { name: "Completar Plan" })).toBeInTheDocument();
@@ -722,7 +755,7 @@ describe("gestionar un Plan activo", () => {
     stubPlans({
       list: () => [current],
       get: () => current,
-      omit: (id, training) => {
+      omit: (id, training, _body) => {
         requests.push(`omit:${id}:${training}`);
         current = {
           ...current,
@@ -736,7 +769,7 @@ describe("gestionar un Plan activo", () => {
         };
         return current;
       },
-      restore: (id, training) => {
+      restore: (id, training, _body) => {
         requests.push(`restore:${id}:${training}`);
         current = {
           ...current,
@@ -750,7 +783,7 @@ describe("gestionar un Plan activo", () => {
         };
         return current;
       },
-      complete: (id) => {
+      complete: (id, _body) => {
         requests.push(`complete:${id}`);
         current = {
           ...current,
@@ -823,6 +856,22 @@ describe("gestionar un Plan activo", () => {
     expect(await screen.findByLabelText("Nombre del Plan")).toHaveValue("Ciclo base");
     expect(screen.queryByRole("button", { name: "Añadir semana" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Quitar semana" })).not.toBeInTheDocument();
+  });
+
+  test("un día pendiente de un Plan activo muestra su Fecha prevista como «Prevista»", async () => {
+    const plan = activePlanFixture();
+    stubPlans({ list: () => [plan], get: () => plan });
+    renderWithRoutes(
+      `/planes/${plan.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+      </Routes>,
+    );
+
+    // el día pendiente del editor presenta la Fecha prevista etiquetada, sin
+    // confundirla con una Fecha realizada
+    expect(await screen.findByText(/Prevista · 4 ago/)).toBeInTheDocument();
+    expect(screen.queryByText(/Realizada/)).not.toBeInTheDocument();
   });
 });
 

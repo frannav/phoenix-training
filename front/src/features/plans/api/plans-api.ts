@@ -148,24 +148,30 @@ export async function deletePlan(id: string): Promise<{ deleted: true }> {
 /**
  * Activa un Plan borrador fijando el lunes de la primera semana: el servidor
  * calcula las Fechas previstas y deja todos los Entrenamientos pendientes.
+ * La acción respeta la revisión leída del Plan.
  */
-export async function activatePlan(id: string, startDate: string): Promise<{ plan: PlanItem }> {
-  return apiPost<{ plan: PlanItem }>(`/api/plans/${id}/activate`, { startDate });
+export async function activatePlan(
+  id: string,
+  revision: number,
+  startDate: string,
+): Promise<{ plan: PlanItem }> {
+  return apiPost<{ plan: PlanItem }>(`/api/plans/${id}/activate`, { revision, startDate });
 }
 
 /** Completa un Plan activo: convierte los días pendientes en omitidos. */
-export async function completePlan(id: string): Promise<{ plan: PlanItem }> {
-  return apiPost<{ plan: PlanItem }>(`/api/plans/${id}/complete`, {});
+export async function completePlan(id: string, revision: number): Promise<{ plan: PlanItem }> {
+  return apiPost<{ plan: PlanItem }>(`/api/plans/${id}/complete`, { revision });
 }
 
 /** Omite un Entrenamiento planificado pendiente de un Plan activo. */
 export async function omitTraining(
   planId: string,
   trainingId: string,
+  revision: number,
 ): Promise<{ plan: PlanItem }> {
   return apiPost<{ plan: PlanItem }>(
     `/api/plans/${planId}/trainings/${trainingId}/omit`,
-    {},
+    { revision },
   );
 }
 
@@ -173,19 +179,24 @@ export async function omitTraining(
 export async function restoreTraining(
   planId: string,
   trainingId: string,
+  revision: number,
 ): Promise<{ plan: PlanItem }> {
   return apiPost<{ plan: PlanItem }>(
     `/api/plans/${planId}/trainings/${trainingId}/restore`,
-    {},
+    { revision },
   );
 }
 
 /** Duplica cualquier Plan como borrador sin fechas, estados ni Sesiones. */
 export async function duplicatePlan(
   id: string,
+  revision: number,
   name?: string,
 ): Promise<{ plan: PlanItem }> {
-  return apiPost<{ plan: PlanItem }>(`/api/plans/${id}/duplicate`, name ? { name } : {});
+  return apiPost<{ plan: PlanItem }>(
+    `/api/plans/${id}/duplicate`,
+    name ? { revision, name } : { revision },
+  );
 }
 
 /**

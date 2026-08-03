@@ -926,6 +926,12 @@ export function PlanEditor({
                     </button>
                   </div>
 
+                  {isActive && training.plannedDate !== null && (
+                    <p className={styles.pendingDate}>
+                      Prevista · {formatDomainDate(training.plannedDate)}
+                    </p>
+                  )}
+
                   {isActive && onRequestOmit && (
                     <button
                       type="button"

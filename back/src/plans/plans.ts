@@ -131,10 +131,20 @@ export function createOpaquePlanId(): string {
  * ocupa un día concreto de su semana y usa una Rutina propia disponible
  * (referencia viva) o un contenido específico que respeta las Formas de
  * registro y los límites de dominio.
+ *
+ * Al editar un Plan existente (`existingPlanId`) las referencias a Rutinas
+ * archivadas ya establecidas se conservan sin revalidarse como «usos
+ * nuevos»: una referencia viva sobrevive al archivo de la Rutina y el Plan
+ * debe seguir pudiendo editarse (spec «Rutinas y semántica temporal»). Solo
+ * los usos nuevos de una Rutina archivada se rechazan.
  */
 export async function validatePlanInput(
   database: AppDatabase,
-  { accountId, input }: { accountId: string; input: PlanInput },
+  {
+    accountId,
+    input,
+    existingPlanId,
+  }: { accountId: string; input: PlanInput; existingPlanId?: string },
 ): Promise<{ ok: true } | { ok: false; fields: Record<string, string[]> }> {
   const fields: Record<string, string[]> = {};
   const addError = (key: string, message: string) => {
@@ -152,6 +162,29 @@ export async function validatePlanInput(
   );
   if (trainings.length === 0) {
     addError("weeks", "Un Plan necesita al menos un Entrenamiento planificado.");
+  }
+
+  // Referencias vivas a Rutinas ya establecidas del Plan existente: se
+  // conservan aunque la Rutina esté archivada, porque la referencia viva
+  // sobrevive al archivo. La clave es `trainingId:routineId` y solo coincide
+  // cuando el Entrenamiento conserva su identidad y su Rutina.
+  const unchangedRoutineReferences = new Set<string>();
+  if (existingPlanId) {
+    const existingRoutineTrainings = await database
+      .select({ id: planTraining.id, routineId: planTraining.routineId })
+      .from(planTraining)
+      .where(
+        and(
+          eq(planTraining.planId, existingPlanId),
+          eq(planTraining.source, "rutina"),
+        ),
+      )
+      .all();
+    for (const row of existingRoutineTrainings) {
+      if (row.routineId) {
+        unchangedRoutineReferences.add(`${row.id}:${row.routineId}`);
+      }
+    }
   }
 
   // Referencias vivas a Rutinas: resueltas en una sola consulta por identidad.
@@ -207,7 +240,14 @@ export async function validatePlanInput(
           if (!routineRow) {
             addError(key("routineId"), "La Rutina no existe o no pertenece a tu Cuenta.");
           } else if (routineRow.archived) {
-            addError(key("routineId"), "La Rutina no está disponible para usos nuevos.");
+            // Una referencia viva ya establecida sobrevive al archivo de la
+            // Rutina; solo los usos nuevos de una Rutina archivada se rechazan.
+            const unchanged =
+              training.id !== undefined &&
+              unchangedRoutineReferences.has(`${training.id}:${routineId}`);
+            if (!unchanged) {
+              addError(key("routineId"), "La Rutina no está disponible para usos nuevos.");
+            }
           }
         }
         if (training.specific.length > 0) {
@@ -356,6 +396,7 @@ export type PlanActivateOutcome =
   | { ok: false; reason: "not-found" }
   | { ok: false; reason: "not-draft" }
   | { ok: false; reason: "active-exists" }
+  | { ok: false; reason: "stale-revision" }
   | { ok: false; reason: "validation"; fields: Record<string, string[]> };
 
 /**
@@ -364,8 +405,10 @@ export type PlanActivateOutcome =
  * previstas de todos los Entrenamientos planificados sin cambiar la
  * estructura y deja todos en pendiente. Cada Cuenta puede tener como máximo
  * un Plan activo: la transición lo comprueba en la misma transacción y el
- * índice parcial de unicidad respalda el caso concurrente. Un lunes inválido
- * o una activación imposible no persisten ningún cambio.
+ * índice parcial de unicidad respalda el caso concurrente. La acción respeta
+ * la revisión leída: una revisión obsoleta devuelve conflicto sin persistir
+ * ningún cambio. Un lunes inválido o una activación imposible tampoco
+ * persisten nada.
  */
 export async function activatePlan(
   database: AppDatabase,
@@ -373,8 +416,9 @@ export async function activatePlan(
     accountId,
     planId,
     startDate,
+    revision,
     now,
-  }: { accountId: string; planId: string; startDate: string; now: Date },
+  }: { accountId: string; planId: string; startDate: string; revision: number; now: Date },
 ): Promise<PlanActivateOutcome> {
   let outcome: PlanActivateOutcome = { ok: false, reason: "not-found" };
   await database.transaction((tx) => {
@@ -389,6 +433,13 @@ export async function activatePlan(
     }
     if (current.status !== "borrador") {
       outcome = { ok: false, reason: "not-draft" };
+      return;
+    }
+
+    // La activación es una acción con revisión: una revisión obsoleta
+    // devuelve conflicto sin cambios parciales.
+    if (current.revision !== revision) {
+      outcome = { ok: false, reason: "stale-revision" };
       return;
     }
 
@@ -709,7 +760,14 @@ export async function replacePlan(
     now: Date;
   },
 ): Promise<PlanReplaceOutcome> {
-  const validation = await validatePlanInput(database, { accountId, input });
+  const validation = await validatePlanInput(database, {
+    accountId,
+    input,
+    // Al editar un Plan existente se conservan las referencias vivas a
+    // Rutinas archivadas ya establecidas; la sustitución solo rechaza usos
+    // nuevos de Rutinas retiradas.
+    existingPlanId: planId,
+  });
   if (!validation.ok) {
     return { ok: false, reason: "validation" as const, fields: validation.fields };
   }
@@ -994,14 +1052,17 @@ export type PlanTrainingTransitionOutcome =
   | { ok: false; reason: "not-found" }
   | { ok: false; reason: "not-active"; message: string }
   | { ok: false; reason: "training-not-found" }
+  | { ok: false; reason: "stale-revision" }
   | { ok: false; reason: "transition-impossible"; message: string };
 
 /**
  * Transición explícita del estado de un Entrenamiento planificado dentro de
  * una única transacción: omitir exige que esté pendiente y devolver a
  * pendiente exige que esté omitido, y ambas solo existen mientras el Plan
- * siga activo. Un estado imposible o una transición repetida devuelven el
- * error común de transición con estado 409 sin cambios parciales.
+ * siga activo. La transición respeta la revisión leída del Plan: una
+ * revisión obsoleta devuelve conflicto sin cambios parciales. Un estado
+ * imposible o una transición repetida devuelven el error común de transición
+ * con estado 409 sin cambios parciales.
  */
 async function transitionTrainingStatus(
   database: AppDatabase,
@@ -1009,6 +1070,7 @@ async function transitionTrainingStatus(
     accountId,
     planId,
     trainingId,
+    revision,
     from,
     to,
     planErrorMessage,
@@ -1018,6 +1080,7 @@ async function transitionTrainingStatus(
     accountId: string;
     planId: string;
     trainingId: string;
+    revision: number;
     from: PlanTrainingStatus;
     to: PlanTrainingStatus;
     planErrorMessage: string;
@@ -1038,6 +1101,10 @@ async function transitionTrainingStatus(
     }
     if (current.status !== "activo") {
       outcome = { ok: false, reason: "not-active", message: planErrorMessage };
+      return;
+    }
+    if (current.revision !== revision) {
+      outcome = { ok: false, reason: "stale-revision" };
       return;
     }
     const training = tx
@@ -1097,17 +1164,25 @@ export async function restoreTraining(
 export type PlanCompleteOutcome =
   | { ok: true }
   | { ok: false; reason: "not-found" }
-  | { ok: false; reason: "not-active" };
+  | { ok: false; reason: "not-active" }
+  | { ok: false; reason: "stale-revision" };
 
 /**
  * Completa un Plan activo dentro de una única transacción: cierra el Plan y
  * convierte atómicamente todos los Entrenamientos pendientes en omitidos,
  * conservando las Fechas previstas como calendario cerrado. Un Plan
- * completado no se reactiva; completar libera el cupo de Plan activo.
+ * completado no se reactiva; completar libera el cupo de Plan activo. La
+ * acción respeta la revisión leída: una revisión obsoleta devuelve conflicto
+ * sin cambios parciales.
  */
 export async function completePlan(
   database: AppDatabase,
-  { accountId, planId, now }: { accountId: string; planId: string; now: Date },
+  {
+    accountId,
+    planId,
+    revision,
+    now,
+  }: { accountId: string; planId: string; revision: number; now: Date },
 ): Promise<PlanCompleteOutcome> {
   let outcome: PlanCompleteOutcome = { ok: false, reason: "not-found" };
   await database.transaction((tx) => {
@@ -1122,6 +1197,10 @@ export async function completePlan(
     }
     if (current.status !== "activo") {
       outcome = { ok: false, reason: "not-active" };
+      return;
+    }
+    if (current.revision !== revision) {
+      outcome = { ok: false, reason: "stale-revision" };
       return;
     }
     // Guarda de Sesión activa originada en el Plan: el origen de Sesión
@@ -1143,14 +1222,17 @@ export async function completePlan(
 
 export type PlanDuplicateOutcome =
   | { ok: true; planId: string }
-  | { ok: false; reason: "not-found" };
+  | { ok: false; reason: "not-found" }
+  | { ok: false; reason: "stale-revision" };
 
 /**
  * Duplica cualquier Plan propio como un borrador nuevo dentro de una única
  * transacción: sin Fechas previstas, sin estados ni Sesiones, conservando
  * las referencias vivas a las Rutinas del original y copiando de forma
  * independiente los Entrenamientos específicos con identidades nuevas y los
- * mismos valores. Las copias reciben identidad del servidor.
+ * mismos valores. Las copias reciben identidad del servidor. La acción
+ * respeta la revisión leída del original: una revisión obsoleta devuelve
+ * conflicto sin crear la copia.
  */
 export async function duplicatePlan(
   database: AppDatabase,
@@ -1158,8 +1240,9 @@ export async function duplicatePlan(
     accountId,
     planId,
     name,
+    revision,
     now,
-  }: { accountId: string; planId: string; name: string; now: Date },
+  }: { accountId: string; planId: string; name: string; revision: number; now: Date },
 ): Promise<PlanDuplicateOutcome> {
   let outcome: PlanDuplicateOutcome = { ok: false, reason: "not-found" };
   await database.transaction((tx) => {
@@ -1170,6 +1253,10 @@ export async function duplicatePlan(
       .get();
     if (!source) {
       outcome = { ok: false, reason: "not-found" };
+      return;
+    }
+    if (source.revision !== revision) {
+      outcome = { ok: false, reason: "stale-revision" };
       return;
     }
 

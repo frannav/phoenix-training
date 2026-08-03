@@ -39,7 +39,8 @@ export function PlansPage() {
   });
 
   const duplicateMutation = useMutation({
-    mutationFn: (id: string) => duplicatePlan(id),
+    mutationFn: ({ id, revision }: { id: string; revision: number }) =>
+      duplicatePlan(id, revision),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["plans"] });
     },
@@ -153,7 +154,7 @@ export function PlansPage() {
                       type="button"
                       aria-label={`Duplicar ${plan.name}`}
                       disabled={duplicateMutation.isPending}
-                      onClick={() => duplicateMutation.mutate(plan.id)}
+                      onClick={() => duplicateMutation.mutate({ id: plan.id, revision: plan.revision })}
                     >
                       Duplicar
                     </button>

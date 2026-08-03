@@ -93,14 +93,22 @@ const activePlanExistsMessage = "Ya tienes un Plan activo. Complétalo antes de 
 
 const planActivateSchema = z
   .object({
+    revision: z.number().int().min(1, "Indica la revisión del Plan que editas."),
     startDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe usar el formato AAAA-MM-DD."),
   })
   .strict();
 
+const planActionRevisionSchema = z
+  .object({
+    revision: z.number().int().min(1, "Indica la revisión del Plan que editas."),
+  })
+  .strict();
+
 const planDuplicateSchema = z
   .object({
+    revision: z.number().int().min(1, "Indica la revisión del Plan que editas."),
     name: z
       .string()
       .trim()
@@ -281,9 +289,13 @@ export function createPlansRouter({
       accountId: context.get("accountId"),
       planId: context.req.param("planId"),
       startDate: parsed.data.startDate,
+      revision: parsed.data.revision,
       now: now(),
     });
     if (!outcome.ok) {
+      if (outcome.reason === "stale-revision") {
+        return context.json(apiError("STALE_REVISION", staleRevisionMessage), 409);
+      }
       if (outcome.reason === "not-draft") {
         return context.json(apiError("TRANSITION_IMPOSSIBLE", activateNotDraftMessage), 409);
       }
@@ -307,12 +319,22 @@ export function createPlansRouter({
   });
 
   router.post("/plans/:planId/complete", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = planActionRevisionSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
     const outcome = await completePlan(database, {
       accountId: context.get("accountId"),
       planId: context.req.param("planId"),
+      revision: parsed.data.revision,
       now: now(),
     });
     if (!outcome.ok) {
+      if (outcome.reason === "stale-revision") {
+        return context.json(apiError("STALE_REVISION", staleRevisionMessage), 409);
+      }
       if (outcome.reason === "not-active") {
         return context.json(apiError("TRANSITION_IMPOSSIBLE", completeNotActiveMessage), 409);
       }
@@ -326,13 +348,23 @@ export function createPlansRouter({
   });
 
   router.post("/plans/:planId/trainings/:trainingId/omit", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = planActionRevisionSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
     const outcome = await omitTraining(database, {
       accountId: context.get("accountId"),
       planId: context.req.param("planId"),
       trainingId: context.req.param("trainingId"),
+      revision: parsed.data.revision,
       now: now(),
     });
     if (!outcome.ok) {
+      if (outcome.reason === "stale-revision") {
+        return context.json(apiError("STALE_REVISION", staleRevisionMessage), 409);
+      }
       if (outcome.reason === "not-active") {
         return context.json(apiError("TRANSITION_IMPOSSIBLE", outcome.message), 409);
       }
@@ -349,13 +381,23 @@ export function createPlansRouter({
   });
 
   router.post("/plans/:planId/trainings/:trainingId/restore", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = planActionRevisionSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
     const outcome = await restoreTraining(database, {
       accountId: context.get("accountId"),
       planId: context.req.param("planId"),
       trainingId: context.req.param("trainingId"),
+      revision: parsed.data.revision,
       now: now(),
     });
     if (!outcome.ok) {
+      if (outcome.reason === "stale-revision") {
+        return context.json(apiError("STALE_REVISION", staleRevisionMessage), 409);
+      }
       if (outcome.reason === "not-active" || outcome.reason === "transition-impossible") {
         return context.json(apiError("TRANSITION_IMPOSSIBLE", outcome.message), 409);
       }
@@ -389,9 +431,13 @@ export function createPlansRouter({
       accountId: context.get("accountId"),
       planId: context.req.param("planId"),
       name: parsed.data.name ?? defaultName,
+      revision: parsed.data.revision,
       now: now(),
     });
     if (!outcome.ok) {
+      if (outcome.reason === "stale-revision") {
+        return context.json(apiError("STALE_REVISION", staleRevisionMessage), 409);
+      }
       return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
     }
 

@@ -118,6 +118,16 @@
   color: var(--color-accent-strong);
 }
 
+/* Fecha prevista de un Entrenamiento pendiente de un Plan activo: se
+   presenta etiquetada como «Prevista» para no confundirla con una Fecha
+   realizada. */
+.pendingDate {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .closedTraining {
   border: 1px dashed var(--color-border);
   border-radius: 0.85rem;
