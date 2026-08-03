@@ -44,7 +44,9 @@ Una especificación funcional, de experiencia y técnica del MVP lista para conv
 - [Explorar el catálogo revisado de Ejercicios](issues/18-explorar-catalogo-revisado-ejercicios.md) — Implementado en `0837e7e`; el catálogo local versionado ofrece búsqueda, filtros, paginación opaca y actualizaciones con identidades estables.
 - [Mantener RM registrados](issues/20-mantener-rm-registrados.md) — Implementado en `92e8302` y reparado en `bd134b3`; los RM cubren vigencia temporal, edición, eliminación y aislamiento por Cuenta sin estimaciones.
 - [Crear y reutilizar Rutinas](issues/21-crear-reutilizar-rutinas.md) — Implementado en `3424b28` y reparado en `99b8fa8`; el agregado de Rutina incluye sustitución con revisión optimista atómica, archivo/restauración, API, UI y aislamiento por Cuenta.
+- [Diseñar Planes borrador](issues/22-disenar-planes-borrador.md) — Implementado en `b360628` (merge de `6add71d`); los Planes de varias semanas incluyen referencias vivas a Rutinas, personalización independiente, editor React, sustitución con revisión optimista, eliminación protegida y aislamiento por Cuenta.
 - [Iniciar y reanudar una Sesión libre](issues/25-iniciar-reanudar-sesion-libre.md) — Una Cuenta mantiene como máximo una Sesión activa; el agregado se reanuda desde la API con revisión y último Ejercicio confirmado, mientras Inicio y AppShell ofrecen acceso persistente y la pantalla completa oculta navegación competidora.
+- [Registrar resultados por Serie](issues/26-registrar-resultados-serie.md) — Implementado en `33a1b03` (merge de `bf2efef`) y reparado en `842f6c1`; las Sesiones activas registran estados, objetivos, resultados y RPE con validación atómica, guardado inmediato, conflictos de revisión e interfaz compacta.
 
 ## Deferred to implementation planning
 
