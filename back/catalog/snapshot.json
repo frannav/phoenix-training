@@ -1,0 +1,1278 @@
+[
+  {
+    "id": "0025",
+    "name": "barbell bench press",
+    "category": "chest",
+    "body_part": "chest",
+    "equipment": "barbell",
+    "instructions": {
+      "en": "Lie flat on a bench with your feet flat on the ground and your back pressed against the bench. Grasp the barbell with an overhand grip slightly wider than shoulder-width apart. Lift the barbell off the rack and hold it directly above your chest with your arms fully extended. Lower the barbell slowly towards your chest, keeping your elbows tucked in. Pause for a moment when the barbell touches your chest. Push the barbell back up to the starting position by extending your arms. Repeat for the desired number of repetitions.",
+      "it": "Sdraiati su una panca con i piedi appoggiati a terra e la schiena premuta contro la panca. Afferrare il bilanciere con una presa prona leggermente più larga della larghezza delle spalle. Solleva il bilanciere dal rack e tienilo direttamente sopra il petto con le braccia completamente distese. Abbassa lentamente il bilanciere verso il petto, tenendo i gomiti piegati. Fai una pausa per un momento quando il bilanciere tocca il petto. Spingi il bilanciere nella posizione iniziale estendendo le braccia. Ripetere per il numero di ripetizioni desiderato.",
+      "tr": "Ayaklarınız yere düz basacak ve sırtınız banka yaslanacak şekilde bir bankın üzerine düz bir şekilde uzanın. Halteri omuz genişliğinden biraz daha geniş olacak şekilde üstten kavrayın. Halteri raftan kaldırın ve kollarınız tamamen uzatılmış halde doğrudan göğsünüzün üzerinde tutun. Dirseklerinizi içeride tutarak halteri yavaşça göğsünüze doğru indirin. Halter göğsünüze dokunduğunda bir an duraklayın. Kollarınızı uzatarak halteri başlangıç ​​pozisyonuna doğru itin. İstenilen sayıda tekrar için tekrarlayın.",
+      "es": "Túmbate sobre un banco con los pies apoyados en el suelo y la espalda presionada contra el banco. Agarra la barra con un agarre pronado un poco más ancho que la separación de los hombros. Levanta la barra del soporte y sostenla directamente sobre el pecho con los brazos completamente extendidos. Baja la barra lentamente hacia el pecho, manteniendo los codos pegados al cuerpo. Haz una pausa breve cuando la barra toque el pecho. Empuja la barra de vuelta a la posición inicial extendiendo los brazos. Repite el número de repeticiones deseado.",
+      "ru": "Лягте на скамью, поставьте ступни на землю и прижмите спину к скамье. Возьмите штангу хватом сверху на расстоянии чуть шире плеч. Снимите штангу со стойки и держите ее прямо над грудью, полностью вытянув руки. Медленно опустите штангу к груди, держа локти прижатыми. Сделайте паузу на мгновение, когда штанга коснется вашей груди. Верните штангу в исходное положение, вытянув руки. Повторите необходимое количество повторений.",
+      "zh": "平躺在长凳上，双脚平放在地上，背部紧贴长凳。 正手握住杠铃，握距略宽于肩宽。 将杠铃从架子上提起，并将其直接放在胸部上方，双臂完全伸展。 将杠铃慢慢降低到胸部，保持肘部内收。 当杠铃触及胸部时暂停片刻。 伸展双臂，将杠铃推回到起始位置。 重复所需的重复次数。",
+      "hi": "एक बेंच पर सीधे लेट जाएं और आपके पैर जमीन पर सपाट हों और आपकी पीठ बेंच से सटी हुई हो। बारबेल को कंधे की चौड़ाई से थोड़ी अधिक चौड़ी पकड़ के साथ पकड़ें। बारबेल को रैक से उठाएं और अपनी बाहों को पूरी तरह फैलाकर सीधे अपनी छाती के ऊपर पकड़ें। अपनी कोहनियों को अंदर की ओर रखते हुए बारबेल को धीरे-धीरे अपनी छाती की ओर नीचे लाएँ। जब बारबेल आपकी छाती को छुए तो एक क्षण के लिए रुकें। अपनी भुजाओं को फैलाकर बारबेल को वापस प्रारंभिक स्थिति में धकेलें। दोहराव की वांछित संख्या के लिए दोहराएँ।",
+      "pl": "Połóż się płasko na ławce, stopy oprzyj płasko na podłodze, a plecy przyciśnij do ławki. Chwyć sztangę chwytem nachwytem nieco szerszym niż szerokość barków. Zdejmij sztangę ze stojaka i utrzymuj ją bezpośrednio nad klatką piersiową przy w pełni wyprostowanych rękach. Powoli opuszczaj sztangę w kierunku klatki piersiowej, trzymając łokcie blisko ciała. Zatrzymaj się na chwilę, gdy sztanga dotknie klatki piersiowej. Wypchnij sztangę z powrotem do pozycji wyjściowej, prostując ręce. Powtórz odpowiednią liczbę razy.",
+      "ko": "벤치에 눕되 발을 땅에 댑니다. 등을 벤치에 밀착합니다. 어깨 너비보다 약간 더 넓게 오버그립으로 바벨을 잡습니다. 바벨을 랙에서 들어 가슴 위에서 팔을 완전히 뻗은 상태로 잡습니다. 팔꿈치를 안쪽으로 유지하면서 천천히 바벨을 가슴 쪽으로 내립니다. 바벨이 가슴에 닿을 때 잠시 멈춘 후, 팔을 펴서 바벨을 처음 위치로 밀어냅니다. 원하는 횟수만큼 반복합니다.",
+      "fr": "Allonge-toi à plat sur un banc, les pieds à plat au sol et le dos plaqué contre le banc. Saisis la barre avec une prise en pronation un peu plus large que la largeur des épaules. Soulève la barre du rack et maintiens-la directement au-dessus de ta poitrine, les bras complètement tendus. Abaisse lentement la barre vers ta poitrine, en gardant tes coudes serrés. Marque une pause lorsque la barre touche ta poitrine. Repousse la barre vers le haut jusqu'à la position de départ en étendant tes bras. Répète le nombre de répétitions souhaité."
+    },
+    "instruction_steps": {
+      "en": [
+        "Lie flat on a bench with your feet flat on the ground and your back pressed against the bench.",
+        "Grasp the barbell with an overhand grip slightly wider than shoulder-width apart.",
+        "Lift the barbell off the rack and hold it directly above your chest with your arms fully extended.",
+        "Lower the barbell slowly towards your chest, keeping your elbows tucked in.",
+        "Pause for a moment when the barbell touches your chest.",
+        "Push the barbell back up to the starting position by extending your arms.",
+        "Repeat for the desired number of repetitions."
+      ],
+      "it": [
+        "Sdraiati su una panca con i piedi appoggiati a terra e la schiena premuta contro la panca.",
+        "Afferrare il bilanciere con una presa prona leggermente più larga della larghezza delle spalle.",
+        "Solleva il bilanciere dal rack e tienilo direttamente sopra il petto con le braccia completamente distese.",
+        "Abbassa lentamente il bilanciere verso il petto, mantenendo i gomiti piegati.",
+        "Fai una pausa per un momento quando il bilanciere tocca il tuo petto.",
+        "Spingi il bilanciere nella posizione iniziale estendendo le braccia.",
+        "Ripetere per il numero di ripetizioni desiderato."
+      ],
+      "tr": [
+        "Ayaklarınız yere düz basacak ve sırtınız banka yaslanacak şekilde bir bankın üzerine düz bir şekilde uzanın.",
+        "Halteri omuz genişliğinden biraz daha geniş olacak şekilde üstten kavrayın.",
+        "Halteri raftan kaldırın ve kollarınız tamamen uzatılmış halde doğrudan göğsünüzün üzerinde tutun.",
+        "Dirseklerinizi içeride tutarak halteri yavaşça göğsünüze doğru indirin.",
+        "Halter göğsünüze dokunduğunda bir an duraklayın.",
+        "Kollarınızı uzatarak halteri başlangıç ​​pozisyonuna doğru itin.",
+        "İstenilen sayıda tekrar için tekrarlayın."
+      ],
+      "es": [
+        "Túmbate sobre un banco con los pies apoyados en el suelo y la espalda presionada contra el banco.",
+        "Agarra la barra con un agarre pronado un poco más ancho que la separación de los hombros.",
+        "Levanta la barra del soporte y sostenla directamente sobre el pecho con los brazos completamente extendidos.",
+        "Baja la barra lentamente hacia el pecho, manteniendo los codos pegados al cuerpo.",
+        "Haz una pausa breve cuando la barra toque el pecho.",
+        "Empuja la barra de vuelta a la posición inicial extendiendo los brazos.",
+        "Repite el número de repeticiones deseado."
+      ],
+      "ru": [
+        "Лягте на скамью, поставьте ступни на землю и прижмите спину к скамье.",
+        "Возьмите штангу хватом сверху на расстоянии чуть шире плеч.",
+        "Снимите штангу со стойки и держите ее прямо над грудью, полностью вытянув руки.",
+        "Медленно опустите штангу к груди, держа локти прижатыми.",
+        "Сделайте паузу на мгновение, когда штанга коснется вашей груди.",
+        "Верните штангу в исходное положение, вытянув руки.",
+        "Повторите необходимое количество повторений."
+      ],
+      "zh": [
+        "平躺在长凳上，双脚平放在地上，背部紧贴长凳。",
+        "正手握住杠铃，握距略宽于肩宽。",
+        "将杠铃从架子上提起，并将其直接放在胸部上方，双臂完全伸展。",
+        "将杠铃慢慢降低到胸部，保持肘部内收。",
+        "当杠铃触及胸部时暂停片刻。",
+        "伸展双臂，将杠铃推回到起始位置。",
+        "重复所需的重复次数。"
+      ],
+      "hi": [
+        "एक बेंच पर सीधे लेट जाएं और आपके पैर जमीन पर सपाट हों और आपकी पीठ बेंच से सटी हुई हो।",
+        "बारबेल को कंधे की चौड़ाई से थोड़ी अधिक चौड़ी पकड़ के साथ पकड़ें।",
+        "बारबेल को रैक से उठाएं और अपनी बाहों को पूरी तरह फैलाकर सीधे अपनी छाती के ऊपर पकड़ें।",
+        "अपनी कोहनियों को अंदर की ओर रखते हुए बारबेल को धीरे-धीरे अपनी छाती की ओर नीचे लाएँ।",
+        "जब बारबेल आपकी छाती को छूए तो एक पल के लिए रुकें।",
+        "अपनी भुजाओं को फैलाकर बारबेल को वापस प्रारंभिक स्थिति में धकेलें।",
+        "दोहराव की वांछित संख्या के लिए दोहराएँ।"
+      ],
+      "pl": [
+        "Połóż się płasko na ławce, stopy oprzyj płasko na podłodze, a plecy przyciśnij do ławki.",
+        "Chwyć sztangę chwytem nachwytem nieco szerszym niż szerokość barków.",
+        "Zdejmij sztangę ze stojaka i utrzymuj ją bezpośrednio nad klatką piersiową przy w pełni wyprostowanych rękach.",
+        "Powoli opuszczaj sztangę w kierunku klatki piersiowej, trzymając łokcie blisko ciała.",
+        "Zatrzymaj się na chwilę, gdy sztanga dotknie klatki piersiowej.",
+        "Wypchnij sztangę z powrotem do pozycji wyjściowej, prostując ręce.",
+        "Powtórz odpowiednią liczbę razy."
+      ],
+      "ko": [
+        "벤치에 눕되 발을 땅에 댑니다.",
+        "등을 벤치에 밀착합니다.",
+        "어깨 너비보다 약간 더 넓게 오버그립으로 바벨을 잡습니다.",
+        "바벨을 랙에서 들어 가슴 위에서 팔을 완전히 뻗은 상태로 잡습니다.",
+        "팔꿈치를 안쪽으로 유지하면서 천천히 바벨을 가슴 쪽으로 내립니다.",
+        "바벨이 가슴에 닿을 때 잠시 멈춘 후, 팔을 펴서 바벨을 처음 위치로 밀어냅니다.",
+        "원하는 횟수만큼 반복합니다."
+      ],
+      "fr": [
+        "Allonge-toi à plat sur un banc, les pieds à plat au sol et le dos plaqué contre le banc.",
+        "Saisis la barre avec une prise en pronation un peu plus large que la largeur des épaules.",
+        "Soulève la barre du rack et maintiens-la directement au-dessus de ta poitrine, les bras complètement tendus.",
+        "Abaisse lentement la barre vers ta poitrine, en gardant tes coudes serrés.",
+        "Marque une pause lorsque la barre touche ta poitrine.",
+        "Repousse la barre vers le haut jusqu'à la position de départ en étendant tes bras.",
+        "Répète le nombre de répétitions souhaité."
+      ]
+    },
+    "muscle_group": "triceps",
+    "secondary_muscles": [
+      "triceps",
+      "shoulders"
+    ],
+    "target": "pectorals",
+    "image": "images/0025-EIeI8Vf.jpg",
+    "gif_url": "videos/0025-EIeI8Vf.gif",
+    "media_id": "EIeI8Vf",
+    "created_at": "2026-03-18T12:31:32.870252+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "0043",
+    "name": "barbell full squat",
+    "category": "upper legs",
+    "body_part": "upper legs",
+    "equipment": "barbell",
+    "instructions": {
+      "en": "Stand with your feet shoulder-width apart, toes slightly turned out. Hold the barbell across your upper back, resting it on your traps or rear delts. Engage your core and keep your chest up as you begin to lower your body down. Bend at the knees and hips, pushing your hips back and down as if sitting into a chair. Lower yourself until your thighs are parallel to the ground or slightly below. Keep your knees in line with your toes and your weight in your heels. Drive through your heels to stand back up, extending your hips and knees. Repeat for the desired number of repetitions.",
+      "it": "Stai con i piedi alla larghezza delle spalle, le dita leggermente rivolte verso l'esterno. Tieni il bilanciere sulla parte superiore della schiena, appoggiandolo sulle trappole o sui deltoidi posteriori. Coinvolgi il tuo core e mantieni il petto sollevato mentre inizi ad abbassare il corpo. Piega le ginocchia e i fianchi, spingendo i fianchi indietro e in basso come se fossi seduto su una sedia. Abbassati finché le cosce non sono parallele al suolo o leggermente più in basso. Tieni le ginocchia in linea con le dita dei piedi e il peso sui talloni. Spingi i talloni per rialzarti, estendendo i fianchi e le ginocchia. Ripetere per il numero di ripetizioni desiderato.",
+      "tr": "Ayaklarınız omuz genişliğinde açık, ayak parmaklarınız hafifçe dışa dönük olacak şekilde ayakta durun. Halterinizi sırtınızın üst kısmında tutun ve trapezlerinize veya arka deltalarınıza dayayın. Vücudunuzu aşağı indirmeye başladığınızda merkez bölgenizi devreye sokun ve göğsünüzü yukarıda tutun. Dizlerinizi ve kalçalarınızı bükün, sanki bir sandalyeye oturuyormuş gibi kalçalarınızı geriye ve aşağı doğru itin. Uyluklarınız yere paralel veya biraz aşağıda oluncaya kadar kendinizi indirin. Dizlerinizi ayak parmaklarınızla aynı hizada ve ağırlığınızı topuklarınızda tutun. Kalçalarınızı ve dizlerinizi uzatarak ayağa kalkmak için topuklarınızı kullanın. İstenilen sayıda tekrar için tekrarlayın.",
+      "es": "Ponte de pie con los pies separados a la altura de los hombros, con los dedos de los pies ligeramente hacia afuera. Sujeta la barra sobre la parte superior de la espalda, apoyándola en los trapecios o los deltoides posteriores. Activa el core y mantén el pecho elevado mientras comienzas a bajar el cuerpo. Flexiona las rodillas y las caderas, empujando las caderas hacia atrás y hacia abajo como si te sentaras en una silla. Baja hasta que los muslos queden paralelos al suelo o un poco por debajo. Mantén las rodillas alineadas con los dedos de los pies y el peso sobre los talones. Empuja con los talones para volver a ponerte de pie, extendiendo las caderas y las rodillas. Repite el número de repeticiones deseado.",
+      "ru": "Встаньте, ноги на ширине плеч, носки слегка развернуты наружу. Держите штангу на верхней части спины, опираясь на трапеции или задние дельты. Напрягите корпус и держите грудь поднятой, когда начинаете опускать тело вниз. Согните колени и бедра, отводя бедра назад и вниз, как будто вы сидите на стуле. Опускайтесь до тех пор, пока бедра не станут параллельны земле или немного ниже. Держите колени на одной линии с пальцами ног, а вес тела перенесите на пятки. Протолкните пятки, чтобы встать обратно, выпрямляя бедра и колени. Повторите необходимое количество повторений.",
+      "zh": "站立，双脚分开与肩同宽，脚趾稍微向外。 将杠铃放在上背部，将其放在斜方肌或三角肌后束上。 当你开始降低身体时，启动你的核心并保持胸部挺直。 弯曲膝盖和臀部，向后和向下推臀部，就像坐在椅子上一样。 放低身体，直到大腿与地面平行或稍低于地面。 保持膝盖与脚趾对齐，并将重量放在脚后跟上。 通过脚后跟站起来，伸展臀部和膝盖。 重复所需的重复次数。",
+      "hi": "अपने पैरों को कंधे की चौड़ाई पर फैलाकर खड़े हो जाएं, पैर की उंगलियां थोड़ी बाहर निकली हुई हों। बारबेल को अपनी ऊपरी पीठ पर पकड़ें, इसे अपने जाल या पीछे के डेल्टा पर टिकाएं। जब आप अपने शरीर को नीचे करना शुरू करें तो अपने कोर को संलग्न करें और अपनी छाती को ऊपर रखें। घुटनों और कूल्हों पर झुकें, अपने कूल्हों को पीछे और नीचे धकेलें जैसे कि कुर्सी पर बैठे हों। अपने आप को तब तक नीचे रखें जब तक आपकी जांघें ज़मीन के समानांतर या थोड़ा नीचे न हो जाएं। अपने घुटनों को अपने पंजों की सीध में रखें और अपना वजन अपनी एड़ियों पर रखें। अपने कूल्हों और घुटनों को फैलाते हुए वापस खड़े होने के लिए अपनी एड़ी से ड्राइव करें। दोहराव की वांछित संख्या के लिए दोहराएँ।",
+      "pl": "Stań w rozkroku na szerokość barków, z lekko rozstawionymi na zewnątrz palcami stóp. Trzymaj sztangę na górnej części pleców, opierając ją na mięśniach czworobocznych lub tylnych aktonach barków. Napnij mięśnie tułowia i utrzymuj uniesioną klatkę piersiową, rozpoczynając opuszczanie ciała. Ugnij kolana i biodra, cofając biodra w dół, jakbyś siadał na krześle. Opuszczaj się, aż uda będą równoległe do podłoża lub nieco niżej. Utrzymuj kolana w linii ze stopami, a ciężar ciała w piętach. Wypchnij się przez pięty, wracając do pozycji stojącej, prostując biodra i kolana. Powtórz odpowiednią liczbę razy.",
+      "ko": "발을 어깨넓이로 벌리고 발가락을 약간 바깥쪽으로 향하게 섭니다. 바벨을 상체 뒤쪽에 올려놓으면서 승모근이나 후삼각근에 걸쳐놓습니다. 복부에 힘을 주고 가슴을 펼친 상태를 유지하면서 몸을 내리기 시작합니다. 무릎과 허리를 구부려 의자에 앉는 것처럼 허리를 뒤로 내립니다. 넓적다리가 바닥과 평행하거나 약간 아래까지 내려갑니다. 무릎이 발가락과 일직선상에 있고 체중은 발 뒤꿈치에 있는지 확인합니다. 발 뒤꿈치로 힘을 주어 일어나면서 허리와 무릎을 펼칩니다. 원하는 반복 횟수만큼 반복합니다.",
+      "fr": "Tiens-toi debout, les pieds écartés à la largeur des épaules, les orteils légèrement tournés vers l'extérieur. Tiens la barre en travers du haut de ton dos, en la faisant reposer sur tes trapèzes ou tes deltoïdes postérieurs. Gaine ta sangle abdominale et garde ta poitrine relevée pendant que tu commences à abaisser ton corps. Fléchis les genoux et les hanches en poussant tes hanches vers l'arrière et vers le bas comme si tu t'asseyais sur une chaise. Descends jusqu'à ce que tes cuisses soient parallèles au sol ou légèrement en dessous. Garde les genoux alignés avec les orteils et le poids dans les talons. Pousse sur tes talons pour te relever, en étendant tes hanches et tes genoux. Répète le nombre de répétitions souhaité."
+    },
+    "instruction_steps": {
+      "en": [
+        "Stand with your feet shoulder-width apart, toes slightly turned out.",
+        "Hold the barbell across your upper back, resting it on your traps or rear delts.",
+        "Engage your core and keep your chest up as you begin to lower your body down.",
+        "Bend at the knees and hips, pushing your hips back and down as if sitting into a chair.",
+        "Lower yourself until your thighs are parallel to the ground or slightly below.",
+        "Keep your knees in line with your toes and your weight in your heels.",
+        "Drive through your heels to stand back up, extending your hips and knees.",
+        "Repeat for the desired number of repetitions."
+      ],
+      "it": [
+        "Stai con i piedi alla larghezza delle spalle, le dita leggermente rivolte verso l'esterno.",
+        "Tieni il bilanciere sulla parte superiore della schiena, appoggiandolo sulle trappole o sui deltoidi posteriori.",
+        "Coinvolgi il tuo core e mantieni il petto sollevato mentre inizi ad abbassare il corpo.",
+        "Piega le ginocchia e i fianchi, spingendo i fianchi indietro e in basso come se fossi seduto su una sedia.",
+        "Abbassati finché le cosce non sono parallele al suolo o leggermente più in basso.",
+        "Tieni le ginocchia in linea con le dita dei piedi e il peso sui talloni.",
+        "Spingi i talloni per rialzarti, estendendo i fianchi e le ginocchia.",
+        "Ripetere per il numero di ripetizioni desiderato."
+      ],
+      "tr": [
+        "Ayaklarınız omuz genişliğinde açık, ayak parmaklarınız hafifçe dışa dönük olacak şekilde ayakta durun.",
+        "Halterinizi sırtınızın üst kısmında tutun ve trapezlerinize veya arka deltalarınıza dayayın.",
+        "Vücudunuzu aşağı indirmeye başladığınızda merkez bölgenizi devreye sokun ve göğsünüzü yukarıda tutun.",
+        "Dizlerinizi ve kalçalarınızı bükün, sanki bir sandalyeye oturuyormuş gibi kalçalarınızı geriye ve aşağı doğru itin.",
+        "Uyluklarınız yere paralel veya biraz aşağıda oluncaya kadar kendinizi indirin.",
+        "Dizlerinizi ayak parmaklarınızla aynı hizada ve ağırlığınızı topuklarınızda tutun.",
+        "Kalçalarınızı ve dizlerinizi uzatarak ayağa kalkmak için topuklarınızı kullanın.",
+        "İstenilen sayıda tekrar için tekrarlayın."
+      ],
+      "es": [
+        "Ponte de pie con los pies separados a la altura de los hombros, con los dedos de los pies ligeramente hacia afuera.",
+        "Sujeta la barra sobre la parte superior de la espalda, apoyándola en los trapecios o los deltoides posteriores.",
+        "Activa el core y mantén el pecho elevado mientras comienzas a bajar el cuerpo.",
+        "Flexiona las rodillas y las caderas, empujando las caderas hacia atrás y hacia abajo como si te sentaras en una silla.",
+        "Baja hasta que los muslos queden paralelos al suelo o un poco por debajo.",
+        "Mantén las rodillas alineadas con los dedos de los pies y el peso sobre los talones.",
+        "Empuja con los talones para volver a ponerte de pie, extendiendo las caderas y las rodillas.",
+        "Repite el número de repeticiones deseado."
+      ],
+      "ru": [
+        "Встаньте, ноги на ширине плеч, носки слегка развернуты наружу.",
+        "Держите штангу на верхней части спины, опираясь на трапеции или задние дельты.",
+        "Напрягите корпус и держите грудь поднятой, когда начинаете опускать тело вниз.",
+        "Согните колени и бедра, отводя бедра назад и вниз, как будто вы сидите на стуле.",
+        "Опускайтесь до тех пор, пока бедра не станут параллельны земле или немного ниже.",
+        "Держите колени на одной линии с пальцами ног, а вес тела перенесите на пятки.",
+        "Протолкните пятки, чтобы встать обратно, выпрямляя бедра и колени.",
+        "Повторите необходимое количество повторений."
+      ],
+      "zh": [
+        "站立，双脚分开与肩同宽，脚趾稍微向外。",
+        "将杠铃放在上背部，将其放在斜方肌或三角肌后束上。",
+        "当你开始降低身体时，启动你的核心并保持胸部挺直。",
+        "弯曲膝盖和臀部，向后和向下推臀部，就像坐在椅子上一样。",
+        "放低身体，直到大腿与地面平行或稍低于地面。",
+        "保持膝盖与脚趾对齐，并将重量放在脚后跟上。",
+        "通过脚后跟站起来，伸展臀部和膝盖。",
+        "重复所需的重复次数。"
+      ],
+      "hi": [
+        "अपने पैरों को कंधे की चौड़ाई पर फैलाकर खड़े हो जाएं, पैर की उंगलियां थोड़ी बाहर निकली हुई हों।",
+        "बारबेल को अपनी ऊपरी पीठ पर पकड़ें, इसे अपने जाल या पीछे के डेल्टा पर टिकाएं।",
+        "जब आप अपने शरीर को नीचे करना शुरू करें तो अपने कोर को संलग्न करें और अपनी छाती को ऊपर रखें।",
+        "घुटनों और कूल्हों पर झुकें, अपने कूल्हों को पीछे और नीचे धकेलें जैसे कि कुर्सी पर बैठे हों।",
+        "अपने आप को तब तक नीचे रखें जब तक आपकी जांघें ज़मीन के समानांतर या थोड़ा नीचे न हो जाएं।",
+        "अपने घुटनों को अपने पंजों की सीध में रखें और अपना वजन अपनी एड़ियों पर रखें।",
+        "अपने कूल्हों और घुटनों को फैलाते हुए वापस खड़े होने के लिए अपनी एड़ी से ड्राइव करें।",
+        "दोहराव की वांछित संख्या के लिए दोहराएँ।"
+      ],
+      "pl": [
+        "Stań w rozkroku na szerokość barków, z lekko rozstawionymi na zewnątrz palcami stóp.",
+        "Trzymaj sztangę na górnej części pleców, opierając ją na mięśniach czworobocznych lub tylnych aktonach barków.",
+        "Napnij mięśnie tułowia i utrzymuj uniesioną klatkę piersiową, rozpoczynając opuszczanie ciała.",
+        "Ugnij kolana i biodra, cofając biodra w dół, jakbyś siadał na krześle.",
+        "Opuszczaj się, aż uda będą równoległe do podłoża lub nieco niżej.",
+        "Utrzymuj kolana w linii ze stopami, a ciężar ciała w piętach.",
+        "Wypchnij się przez pięty, wracając do pozycji stojącej, prostując biodra i kolana.",
+        "Powtórz odpowiednią liczbę razy."
+      ],
+      "ko": [
+        "발을 어깨넓이로 벌리고 발가락을 약간 바깥쪽으로 향하게 섭니다.",
+        "바벨을 상체 뒤쪽에 올려놓으면서 승모근이나 후삼각근에 걸쳐놓습니다.",
+        "복부에 힘을 주고 가슴을 펼친 상태를 유지하면서 몸을 내리기 시작합니다.",
+        "무릎과 허리를 구부려 의자에 앉는 것처럼 허리를 뒤로 내립니다.",
+        "넓적다리가 바닥과 평행하거나 약간 아래까지 내려갑니다.",
+        "무릎이 발가락과 일직선상에 있고 체중은 발 뒤꿈치에 있는지 확인합니다.",
+        "발 뒤꿈치로 힘을 주어 일어나면서 허리와 무릎을 펼칩니다.",
+        "원하는 반복 횟수만큼 반복합니다."
+      ],
+      "fr": [
+        "Tiens-toi debout, les pieds écartés à la largeur des épaules, les orteils légèrement tournés vers l'extérieur.",
+        "Tiens la barre en travers du haut de ton dos, en la faisant reposer sur tes trapèzes ou tes deltoïdes postérieurs.",
+        "Gaine ta sangle abdominale et garde ta poitrine relevée pendant que tu commences à abaisser ton corps.",
+        "Fléchis les genoux et les hanches en poussant tes hanches vers l'arrière et vers le bas comme si tu t'asseyais sur une chaise.",
+        "Descends jusqu'à ce que tes cuisses soient parallèles au sol ou légèrement en dessous.",
+        "Garde les genoux alignés avec les orteils et le poids dans les talons.",
+        "Pousse sur tes talons pour te relever, en étendant tes hanches et tes genoux.",
+        "Répète le nombre de répétitions souhaité."
+      ]
+    },
+    "muscle_group": "quadriceps",
+    "secondary_muscles": [
+      "quadriceps",
+      "hamstrings",
+      "calves",
+      "core"
+    ],
+    "target": "glutes",
+    "image": "images/0043-qXTaZnJ.jpg",
+    "gif_url": "videos/0043-qXTaZnJ.gif",
+    "media_id": "qXTaZnJ",
+    "created_at": "2026-03-18T12:31:32.871543+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "0032",
+    "name": "barbell deadlift",
+    "category": "upper legs",
+    "body_part": "upper legs",
+    "equipment": "barbell",
+    "instructions": {
+      "en": "Stand with your feet shoulder-width apart and the barbell on the ground in front of you. Bend your knees and hinge at the hips to lower your torso and grip the barbell with an overhand grip, hands slightly wider than shoulder-width apart. Keep your back straight and chest lifted as you drive through your heels to lift the barbell off the ground, extending your hips and knees. As you stand up straight, squeeze your glutes and keep your core engaged. Lower the barbell back down to the ground by bending at the hips and knees, keeping your back straight. Repeat for the desired number of repetitions.",
+      "it": "Stai con i piedi alla larghezza delle spalle e il bilanciere a terra davanti a te. Piega le ginocchia e fai perno sui fianchi per abbassare il busto e afferrare il bilanciere con una presa prona, con le mani leggermente più larghe della larghezza delle spalle. Tieni la schiena dritta e il petto sollevato mentre spingi i talloni per sollevare il bilanciere da terra, estendendo i fianchi e le ginocchia. Mentre stai in piedi, contrai i glutei e mantieni il core impegnato. Abbassa il bilanciere a terra piegando le anche e le ginocchia, mantenendo la schiena dritta. Ripetere per il numero di ripetizioni desiderato.",
+      "tr": "Ayaklarınız omuz genişliğinde açık ve halter önünüzde yerde olacak şekilde ayakta durun. Dizlerinizi bükün ve kalçalarınızı menteşeleyerek gövdenizi indirin ve halteri üstten kavrayarak, eller omuz genişliğinden biraz daha geniş olacak şekilde kavrayın. Halteri yerden kaldırmak için topuklarınızın üzerinden geçerken sırtınızı düz ve göğsünüzü yukarıda tutun, kalçalarınızı ve dizlerinizi uzatın. Dik dururken kalça kaslarınızı sıkın ve merkez bölgenizi meşgul tutun. Sırtınızı düz tutarak, kalçalarınızı ve dizlerinizi bükerek halteri yere indirin. İstenilen sayıda tekrar için tekrarlayın.",
+      "es": "Ponte de pie con los pies separados a la altura de los hombros y la barra en el suelo frente a ti. Flexiona las rodillas y las caderas para bajar el torso y agarra la barra con un agarre pronado, con las manos un poco más separadas que el ancho de los hombros. Mantén la espalda recta y el pecho elevado mientras empujas con los talones para levantar la barra del suelo, extendiendo las caderas y las rodillas. Al ponerte de pie, aprieta los glúteos y mantén el core activado. Baja la barra de vuelta al suelo flexionando las caderas y las rodillas, manteniendo la espalda recta. Repite el número de repeticiones deseado.",
+      "ru": "Встаньте, ноги на ширине плеч, положите штангу на землю перед собой. Согните колени и наклоните бедра, чтобы опустить туловище и взять штангу хватом сверху, руки на расстоянии чуть шире плеч. Держите спину прямо, а грудь приподнятой, пока вы двигаетесь пятками, чтобы поднять штангу с земли, вытягивая бедра и колени. Вставая прямо, сожмите ягодицы и держите корпус напряженным. Опустите штангу обратно на землю, сгибая бедра и колени, сохраняя спину прямой. Повторите необходимое количество повторений.",
+      "zh": "双脚分开与肩同宽站立，杠铃放在你面前的地面上。 弯曲膝盖并以臀部为铰链，降低躯干，正手握住杠铃，双手分开略宽于肩宽。 当你通过脚后跟将杠铃抬离地面时，保持背部挺直，胸部抬起，伸展臀部和膝盖。 当你站直时，挤压你的臀部并保持你的核心参与。 弯曲臀部和膝盖，将杠铃放回地面，保持背部挺直。 重复所需的重复次数。",
+      "hi": "अपने पैरों को कंधे की चौड़ाई पर फैलाकर खड़े हो जाएं और बारबेल आपके सामने जमीन पर हो। अपने घुटनों को मोड़ें और अपने धड़ को नीचे करने के लिए कूल्हों पर टिकाएं और बारबेल को ओवरहैंड ग्रिप से पकड़ें, हाथों को कंधे की चौड़ाई से थोड़ा चौड़ा रखें। बारबेल को जमीन से ऊपर उठाने के लिए अपनी एड़ी के माध्यम से ड्राइव करते समय अपनी पीठ सीधी और छाती ऊपर रखें, अपने कूल्हों और घुटनों को फैलाएं। जैसे ही आप सीधे खड़े हों, अपने ग्लूट्स को निचोड़ें और अपने कोर को व्यस्त रखें। अपनी पीठ को सीधा रखते हुए, कूल्हों और घुटनों पर झुकते हुए बारबेल को वापस ज़मीन पर नीचे लाएँ। दोहराव की वांछित संख्या के लिए दोहराएँ।",
+      "pl": "Stań w rozkroku na szerokość barków, ze sztangą leżącą na podłodze przed tobą. Ugnij kolana i pochyl się w biodrach, aby opuścić tułów i chwycić sztangę chwytem nachwytem, dłonie nieco szerzej niż szerokość barków. Utrzymując proste plecy i uniesioną klatkę piersiową, odepchnij się piętami, unosząc sztangę z podłogi, prostując biodra i kolana. Gdy staniesz prosto, ściśnij pośladki i utrzymuj napięcie mięśni tułowia. Opuść sztangę z powrotem na podłogę, uginając biodra i kolana, utrzymując proste plecy. Powtórz odpowiednią liczbę razy.",
+      "ko": "발을 어깨넓이로 벌리고 서서 바벨을 몸 앞 바닥에 놓습니다. 무릎을 굽혀 허리를 숙이면서 손가락이 앞을 향하도록 바벨을 잡고 손은 어깨넓이보다 약간 넓게 위치시킵니다. 등을 곧게 유지하고 가슴을 펴면서 발 뒤꿈치로 힘을 주어 바벨을 들어올리고 허리와 무릎을 펼칩니다. 서서 일어나면서 둔근을 조이고 복부에 힘을 줍니다. 바벨을 내릴 때는 허리와 무릎을 구부려 바닥으로 낮추면서 등을 곧게 유지합니다. 원하는 반복 횟수만큼 반복합니다.",
+      "fr": "Tiens-toi debout, les pieds écartés à la largeur des épaules et la barre au sol devant toi. Fléchis les genoux et bascule au niveau des hanches pour abaisser ton torse et saisir la barre en prise pronation, les mains légèrement plus écartées que la largeur des épaules. Garde le dos droit et la poitrine relevée pendant que tu pousses sur tes talons pour soulever la barre du sol, en étendant tes hanches et tes genoux. En te redressant, contracte tes fessiers et garde ta sangle abdominale gainée. Abaisse la barre jusqu'au sol en fléchissant les hanches et les genoux, en gardant ton dos droit. Répète le nombre de répétitions souhaité."
+    },
+    "instruction_steps": {
+      "en": [
+        "Stand with your feet shoulder-width apart and the barbell on the ground in front of you.",
+        "Bend your knees and hinge at the hips to lower your torso and grip the barbell with an overhand grip, hands slightly wider than shoulder-width apart.",
+        "Keep your back straight and chest lifted as you drive through your heels to lift the barbell off the ground, extending your hips and knees.",
+        "As you stand up straight, squeeze your glutes and keep your core engaged.",
+        "Lower the barbell back down to the ground by bending at the hips and knees, keeping your back straight.",
+        "Repeat for the desired number of repetitions."
+      ],
+      "it": [
+        "Stai con i piedi alla larghezza delle spalle e il bilanciere a terra davanti a te.",
+        "Piega le ginocchia e fai perno sui fianchi per abbassare il busto e afferrare il bilanciere con una presa prona, con le mani leggermente più larghe della larghezza delle spalle.",
+        "Tieni la schiena dritta e il petto sollevato mentre spingi i talloni per sollevare il bilanciere da terra, estendendo i fianchi e le ginocchia.",
+        "Mentre stai in piedi, contrai i glutei e mantieni il core impegnato.",
+        "Abbassa il bilanciere a terra piegando le anche e le ginocchia, mantenendo la schiena dritta.",
+        "Ripetere per il numero di ripetizioni desiderato."
+      ],
+      "tr": [
+        "Ayaklarınız omuz genişliğinde açık ve halter önünüzde yerde olacak şekilde ayakta durun.",
+        "Dizlerinizi bükün ve kalçalarınızı menteşeleyerek gövdenizi indirin ve halteri üstten kavrayarak, eller omuz genişliğinden biraz daha geniş olacak şekilde kavrayın.",
+        "Halteri yerden kaldırmak için topuklarınızın üzerinden geçerken sırtınızı düz ve göğsünüzü yukarıda tutun, kalçalarınızı ve dizlerinizi uzatın.",
+        "Dik dururken kalça kaslarınızı sıkın ve merkez bölgenizi meşgul tutun.",
+        "Sırtınızı düz tutarak, kalçalarınızı ve dizlerinizi bükerek halteri yere indirin.",
+        "İstenilen sayıda tekrar için tekrarlayın."
+      ],
+      "es": [
+        "Ponte de pie con los pies separados a la altura de los hombros y la barra en el suelo frente a ti.",
+        "Flexiona las rodillas y las caderas para bajar el torso y agarra la barra con un agarre pronado, con las manos un poco más separadas que el ancho de los hombros.",
+        "Mantén la espalda recta y el pecho elevado mientras empujas con los talones para levantar la barra del suelo, extendiendo las caderas y las rodillas.",
+        "Al ponerte de pie, aprieta los glúteos y mantén el core activado.",
+        "Baja la barra de vuelta al suelo flexionando las caderas y las rodillas, manteniendo la espalda recta.",
+        "Repite el número de repeticiones deseado."
+      ],
+      "ru": [
+        "Встаньте, ноги на ширине плеч, положите штангу на землю перед собой.",
+        "Согните колени и наклоните бедра, чтобы опустить туловище и взять штангу хватом сверху, руки на расстоянии чуть шире плеч.",
+        "Держите спину прямо, а грудь приподнятой, пока вы двигаетесь пятками, чтобы поднять штангу с земли, вытягивая бедра и колени.",
+        "Вставая прямо, сожмите ягодицы и держите корпус напряженным.",
+        "Опустите штангу обратно на землю, сгибая бедра и колени, сохраняя спину прямой.",
+        "Повторите необходимое количество повторений."
+      ],
+      "zh": [
+        "双脚分开与肩同宽站立，杠铃放在你面前的地面上。",
+        "弯曲膝盖并以臀部为铰链，降低躯干，正手握住杠铃，双手分开略宽于肩宽。",
+        "当你通过脚后跟将杠铃抬离地面时，保持背部挺直，胸部抬起，伸展臀部和膝盖。",
+        "当你站直时，挤压你的臀部并保持你的核心参与。",
+        "弯曲臀部和膝盖，将杠铃放回地面，保持背部挺直。",
+        "重复所需的重复次数。"
+      ],
+      "hi": [
+        "अपने पैरों को कंधे की चौड़ाई पर फैलाकर खड़े हो जाएं और बारबेल आपके सामने जमीन पर हो।",
+        "अपने घुटनों को मोड़ें और अपने धड़ को नीचे करने के लिए कूल्हों पर टिकाएं और बारबेल को ओवरहैंड ग्रिप से पकड़ें, हाथों को कंधे की चौड़ाई से थोड़ा चौड़ा रखें।",
+        "बारबेल को जमीन से ऊपर उठाने के लिए अपनी एड़ी के माध्यम से ड्राइव करते समय अपनी पीठ सीधी और छाती ऊपर रखें, अपने कूल्हों और घुटनों को फैलाएं।",
+        "जैसे ही आप सीधे खड़े हों, अपने ग्लूट्स को निचोड़ें और अपने कोर को व्यस्त रखें।",
+        "अपनी पीठ को सीधा रखते हुए, कूल्हों और घुटनों पर झुकते हुए बारबेल को वापस ज़मीन पर नीचे लाएँ।",
+        "दोहराव की वांछित संख्या के लिए दोहराएँ।"
+      ],
+      "pl": [
+        "Stań w rozkroku na szerokość barków, ze sztangą leżącą na podłodze przed tobą.",
+        "Ugnij kolana i pochyl się w biodrach, aby opuścić tułów i chwycić sztangę chwytem nachwytem, dłonie nieco szerzej niż szerokość barków.",
+        "Utrzymując proste plecy i uniesioną klatkę piersiową, odepchnij się piętami, unosząc sztangę z podłogi, prostując biodra i kolana.",
+        "Gdy staniesz prosto, ściśnij pośladki i utrzymuj napięcie mięśni tułowia.",
+        "Opuść sztangę z powrotem na podłogę, uginając biodra i kolana, utrzymując proste plecy.",
+        "Powtórz odpowiednią liczbę razy."
+      ],
+      "ko": [
+        "발을 어깨넓이로 벌리고 서서 바벨을 몸 앞 바닥에 놓습니다.",
+        "무릎을 굽혀 허리를 숙이면서 손가락이 앞을 향하도록 바벨을 잡고 손은 어깨넓이보다 약간 넓게 위치시킵니다.",
+        "등을 곧게 유지하고 가슴을 펴면서 발 뒤꿈치로 힘을 주어 바벨을 들어올리고 허리와 무릎을 펼칩니다.",
+        "서서 일어나면서 둔근을 조이고 복부에 힘을 줍니다.",
+        "바벨을 내릴 때는 허리와 무릎을 구부려 바닥으로 낮추면서 등을 곧게 유지합니다.",
+        "원하는 반복 횟수만큼 반복합니다."
+      ],
+      "fr": [
+        "Tiens-toi debout, les pieds écartés à la largeur des épaules et la barre au sol devant toi.",
+        "Fléchis les genoux et bascule au niveau des hanches pour abaisser ton torse et saisir la barre en prise pronation, les mains légèrement plus écartées que la largeur des épaules.",
+        "Garde le dos droit et la poitrine relevée pendant que tu pousses sur tes talons pour soulever la barre du sol, en étendant tes hanches et tes genoux.",
+        "En te redressant, contracte tes fessiers et garde ta sangle abdominale gainée.",
+        "Abaisse la barre jusqu'au sol en fléchissant les hanches et les genoux, en gardant ton dos droit.",
+        "Répète le nombre de répétitions souhaité."
+      ]
+    },
+    "muscle_group": "hamstrings",
+    "secondary_muscles": [
+      "hamstrings",
+      "lower back"
+    ],
+    "target": "glutes",
+    "image": "images/0032-ila4NZS.jpg",
+    "gif_url": "videos/0032-ila4NZS.gif",
+    "media_id": "ila4NZS",
+    "created_at": "2026-03-18T12:31:32.870425+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "0054",
+    "name": "barbell lunge",
+    "category": "upper legs",
+    "body_part": "upper legs",
+    "equipment": "barbell",
+    "instructions": {
+      "en": "Start by standing with your feet shoulder-width apart and a barbell resting on your upper back. Take a step forward with your right foot, keeping your torso upright. Lower your body by bending your right knee until your thigh is parallel to the ground. Push through your right heel to return to the starting position. Repeat with your left leg, alternating legs for the desired number of repetitions.",
+      "it": "Inizia stando in piedi con i piedi alla larghezza delle spalle e un bilanciere appoggiato sulla parte superiore della schiena. Fai un passo avanti con il piede destro, mantenendo il busto eretto. Abbassa il corpo piegando il ginocchio destro finché la coscia non è parallela al suolo. Spingi attraverso il tallone destro per tornare alla posizione di partenza. Ripeti con la gamba sinistra, alternando le gambe per il numero di ripetizioni desiderato.",
+      "tr": "Ayaklarınızı omuz genişliğinde açarak ve sırtınızın üst kısmına bir halter koyarak başlayın. Gövdenizi dik tutarak sağ ayağınızla öne doğru bir adım atın. Sağ dizinizi uyluğunuz yere paralel oluncaya kadar bükerek vücudunuzu indirin. Başlangıç ​​pozisyonuna dönmek için sağ topuğunuzu itin. İstenilen sayıda tekrar için sol bacağınızla, bacak değiştirerek tekrarlayın.",
+      "es": "Empieza de pie con los pies separados a la altura de los hombros y una barra apoyada sobre la parte superior de la espalda. Da un paso hacia delante con el pie derecho, manteniendo el torso erguido. Baja el cuerpo flexionando la rodilla derecha hasta que el muslo quede paralelo al suelo. Empuja con el talón derecho para regresar a la posición inicial. Repite con la pierna izquierda, alternando las piernas el número de repeticiones deseado.",
+      "ru": "Начните с того, что встаньте, поставив ноги на ширине плеч и положив штангу на верхнюю часть спины. Сделайте шаг вперед правой ногой, удерживая туловище в вертикальном положении. Опустите тело, согнув правое колено, пока бедро не станет параллельно земле. Оттолкнитесь правой пяткой, чтобы вернуться в исходное положение. Повторите то же самое с левой ногой, чередуя ноги необходимое количество повторений.",
+      "zh": "首先，双脚分开与肩同宽，将杠铃放在上背部。 右脚向前迈出一步，保持躯干直立。 弯曲右膝降低身体，直到大腿与地面平行。 推动右脚跟回到起始位置。 用左腿重复上述动作，交替腿进行所需的重复次数。",
+      "hi": "अपने पैरों को कंधे की चौड़ाई पर फैलाकर और एक बारबेल को अपनी पीठ के ऊपरी हिस्से पर टिकाकर खड़े होकर शुरुआत करें। अपने धड़ को सीधा रखते हुए अपने दाहिने पैर से एक कदम आगे बढ़ाएं। अपने दाहिने घुटने को मोड़कर अपने शरीर को नीचे करें जब तक कि आपकी जांघ जमीन के समानांतर न हो जाए। प्रारंभिक स्थिति में लौटने के लिए अपनी दाहिनी एड़ी को धक्का दें। वांछित संख्या में दोहराव के लिए पैरों को बारी-बारी से अपने बाएं पैर से दोहराएं।",
+      "pl": "Stań w rozkroku na szerokość barków, ze sztangą opartą na górnej części pleców. Zrób krok do przodu prawą stopą, utrzymując tułów wyprostowany. Opuść ciało, uginając prawe kolano, aż udo będzie równoległe do podłoża. Odepchnij się przez prawą piętę, wracając do pozycji wyjściowej. Powtórz lewą nogą, wykonując wykroki naprzemiennie odpowiednią liczbę razy.",
+      "ko": "양발을 어깨너비로 벌리고 서서 바벨을 상부 등에 올립니다. 오른쪽 발로 앞으로 발을 내딛으면서 몸통을 곧게 유지합니다. 오른쪽 무릎을 굽혀 넓적다리가 바닥과 평행해질 때까지 몸을 내립니다. 오른쪽 발꿈치를 통해 힘을 주어 처음 위치로 돌아옵니다. 왼쪽 발로도 동일하게 진행하며 발을 교대로 하여 반복합니다.",
+      "fr": "Commence debout, les pieds écartés à la largeur des épaules et une barre posée sur le haut du dos. Fais un pas en avant avec le pied droit, en gardant le torse bien droit. Abaisse ton corps en fléchissant ton genou droit jusqu'à ce que ta cuisse soit parallèle au sol. Pousse à travers ton talon droit pour revenir à la position de départ. Répète avec ta jambe gauche, en alternant les jambes pour le nombre de répétitions souhaité."
+    },
+    "instruction_steps": {
+      "en": [
+        "Start by standing with your feet shoulder-width apart and a barbell resting on your upper back.",
+        "Take a step forward with your right foot, keeping your torso upright.",
+        "Lower your body by bending your right knee until your thigh is parallel to the ground.",
+        "Push through your right heel to return to the starting position.",
+        "Repeat with your left leg, alternating legs for the desired number of repetitions."
+      ],
+      "it": [
+        "Inizia stando in piedi con i piedi alla larghezza delle spalle e un bilanciere appoggiato sulla parte superiore della schiena.",
+        "Fai un passo avanti con il piede destro, mantenendo il busto eretto.",
+        "Abbassa il corpo piegando il ginocchio destro finché la coscia non è parallela al suolo.",
+        "Spingi attraverso il tallone destro per tornare alla posizione di partenza.",
+        "Ripeti con la gamba sinistra, alternando le gambe per il numero di ripetizioni desiderato."
+      ],
+      "tr": [
+        "Ayaklarınızı omuz genişliğinde açarak ve sırtınızın üst kısmına bir halter koyarak başlayın.",
+        "Gövdenizi dik tutarak sağ ayağınızla öne doğru bir adım atın.",
+        "Sağ dizinizi uyluğunuz yere paralel oluncaya kadar bükerek vücudunuzu indirin.",
+        "Başlangıç ​​pozisyonuna dönmek için sağ topuğunuzu itin.",
+        "İstenilen sayıda tekrar için sol bacağınızla, bacak değiştirerek tekrarlayın."
+      ],
+      "es": [
+        "Empieza de pie con los pies separados a la altura de los hombros y una barra apoyada sobre la parte superior de la espalda.",
+        "Da un paso hacia delante con el pie derecho, manteniendo el torso erguido.",
+        "Baja el cuerpo flexionando la rodilla derecha hasta que el muslo quede paralelo al suelo.",
+        "Empuja con el talón derecho para regresar a la posición inicial.",
+        "Repite con la pierna izquierda, alternando las piernas el número de repeticiones deseado."
+      ],
+      "ru": [
+        "Начните с того, что встаньте, поставив ноги на ширине плеч и положив штангу на верхнюю часть спины.",
+        "Сделайте шаг вперед правой ногой, удерживая туловище в вертикальном положении.",
+        "Опустите тело, согнув правое колено, пока бедро не станет параллельно земле.",
+        "Оттолкнитесь правой пяткой, чтобы вернуться в исходное положение.",
+        "Повторите то же самое с левой ногой, чередуя ноги необходимое количество повторений."
+      ],
+      "zh": [
+        "首先，双脚分开与肩同宽，将杠铃放在上背部。",
+        "右脚向前迈出一步，保持躯干直立。",
+        "弯曲右膝降低身体，直到大腿与地面平行。",
+        "推动右脚跟回到起始位置。",
+        "用左腿重复上述动作，交替腿进行所需的重复次数。"
+      ],
+      "hi": [
+        "अपने पैरों को कंधे की चौड़ाई पर फैलाकर और एक बारबेल को अपनी पीठ के ऊपरी हिस्से पर टिकाकर खड़े होकर शुरुआत करें।",
+        "अपने धड़ को सीधा रखते हुए अपने दाहिने पैर से एक कदम आगे बढ़ाएं।",
+        "अपने दाहिने घुटने को मोड़कर अपने शरीर को नीचे करें जब तक कि आपकी जांघ जमीन के समानांतर न हो जाए।",
+        "प्रारंभिक स्थिति में लौटने के लिए अपनी दाहिनी एड़ी को धक्का दें।",
+        "वांछित संख्या में दोहराव के लिए पैरों को बारी-बारी से अपने बाएं पैर से दोहराएं।"
+      ],
+      "pl": [
+        "Stań w rozkroku na szerokość barków, ze sztangą opartą na górnej części pleców.",
+        "Zrób krok do przodu prawą stopą, utrzymując tułów wyprostowany.",
+        "Opuść ciało, uginając prawe kolano, aż udo będzie równoległe do podłoża.",
+        "Odepchnij się przez prawą piętę, wracając do pozycji wyjściowej.",
+        "Powtórz lewą nogą, wykonując wykroki naprzemiennie odpowiednią liczbę razy."
+      ],
+      "ko": [
+        "양발을 어깨너비로 벌리고 서서 바벨을 상부 등에 올립니다.",
+        "오른쪽 발로 앞으로 발을 내딛으면서 몸통을 곧게 유지합니다.",
+        "오른쪽 무릎을 굽혀 넓적다리가 바닥과 평행해질 때까지 몸을 내립니다.",
+        "오른쪽 발꿈치를 통해 힘을 주어 처음 위치로 돌아옵니다.",
+        "왼쪽 발로도 동일하게 진행하며 발을 교대로 하여 반복합니다."
+      ],
+      "fr": [
+        "Commence debout, les pieds écartés à la largeur des épaules et une barre posée sur le haut du dos.",
+        "Fais un pas en avant avec le pied droit, en gardant le torse bien droit.",
+        "Abaisse ton corps en fléchissant ton genou droit jusqu'à ce que ta cuisse soit parallèle au sol.",
+        "Pousse à travers ton talon droit pour revenir à la position de départ.",
+        "Répète avec ta jambe gauche, en alternant les jambes pour le nombre de répétitions souhaité."
+      ]
+    },
+    "muscle_group": "quadriceps",
+    "secondary_muscles": [
+      "quadriceps",
+      "hamstrings",
+      "calves"
+    ],
+    "target": "glutes",
+    "image": "images/0054-t8iSghb.jpg",
+    "gif_url": "videos/0054-t8iSghb.gif",
+    "media_id": "t8iSghb",
+    "created_at": "2026-03-18T12:31:32.871887+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "0148",
+    "name": "cable alternate shoulder press",
+    "category": "shoulders",
+    "body_part": "shoulders",
+    "equipment": "cable",
+    "instructions": {
+      "en": "Stand with your feet shoulder-width apart and grasp the handles of the cable machine with an overhand grip. Position your hands at shoulder height, with your palms facing forward. Keep your core engaged and your back straight. Press one handle up and forward until your arm is fully extended. Pause for a moment at the top, then slowly lower the handle back to the starting position. Repeat with the other arm. Alternate between arms for the desired number of repetitions.",
+      "it": "Stai con i piedi a larghezza delle spalle e afferra le maniglie della macchina a cavo con una presa sopra la mano. Posiziona le mani all'altezza delle spalle, con i palmi rivolti in avanti. Mantieni il core impegnato e la schiena dritta. Premi una maniglia verso l'alto e in avanti finché il braccio non è completamente esteso. Fermati un attimo in cima, poi abbassa lentamente la maniglia fino alla posizione iniziale. Ripeti con l'altro braccio. Alternare tra le armi per il numero desiderato di ripetizioni.",
+      "tr": "Ayaklarınızı omuz genişliğinde açın ve kablo makinesinin saplarını üstten kavrayın. Ellerinizi omuz hizasında, avuçlarınız öne bakacak şekilde konumlandırın. Merkez bölgenizi meşgul ve sırtınızı düz tutun. Kolunuz tamamen uzatılıncaya kadar bir kolu yukarı ve ileri doğru bastırın. Tepede bir an duraklayın, ardından kolu yavaşça başlangıç ​​pozisyonuna indirin. Diğer kolla tekrarlayın. İstenilen sayıda tekrar için kollar arasında geçiş yapın.",
+      "es": "Ponte de pie con los pies separados a la altura de los hombros y sujeta las agarraderas de la máquina de cable con agarre prono. Coloca las manos a la altura de los hombros, con las palmas mirando hacia adelante. Mantén el core activado y la espalda recta. Empuja una agarradera hacia arriba y hacia adelante hasta que el brazo quede completamente extendido. Haz una pausa breve en la parte más alta, luego baja lentamente la agarradera de vuelta a la posición inicial. Repite con el otro brazo. Alterna entre los brazos el número de repeticiones deseado.",
+      "ru": "Встаньте, расставив ноги на ширине плеч, и возьмитесь за рукоятки канатного тренажера верхним хватом. Расположите руки на уровне плеч, ладонями вперед. Держите корпус напряженным, а спину прямой. Нажмите одну ручку вверх и вперед, пока рука полностью не выпрямится. Задержитесь на мгновение в верхней точке, затем медленно опустите рукоятку обратно в исходное положение. Повторите с другой рукой. Чередуйте руки, выполняя желаемое количество повторений.",
+      "zh": "双脚分开与肩同宽站立，并用正手握住绳索机的手柄。 将双手放在与肩同高的位置，手掌朝前。 保持核心参与并保持背部挺直。 向上并向前按下一个手柄，直到您的手臂完全伸展。 在最高点暂停片刻，然后慢慢将手柄放回起始位置。 用另一只手臂重复上述步骤。 双臂交替进行所需的重复次数。",
+      "hi": "अपने पैरों को कंधे की चौड़ाई पर फैलाकर खड़े हो जाएं और केबल मशीन के हैंडल को ओवरहैंड ग्रिप से पकड़ लें। अपने हाथों को कंधे की ऊंचाई पर रखें, आपकी हथेलियाँ आगे की ओर हों। अपने कोर को व्यस्त रखें और अपनी पीठ को सीधा रखें। एक हैंडल को ऊपर और आगे की ओर दबाएं जब तक कि आपकी बांह पूरी तरह से विस्तारित न हो जाए। शीर्ष पर एक पल के लिए रुकें, फिर धीरे-धीरे हैंडल को वापस प्रारंभिक स्थिति में ले आएं। दूसरे हाथ से दोहराएँ. दोहराव की वांछित संख्या के लिए भुजाओं के बीच वैकल्पिक करें।",
+      "pl": "Stań ze stopami na szerokość barków i chwyć uchwyty wyciągu chwytem nachwytem. Ustaw dłonie na wysokości barków, dłońmi skierowanymi do przodu. Trzymaj mięśnie brzucha napięte, a plecy proste. Wypchnij jeden uchwyt w górę i do przodu, aż ramię będzie w pełni wyprostowane. Zatrzymaj się na chwilę w górnej pozycji, a następnie powoli opuść uchwyt z powrotem do pozycji wyjściowej. Powtórz drugą ręką. Kontynuuj naprzemienne ramiona przez zadaną liczbę powtórzeń.",
+      "ko": "발을 어깨 너비만큼 벌리고 서서 케이블 머신의 핸들을 손등이 앞을 향하는 오버핸드 그립으로 잡습니다. 손을 어깨 높이에 위치시키고 손바닥이 앞을 향하도록 합니다. 코어를 engaged 하고 허리를 곧게 펴 있습니다. 한쪽 핸들을 위로 앞쪽으로 밀어 올려 팔을 완전히 펼칩니다. 맨 위에서 잠시 멈춘 후 천천히 핸들을 시작 자세로 내립니다. 다른 팔로 반복합니다. 원하는 반복 횟수만큼 양쪽을 번갈아 반복합니다.",
+      "fr": "Tiens-toi debout, les pieds écartés à la largeur des épaules et saisis les poignées de la machine à câble en prise pronation. Positionne tes mains à hauteur des épaules, les paumes tournées vers l'avant. Garde ta sangle abdominale gainée et le dos droit. Pousse une poignée vers le haut et vers l'avant jusqu'à ce que ton bras soit complètement tendu. Marque une pause en haut, puis abaisse lentement la poignée pour revenir à la position de départ. Répète avec l'autre bras. Alterne les bras pour le nombre de répétitions souhaité."
+    },
+    "instruction_steps": {
+      "en": [
+        "Stand with your feet shoulder-width apart and grasp the handles of the cable machine with an overhand grip.",
+        "Position your hands at shoulder height, with your palms facing forward.",
+        "Keep your core engaged and your back straight.",
+        "Press one handle up and forward until your arm is fully extended.",
+        "Pause for a moment at the top, then slowly lower the handle back to the starting position.",
+        "Repeat with the other arm.",
+        "Alternate between arms for the desired number of repetitions."
+      ],
+      "it": [
+        "Stai con i piedi a larghezza delle spalle e afferra le maniglie della macchina a cavo con una presa sopra la mano.",
+        "Posiziona le mani all'altezza delle spalle, con i palmi rivolti in avanti.",
+        "Mantieni il core impegnato e la schiena dritta.",
+        "Premi una maniglia verso l'alto e in avanti finché il braccio non è completamente esteso.",
+        "Fermati un attimo in cima, poi abbassa lentamente la maniglia fino alla posizione iniziale.",
+        "Ripeti con l'altro braccio.",
+        "Alternare tra le armi per il numero desiderato di ripetizioni."
+      ],
+      "tr": [
+        "Ayaklarınızı omuz genişliğinde açın ve kablo makinesinin saplarını üstten kavrayın.",
+        "Ellerinizi omuz hizasında, avuçlarınız öne bakacak şekilde konumlandırın.",
+        "Merkez bölgenizi meşgul ve sırtınızı düz tutun.",
+        "Kolunuz tamamen uzatılıncaya kadar bir kolu yukarı ve ileri doğru bastırın.",
+        "Tepede bir an duraklayın, ardından kolu yavaşça başlangıç ​​pozisyonuna indirin.",
+        "Diğer kolla tekrarlayın.",
+        "İstenilen sayıda tekrar için kollar arasında geçiş yapın."
+      ],
+      "es": [
+        "Ponte de pie con los pies separados a la altura de los hombros y sujeta las agarraderas de la máquina de cable con agarre prono.",
+        "Coloca las manos a la altura de los hombros, con las palmas mirando hacia adelante.",
+        "Mantén el core activado y la espalda recta.",
+        "Empuja una agarradera hacia arriba y hacia adelante hasta que el brazo quede completamente extendido.",
+        "Haz una pausa breve en la parte más alta, luego baja lentamente la agarradera de vuelta a la posición inicial.",
+        "Repite con el otro brazo.",
+        "Alterna entre los brazos el número de repeticiones deseado."
+      ],
+      "ru": [
+        "Встаньте, расставив ноги на ширине плеч, и возьмитесь за рукоятки канатного тренажера верхним хватом.",
+        "Расположите руки на уровне плеч, ладонями вперед.",
+        "Держите корпус напряженным, а спину прямой.",
+        "Нажмите одну ручку вверх и вперед, пока рука полностью не выпрямится.",
+        "Задержитесь на мгновение в верхней точке, затем медленно опустите рукоятку обратно в исходное положение.",
+        "Повторите с другой рукой.",
+        "Чередуйте руки, выполняя желаемое количество повторений."
+      ],
+      "zh": [
+        "双脚分开与肩同宽站立，并用正手握住绳索机的手柄。",
+        "将双手放在与肩同高的位置，手掌朝前。",
+        "保持核心参与并保持背部挺直。",
+        "向上并向前按下一个手柄，直到您的手臂完全伸展。",
+        "在最高点暂停片刻，然后慢慢将手柄放回起始位置。",
+        "用另一只手臂重复上述步骤。",
+        "双臂交替进行所需的重复次数。"
+      ],
+      "hi": [
+        "अपने पैरों को कंधे की चौड़ाई पर फैलाकर खड़े हो जाएं और केबल मशीन के हैंडल को ओवरहैंड ग्रिप से पकड़ लें।",
+        "अपने हाथों को कंधे की ऊंचाई पर रखें, आपकी हथेलियाँ आगे की ओर हों।",
+        "अपने कोर को व्यस्त रखें और अपनी पीठ को सीधा रखें।",
+        "एक हैंडल को ऊपर और आगे की ओर दबाएं जब तक कि आपकी बांह पूरी तरह से विस्तारित न हो जाए।",
+        "शीर्ष पर एक पल के लिए रुकें, फिर धीरे-धीरे हैंडल को वापस प्रारंभिक स्थिति में ले आएं।",
+        "दूसरे हाथ से दोहराएँ.",
+        "दोहराव की वांछित संख्या के लिए भुजाओं के बीच वैकल्पिक करें।"
+      ],
+      "pl": [
+        "Stań ze stopami na szerokość barków i chwyć uchwyty wyciągu chwytem nachwytem.",
+        "Ustaw dłonie na wysokości barków, dłońmi skierowanymi do przodu.",
+        "Trzymaj mięśnie brzucha napięte, a plecy proste.",
+        "Wypchnij jeden uchwyt w górę i do przodu, aż ramię będzie w pełni wyprostowane.",
+        "Zatrzymaj się na chwilę w górnej pozycji, a następnie powoli opuść uchwyt z powrotem do pozycji wyjściowej.",
+        "Powtórz drugą ręką.",
+        "Kontynuuj naprzemienne ramiona przez zadaną liczbę powtórzeń."
+      ],
+      "ko": [
+        "발을 어깨 너비만큼 벌리고 서서 케이블 머신의 핸들을 손등이 앞을 향하는 오버핸드 그립으로 잡습니다.",
+        "손을 어깨 높이에 위치시키고 손바닥이 앞을 향하도록 합니다.",
+        "코어를 engaged 하고 허리를 곧게 펴 있습니다.",
+        "한쪽 핸들을 위로 앞쪽으로 밀어 올려 팔을 완전히 펼칩니다.",
+        "맨 위에서 잠시 멈춘 후 천천히 핸들을 시작 자세로 내립니다.",
+        "다른 팔로 반복합니다.",
+        "원하는 반복 횟수만큼 양쪽을 번갈아 반복합니다."
+      ],
+      "fr": [
+        "Tiens-toi debout, les pieds écartés à la largeur des épaules et saisis les poignées de la machine à câble en prise pronation.",
+        "Positionne tes mains à hauteur des épaules, les paumes tournées vers l'avant.",
+        "Garde ta sangle abdominale gainée et le dos droit.",
+        "Pousse une poignée vers le haut et vers l'avant jusqu'à ce que ton bras soit complètement tendu.",
+        "Marque une pause en haut, puis abaisse lentement la poignée pour revenir à la position de départ.",
+        "Répète avec l'autre bras.",
+        "Alterne les bras pour le nombre de répétitions souhaité."
+      ]
+    },
+    "muscle_group": "triceps",
+    "secondary_muscles": [
+      "triceps",
+      "upper back"
+    ],
+    "target": "delts",
+    "image": "images/0148-KHPZL0b.jpg",
+    "gif_url": "videos/0148-KHPZL0b.gif",
+    "media_id": "KHPZL0b",
+    "created_at": "2026-03-18T12:31:32.874106+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "1638",
+    "name": "cable pulldown bicep curl",
+    "category": "upper arms",
+    "body_part": "upper arms",
+    "equipment": "cable",
+    "instructions": {
+      "en": "Attach a straight bar to the cable machine at the highest setting. Stand facing the machine with your feet shoulder-width apart. Grasp the bar with an underhand grip, hands shoulder-width apart. Keep your elbows close to your sides and your upper arms stationary. Exhale and slowly curl the bar down towards your thighs, keeping your wrists straight. Pause for a moment at the bottom of the movement, squeezing your biceps. Inhale and slowly return the bar to the starting position, fully extending your arms. Repeat for the desired number of repetitions.",
+      "it": "Fissa una barra dritta alla macchina a cavo con la massima regolazione. Stai rivolto verso la macchina con i piedi alla larghezza delle spalle. Afferra la barra con una presa sotto, mani divaricate alla larghezza delle spalle. Tieni i gomiti vicini ai fianchi e le braccia superiori ferme. Espira e piega lentamente la barra verso le cosce, mantenendo i polsi dritti. Fermati un attimo alla base del movimento, stringendo i bicipiti. Inspira e riporta lentamente la barra alla posizione iniziale, estendendo completamente le braccia. Ripeti per il numero desiderato di ripetizioni.",
+      "tr": "Kablo makinesine en yüksek ayarda düz bir çubuk takın. Ayaklarınız omuz genişliğinde açık olacak şekilde makineye dönük durun. Barı alttan kavrayın, eller omuz genişliğinde açık olsun. Dirseklerinizi yanlarınıza yakın ve üst kollarınızı sabit tutun. Nefes verin ve bileklerinizi düz tutarak çubuğu yavaşça uyluklarınıza doğru kıvırın. Hareketin alt noktasında bir anlığına duraklayın ve bicepslerinizi sıkın. Nefes alın ve barı yavaşça başlangıç ​​pozisyonuna getirin, kollarınızı tamamen uzatın. İstenilen sayıda tekrar için tekrarlayın.",
+      "es": "Sujeta una barra recta a la máquina de cable en el ajuste más alto. Ponte de pie frente a la máquina con los pies separados a la altura de los hombros. Sujeta la barra con agarre supino, manos separadas a la altura de los hombros. Mantén los codos cerca de los costados y los brazos superiores quietos. Exhala y curva lentamente la barra hacia los muslos, manteniendo las muñecas rectas. Haz una pausa por un momento en la parte baja del movimiento, apretando los bíceps. Inhala y regresa lentamente la barra a la posición inicial, extendiendo los brazos por completo. Repite el número de repeticiones deseado.",
+      "ru": "Прикрепите прямую штангу к канатному станку на самом высоком уровне. Встаньте лицом к тренажеру, поставив ноги на ширине плеч. Возьмитесь за перекладину хватом снизу, руки на ширине плеч. Держите локти близко к бокам, а плечи неподвижно. Выдохните и медленно согните штангу к бедрам, сохраняя запястья прямыми. Задержитесь на мгновение в нижней части движения, напрягая бицепсы. Вдохните и медленно верните штангу в исходное положение, полностью выпрямляя руки. Повторите необходимое количество повторений.",
+      "zh": "在最高设置下将直杆连接到电缆机上。 面向机器站立，双脚分开与肩同宽。 反手握住杠铃，双手与肩同宽。 保持肘部靠近身体两侧，上臂保持静止。 呼气，慢慢将杠铃向大腿方向卷曲，保持手腕伸直。 在动作底部暂停片刻，挤压二头肌。 吸气，慢慢地将杠铃返回到起始位置，充分伸展双臂。 重复所需的重复次数。",
+      "hi": "उच्चतम सेटिंग पर केबल मशीन में एक सीधी पट्टी संलग्न करें। अपने पैरों को कंधे की चौड़ाई से अलग रखते हुए मशीन की ओर मुंह करके खड़े हो जाएं। बार को अंडरहैंड ग्रिप से पकड़ें, हाथ कंधे की चौड़ाई से अलग हों। अपनी कोहनियों को अपनी भुजाओं के पास रखें और अपनी ऊपरी भुजाओं को स्थिर रखें। सांस छोड़ें और अपनी कलाइयों को सीधा रखते हुए बार को धीरे-धीरे अपनी जांघों की ओर नीचे की ओर मोड़ें। अपने बाइसेप्स को निचोड़ते हुए, गति के निचले भाग में एक पल के लिए रुकें। श्वास लें और धीरे-धीरे अपनी बाहों को पूरी तरह फैलाते हुए बार को प्रारंभिक स्थिति में लौटाएँ। दोहराव की वांछित संख्या के लिए दोहराएँ।",
+      "pl": "Podłącz prostą drążkę do wyciągu na najwyższym ustawieniu. Stań przodem do maszyny, stopy rozstawione na szerokość barków. Chwyć drążek podchwytem, dłonie rozstawione na szerokość barków. Trzymaj łokcie blisko boków, a ramiona górne nieruchomo. Wydychaj powietrze i powoli opuść drążek w kierunku ud, trzymając proste nadgarstki. Zatrzymaj się na moment na dole ruchu, mocno napinając bicepsy. Wdychaj powietrze i powoli wróć z drążkiem do pozycji wyjściowej, całkowicie prostując ramiona. Powtórz zalecaną liczbę powtórzeń.",
+      "ko": "가장 높은 설정의 케이블 머신에 바를 부착합니다. 머신을 향해 어깨 너비로 발을 벌리고 섭니다. 손가락이 위를 향하는 그립으로 바를 잡고 손은 어깨 너비로 벌립니다. 팔꿈치를 옆에 붙이고 상완을 고정한 채로 유지합니다. 숨을 내쉬며 손목을 곧게 유지한 채 천천히 바를 넓적다리 방향으로 구부립니다. 움직임의 최하점에서 이두근을 조이며 잠깐 멈춥니다. 숨을 들이쉬며 천천히 팔을 완전히 펴서 시작 위치로 돌립니다. 원하는 반복 횟수만큼 반복합니다.",
+      "fr": "Fixe une barre droite à la machine à câble au réglage le plus haut. Tiens-toi face à la machine, les pieds écartés à la largeur des épaules. Saisis la barre avec une prise en supination, les mains écartées à la largeur des épaules. Garde tes coudes près de tes flancs et le haut de tes bras immobile. Expire et abaisse lentement la barre vers tes cuisses, en gardant les poignets droits. Marque une pause en bas du mouvement, en contractant tes biceps. Inspire et ramène lentement la barre à la position de départ, en tendant complètement les bras. Répète le nombre de répétitions souhaité."
+    },
+    "instruction_steps": {
+      "en": [
+        "Attach a straight bar to the cable machine at the highest setting.",
+        "Stand facing the machine with your feet shoulder-width apart.",
+        "Grasp the bar with an underhand grip, hands shoulder-width apart.",
+        "Keep your elbows close to your sides and your upper arms stationary.",
+        "Exhale and slowly curl the bar down towards your thighs, keeping your wrists straight.",
+        "Pause for a moment at the bottom of the movement, squeezing your biceps.",
+        "Inhale and slowly return the bar to the starting position, fully extending your arms.",
+        "Repeat for the desired number of repetitions."
+      ],
+      "it": [
+        "Fissa una barra dritta alla macchina a cavo con la massima regolazione.",
+        "Stai rivolto verso la macchina con i piedi alla larghezza delle spalle.",
+        "Afferra la barra con una presa sotto, mani divaricate alla larghezza delle spalle.",
+        "Tieni i gomiti vicini ai fianchi e le braccia superiori ferme.",
+        "Espira e piega lentamente la barra verso le cosce, mantenendo i polsi dritti.",
+        "Fermati un attimo alla base del movimento, stringendo i bicipiti.",
+        "Inspira e riporta lentamente la barra alla posizione iniziale, estendendo completamente le braccia.",
+        "Ripeti per il numero desiderato di ripetizioni."
+      ],
+      "tr": [
+        "Kablo makinesine en yüksek ayarda düz bir çubuk takın.",
+        "Ayaklarınız omuz genişliğinde açık olacak şekilde makineye dönük durun.",
+        "Barı alttan kavrayın, eller omuz genişliğinde açık olsun.",
+        "Dirseklerinizi yanlarınıza yakın ve üst kollarınızı sabit tutun.",
+        "Nefes verin ve bileklerinizi düz tutarak çubuğu yavaşça uyluklarınıza doğru kıvırın.",
+        "Hareketin alt noktasında bir anlığına duraklayın ve bicepslerinizi sıkın.",
+        "Nefes alın ve barı yavaşça başlangıç ​​pozisyonuna getirin, kollarınızı tamamen uzatın.",
+        "İstenilen sayıda tekrar için tekrarlayın."
+      ],
+      "es": [
+        "Sujeta una barra recta a la máquina de cable en el ajuste más alto.",
+        "Ponte de pie frente a la máquina con los pies separados a la altura de los hombros.",
+        "Sujeta la barra con agarre supino, manos separadas a la altura de los hombros.",
+        "Mantén los codos cerca de los costados y los brazos superiores quietos.",
+        "Exhala y curva lentamente la barra hacia los muslos, manteniendo las muñecas rectas.",
+        "Haz una pausa por un momento en la parte baja del movimiento, apretando los bíceps.",
+        "Inhala y regresa lentamente la barra a la posición inicial, extendiendo los brazos por completo.",
+        "Repite el número de repeticiones deseado."
+      ],
+      "ru": [
+        "Прикрепите прямую штангу к канатному станку на самом высоком уровне.",
+        "Встаньте лицом к тренажеру, поставив ноги на ширине плеч.",
+        "Возьмитесь за перекладину хватом снизу, руки на ширине плеч.",
+        "Держите локти близко к бокам, а плечи неподвижно.",
+        "Выдохните и медленно согните штангу к бедрам, сохраняя запястья прямыми.",
+        "Задержитесь на мгновение в нижней части движения, напрягая бицепсы.",
+        "Вдохните и медленно верните штангу в исходное положение, полностью выпрямляя руки.",
+        "Повторите необходимое количество повторений."
+      ],
+      "zh": [
+        "在最高设置下将直杆连接到电缆机上。",
+        "面向机器站立，双脚分开与肩同宽。",
+        "反手握住杠铃，双手与肩同宽。",
+        "保持肘部靠近身体两侧，上臂保持静止。",
+        "呼气，慢慢将杠铃向大腿方向卷曲，保持手腕伸直。",
+        "在动作底部暂停片刻，挤压二头肌。",
+        "吸气，慢慢地将杠铃返回到起始位置，充分伸展双臂。",
+        "重复所需的重复次数。"
+      ],
+      "hi": [
+        "उच्चतम सेटिंग पर केबल मशीन में एक सीधी पट्टी संलग्न करें।",
+        "अपने पैरों को कंधे की चौड़ाई से अलग रखते हुए मशीन की ओर मुंह करके खड़े हो जाएं।",
+        "बार को अंडरहैंड ग्रिप से पकड़ें, हाथ कंधे की चौड़ाई से अलग हों।",
+        "अपनी कोहनियों को अपनी भुजाओं के पास रखें और अपनी ऊपरी भुजाओं को स्थिर रखें।",
+        "सांस छोड़ें और अपनी कलाइयों को सीधा रखते हुए बार को धीरे-धीरे अपनी जांघों की ओर नीचे की ओर मोड़ें।",
+        "अपने बाइसेप्स को निचोड़ते हुए, गति के निचले भाग में एक पल के लिए रुकें।",
+        "श्वास लें और धीरे-धीरे अपनी बाहों को पूरी तरह फैलाते हुए बार को प्रारंभिक स्थिति में लौटाएँ।",
+        "दोहराव की वांछित संख्या के लिए दोहराएँ।"
+      ],
+      "pl": [
+        "Podłącz prostą drążkę do wyciągu na najwyższym ustawieniu.",
+        "Stań przodem do maszyny, stopy rozstawione na szerokość barków.",
+        "Chwyć drążek podchwytem, dłonie rozstawione na szerokość barków.",
+        "Trzymaj łokcie blisko boków, a ramiona górne nieruchomo.",
+        "Wydychaj powietrze i powoli opuść drążek w kierunku ud, trzymając proste nadgarstki.",
+        "Zatrzymaj się na moment na dole ruchu, mocno napinając bicepsy.",
+        "Wdychaj powietrze i powoli wróć z drążkiem do pozycji wyjściowej, całkowicie prostując ramiona.",
+        "Powtórz zalecaną liczbę powtórzeń."
+      ],
+      "ko": [
+        "가장 높은 설정의 케이블 머신에 바를 부착합니다.",
+        "머신을 향해 어깨 너비로 발을 벌리고 섭니다.",
+        "손가락이 위를 향하는 그립으로 바를 잡고 손은 어깨 너비로 벌립니다.",
+        "팔꿈치를 옆에 붙이고 상완을 고정한 채로 유지합니다.",
+        "숨을 내쉬며 손목을 곧게 유지한 채 천천히 바를 넓적다리 방향으로 구부립니다.",
+        "움직임의 최하점에서 이두근을 조이며 잠깐 멈춥니다.",
+        "숨을 들이쉬며 천천히 팔을 완전히 펴서 시작 위치로 돌립니다.",
+        "원하는 반복 횟수만큼 반복합니다."
+      ],
+      "fr": [
+        "Fixe une barre droite à la machine à câble au réglage le plus haut.",
+        "Tiens-toi face à la machine, les pieds écartés à la largeur des épaules.",
+        "Saisis la barre avec une prise en supination, les mains écartées à la largeur des épaules.",
+        "Garde tes coudes près de tes flancs et le haut de tes bras immobile.",
+        "Expire et abaisse lentement la barre vers tes cuisses, en gardant les poignets droits.",
+        "Marque une pause en bas du mouvement, en contractant tes biceps.",
+        "Inspire et ramène lentement la barre à la position de départ, en tendant complètement les bras.",
+        "Répète le nombre de répétitions souhaité."
+      ]
+    },
+    "muscle_group": "forearms",
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "target": "biceps",
+    "image": "images/1638-QTXKWPh.jpg",
+    "gif_url": "videos/1638-QTXKWPh.gif",
+    "media_id": "QTXKWPh",
+    "created_at": "2026-03-18T12:31:32.875418+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "3216",
+    "name": "chest tap push-up (male)",
+    "category": "chest",
+    "body_part": "chest",
+    "equipment": "body weight",
+    "instructions": {
+      "en": "Start in a high plank position with your hands slightly wider than shoulder-width apart and your body in a straight line. Lower your body towards the ground by bending your elbows, keeping them close to your sides. As you lower yourself, tap your chest with your right hand. Push yourself back up to the starting position. Repeat the movement, this time tapping your chest with your left hand. Continue alternating sides for the desired number of repetitions.",
+      "it": "Inizia in posizione di plank alta, con le mani leggermente più larghe della larghezza delle spalle e il corpo in linea retta. Abbassa il corpo verso il suolo piegando i gomiti, tenendoli vicini ai fianchi. Mentre ti abbassi, tocca il petto con la mano destra. Spingi di nuovo verso la posizione di partenza. Ripeti il movimento, questa volta toccando il petto con la mano sinistra. Continua ad alternare i lati per il numero desiderato di ripetizioni.",
+      "tr": "Elleriniz omuz genişliğinden biraz daha geniş ve vücudunuz düz bir çizgide olacak şekilde yüksek bir plank pozisyonuyla başlayın. Dirseklerinizi bükerek vücudunuzu yanlarınıza yakın tutarak yere doğru indirin. Kendinizi indirirken sağ elinizle göğsünüze hafifçe vurun. Kendinizi başlangıç ​​pozisyonuna geri itin. Hareketi bu sefer sol elinizle göğsünüze vurarak tekrarlayın. İstenilen tekrar sayısı için alternatif taraflara devam edin.",
+      "es": "Comienza en posición de plancha alta con las manos un poco más separadas que el ancho de los hombros y el cuerpo en línea recta. Baja el cuerpo hacia el suelo flexionando los codos, manteniéndolos cerca de los costados. Mientras te bajas, toca tu pecho con la mano derecha. Empújate de vuelta hacia arriba hasta la posición inicial. Repite el movimiento, esta vez tocando tu pecho con la mano izquierda. Continúa alternando lados durante el número de repeticiones deseado.",
+      "ru": "Начните с положения высокой планки, расставив руки чуть шире плеч, а тело образуя прямую линию. Опустите тело к земле, согнув локти и держа их близко к бокам. Опускаясь, постучите правой рукой по груди. Вернитесь в исходное положение. Повторите движение, на этот раз постукивая левой рукой по груди. Продолжайте чередовать стороны желаемое количество повторений.",
+      "zh": "从高平板支撑位置开始，双手分开略宽于肩宽，身体呈一条直线。 弯曲肘部，使肘部靠近身体两侧，将身体降低到地面。 当你降低身体时，用右手拍打胸部。 将自己推回到起始位置。 重复这个动作，这次用左手敲击胸部。 继续交替进行所需的重复次数。",
+      "hi": "अपने हाथों को कंधे की चौड़ाई से थोड़ा अधिक चौड़ा करके और अपने शरीर को एक सीधी रेखा में रखते हुए एक उच्च तख़्त स्थिति में शुरुआत करें। अपनी कोहनियों को मोड़कर, उन्हें अपनी भुजाओं के पास रखते हुए, अपने शरीर को ज़मीन की ओर नीचे लाएँ। जैसे ही आप खुद को नीचे करें, अपने दाहिने हाथ से अपनी छाती को थपथपाएं। अपने आप को वापस प्रारंभिक स्थिति में धकेलें। इस क्रिया को दोहराएँ, इस बार अपने बाएँ हाथ से अपनी छाती को थपथपाएँ। दोहराव की वांछित संख्या के लिए पक्षों को बदलना जारी रखें।",
+      "pl": "Zacznij w pozycji wysokiej deski, dłonie nieco szerzej niż na szerokość barków, ciało w jednej linii prostej. Opuść ciało w kierunku podłogi, zginając łokcie, trzymając je blisko tułowia. Podczas opuszczania, dotknij klatki piersiowej prawą dłonią. Wypchnij się z powrotem do pozycji wyjściowej. Powtórz ruch, tym razem dotykając klatki piersiowej lewą dłonią. Kontynuuj zmianę stron przez zalecaną liczbę powtórzeń.",
+      "ko": "손을 어깨 너비보다 약간 넓게 놓고 몸을 곧게 한 상태로 높은 플랭크 자세를 시작합니다. 팔꿈치를 구부려서 지면을 향해 몸을 내려놓되 팔꿈치를 몸에 가깝게 유지합니다. 내려가면서 오른손으로 가슴을 터치합니다. 시작 위치로 다시 올려집니다. 이번에는 왼손으로 가슴을 터치하면서 동작을 반복합니다. 양쪽을 번갈아가며 원하는 횟수만큼 반복합니다.",
+      "fr": "Commence en position de planche haute, les mains un peu plus écartées que la largeur des épaules et le corps bien aligné. Abaisse ton corps vers le sol en fléchissant les coudes, en les gardant près de tes flancs. En te baissant, tape ta poitrine avec ta main droite. Repousse-toi vers le haut jusqu'à la position de départ. Répète le mouvement, cette fois en tapotant ta poitrine avec ta main gauche. Continue à alterner les côtés pour le nombre de répétitions souhaité."
+    },
+    "instruction_steps": {
+      "en": [
+        "Start in a high plank position with your hands slightly wider than shoulder-width apart and your body in a straight line.",
+        "Lower your body towards the ground by bending your elbows, keeping them close to your sides.",
+        "As you lower yourself, tap your chest with your right hand.",
+        "Push yourself back up to the starting position.",
+        "Repeat the movement, this time tapping your chest with your left hand.",
+        "Continue alternating sides for the desired number of repetitions."
+      ],
+      "it": [
+        "Inizia in posizione di plank alta, con le mani leggermente più larghe della larghezza delle spalle e il corpo in linea retta.",
+        "Abbassa il corpo verso il suolo piegando i gomiti, tenendoli vicini ai fianchi.",
+        "Mentre ti abbassi, tocca il petto con la mano destra.",
+        "Spingi di nuovo verso la posizione di partenza.",
+        "Ripeti il movimento, questa volta toccando il petto con la mano sinistra.",
+        "Continua ad alternare i lati per il numero desiderato di ripetizioni."
+      ],
+      "tr": [
+        "Elleriniz omuz genişliğinden biraz daha geniş ve vücudunuz düz bir çizgide olacak şekilde yüksek bir plank pozisyonuyla başlayın.",
+        "Dirseklerinizi bükerek vücudunuzu yanlarınıza yakın tutarak yere doğru indirin.",
+        "Kendinizi indirirken sağ elinizle göğsünüze hafifçe vurun.",
+        "Kendinizi başlangıç ​​pozisyonuna geri itin.",
+        "Hareketi bu sefer sol elinizle göğsünüze vurarak tekrarlayın.",
+        "İstenilen tekrar sayısı için alternatif taraflara devam edin."
+      ],
+      "es": [
+        "Comienza en posición de plancha alta con las manos un poco más separadas que el ancho de los hombros y el cuerpo en línea recta.",
+        "Baja el cuerpo hacia el suelo flexionando los codos, manteniéndolos cerca de los costados.",
+        "Mientras te bajas, toca tu pecho con la mano derecha.",
+        "Empújate de vuelta hacia arriba hasta la posición inicial.",
+        "Repite el movimiento, esta vez tocando tu pecho con la mano izquierda.",
+        "Continúa alternando lados durante el número de repeticiones deseado."
+      ],
+      "ru": [
+        "Начните с положения высокой планки, расставив руки чуть шире плеч, а тело образуя прямую линию.",
+        "Опустите тело к земле, согнув локти и держа их близко к бокам.",
+        "Опускаясь, постучите правой рукой по груди.",
+        "Вернитесь в исходное положение.",
+        "Повторите движение, на этот раз постукивая левой рукой по груди.",
+        "Продолжайте чередовать стороны желаемое количество повторений."
+      ],
+      "zh": [
+        "从高平板支撑位置开始，双手分开略宽于肩宽，身体呈一条直线。",
+        "弯曲肘部，使肘部靠近身体两侧，将身体降低到地面。",
+        "当你降低身体时，用右手拍打胸部。",
+        "将自己推回到起始位置。",
+        "重复这个动作，这次用左手敲击胸部。",
+        "继续交替进行所需的重复次数。"
+      ],
+      "hi": [
+        "अपने हाथों को कंधे की चौड़ाई से थोड़ा अधिक चौड़ा करके और अपने शरीर को एक सीधी रेखा में रखते हुए एक उच्च तख़्त स्थिति में शुरुआत करें।",
+        "अपनी कोहनियों को मोड़कर, उन्हें अपनी भुजाओं के पास रखते हुए, अपने शरीर को ज़मीन की ओर नीचे लाएँ।",
+        "जैसे ही आप खुद को नीचे करें, अपने दाहिने हाथ से अपनी छाती को थपथपाएं।",
+        "अपने आप को वापस प्रारंभिक स्थिति में धकेलें।",
+        "इस क्रिया को दोहराएँ, इस बार अपने बाएँ हाथ से अपनी छाती को थपथपाएँ।",
+        "दोहराव की वांछित संख्या के लिए पक्षों को बदलना जारी रखें।"
+      ],
+      "pl": [
+        "Zacznij w pozycji wysokiej deski, dłonie nieco szerzej niż na szerokość barków, ciało w jednej linii prostej.",
+        "Opuść ciało w kierunku podłogi, zginając łokcie, trzymając je blisko tułowia.",
+        "Podczas opuszczania, dotknij klatki piersiowej prawą dłonią.",
+        "Wypchnij się z powrotem do pozycji wyjściowej.",
+        "Powtórz ruch, tym razem dotykając klatki piersiowej lewą dłonią.",
+        "Kontynuuj zmianę stron przez zalecaną liczbę powtórzeń."
+      ],
+      "ko": [
+        "손을 어깨 너비보다 약간 넓게 놓고 몸을 곧게 한 상태로 높은 플랭크 자세를 시작합니다.",
+        "팔꿈치를 구부려서 지면을 향해 몸을 내려놓되 팔꿈치를 몸에 가깝게 유지합니다.",
+        "내려가면서 오른손으로 가슴을 터치합니다.",
+        "시작 위치로 다시 올려집니다.",
+        "이번에는 왼손으로 가슴을 터치하면서 동작을 반복합니다.",
+        "양쪽을 번갈아가며 원하는 횟수만큼 반복합니다."
+      ],
+      "fr": [
+        "Commence en position de planche haute, les mains un peu plus écartées que la largeur des épaules et le corps bien aligné.",
+        "Abaisse ton corps vers le sol en fléchissant les coudes, en les gardant près de tes flancs.",
+        "En te baissant, tape ta poitrine avec ta main droite.",
+        "Repousse-toi vers le haut jusqu'à la position de départ.",
+        "Répète le mouvement, cette fois en tapotant ta poitrine avec ta main gauche.",
+        "Continue à alterner les côtés pour le nombre de répétitions souhaité."
+      ]
+    },
+    "muscle_group": "triceps",
+    "secondary_muscles": [
+      "triceps",
+      "shoulders"
+    ],
+    "target": "pectorals",
+    "image": "images/3216-7E06s6d.jpg",
+    "gif_url": "videos/3216-7E06s6d.gif",
+    "media_id": "7E06s6d",
+    "created_at": "2026-03-18T12:31:32.877023+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "0017",
+    "name": "assisted pull-up",
+    "category": "back",
+    "body_part": "back",
+    "equipment": "leverage machine",
+    "instructions": {
+      "en": "Adjust the machine to your desired weight and height settings. Grasp the handles with an overhand grip, slightly wider than shoulder-width apart. Hang with your arms fully extended and your feet off the ground. Engage your back muscles and pull your body up towards the handles, keeping your elbows close to your body. Continue pulling until your chin is above the handles. Pause for a moment at the top, then slowly lower your body back down to the starting position. Repeat for the desired number of repetitions.",
+      "it": "Regola la macchina in base alle impostazioni di peso e altezza desiderate. Afferrare le maniglie con una presa prona, leggermente più larga della larghezza delle spalle. Appendere con le braccia completamente distese e i piedi sollevati da terra. Coinvolgi i muscoli della schiena e solleva il corpo verso le maniglie, mantenendo i gomiti vicini al corpo. Continua a tirare finché il mento non è sopra le maniglie. Fai una pausa per un momento in alto, quindi abbassa lentamente il corpo fino alla posizione di partenza. Ripetere per il numero di ripetizioni desiderato.",
+      "tr": "Makineyi istediğiniz ağırlık ve boy ayarlarına ayarlayın. Tutamaçları omuz genişliğinden biraz daha geniş olacak şekilde üstten kavrayın. Kollarınız tamamen uzatılmış ve ayaklarınız yerden yukarıda olacak şekilde asın. Sırt kaslarınızı çalıştırın ve dirseklerinizi vücudunuza yakın tutarak vücudunuzu tutamaçlara doğru yukarı çekin. Çeneniz tutamakların üzerine gelene kadar çekmeye devam edin. Tepe noktasında bir an duraklayın, ardından vücudunuzu yavaşça başlangıç ​​pozisyonuna indirin. İstenilen sayıda tekrar için tekrarlayın.",
+      "es": "Ajusta la máquina a los valores de peso y altura deseados. Agarra las agarraderas con un agarre prono, un poco más separadas que el ancho de los hombros. Cuélgate con los brazos completamente extendidos y los pies sin tocar el suelo. Activa los músculos de la espalda y lleva el cuerpo hacia arriba hacia las agarraderas, manteniendo los codos cerca del cuerpo. Continúa subiendo hasta que la barbilla quede por encima de las agarraderas. Haz una pausa por un momento en la parte superior, luego baja lentamente el cuerpo de vuelta a la posición inicial. Repite el número de repeticiones deseado.",
+      "ru": "Настройте машину на желаемые параметры веса и роста. Возьмитесь за ручки хватом сверху, на расстоянии чуть шире плеч. Висите, полностью вытянув руки и оторвав ноги от земли. Задействуйте мышцы спины и подтяните тело к ручкам, держа локти близко к телу. Продолжайте тянуть, пока подбородок не окажется над ручками. Задержитесь на мгновение в верхней точке, затем медленно опустите тело обратно в исходное положение. Повторите необходимое количество повторений.",
+      "zh": "将机器调整至您所需的体重和高度设置。 正手握住手柄，握距略宽于肩宽。 双臂完全伸展，双脚离开地面。 收紧背部肌肉，将身体拉向手柄，保持肘部靠近身体。 继续拉，直到下巴位于手柄上方。 在顶部停顿片刻，然后慢慢将身体放回起始位置。 重复所需的重复次数。",
+      "hi": "मशीन को अपनी वांछित वजन और ऊंचाई सेटिंग्स के अनुसार समायोजित करें। हैंडल को कंधे की चौड़ाई से थोड़ा अधिक चौड़े ओवरहैंड ग्रिप से पकड़ें। अपनी बाहों को पूरी तरह फैलाकर और अपने पैरों को ज़मीन से ऊपर रखकर लटकें। अपनी पीठ की मांसपेशियों को शामिल करें और अपनी कोहनियों को अपने शरीर के करीब रखते हुए, अपने शरीर को हैंडल की ओर ऊपर खींचें। तब तक खींचते रहें जब तक आपकी ठुड्डी हैंडल के ऊपर न आ जाए। शीर्ष पर एक पल के लिए रुकें, फिर धीरे-धीरे अपने शरीर को वापस प्रारंभिक स्थिति में ले आएं। दोहराव की वांछित संख्या के लिए दोहराएँ।",
+      "pl": "Ustaw maszynę na odpowiedni ciężar i wysokość. Chwyć uchwyty nachwytem, nieco szerzej niż na szerokość barków. Zwiśnij z rękami w pełni wyprostowanymi i stopami uniesionymi nad podłogę. Napnij mięśnie pleców i podciągnij ciało w kierunku uchwytów, trzymając łokcie blisko ciała. Kontynuuj podciąganie, aż broda znajdzie się nad uchwytami. Zatrzymaj się na chwilę w górnej pozycji, a następnie powoli opuść ciało z powrotem do pozycji wyjściowej. Powtórz zalecaną liczbę razy.",
+      "ko": "머신을 원하는 무게와 높이 설정으로 조정합니다. 손바닥이 앞을 향하도록 손잡이를 어깨너비보다 약간 넓게 잡습니다. 팔을 완전히 펼친 상태로 발이 바닥에서 떨어져 매달립니다. 등 근육을 활성화하고 팔꿈치를 몸 옆에 붙이며 몸을 위로 당겨 턱이 손잡이 위로 올라올 때까지 계속 당깁니다. 맨 위에서 잠깐 멈춘 후 천천히 시작 위치로 내려갑니다. 원하는 횟수만큼 반복합니다.",
+      "fr": "Règle la machine aux réglages de poids et de hauteur souhaités. Saisis les poignées avec une prise en pronation, légèrement plus écartées que la largeur des épaules. Suspends-toi, les bras complètement étendus et les pieds décollés du sol. Sollicite les muscles de ton dos et tire ton corps vers les poignées, en gardant tes coudes près de ton corps. Continue à tirer jusqu'à ce que ton menton soit au-dessus des poignées. Marque une pause en haut, puis abaisse lentement ton corps pour revenir à la position de départ. Répète le nombre de répétitions souhaité."
+    },
+    "instruction_steps": {
+      "en": [
+        "Adjust the machine to your desired weight and height settings.",
+        "Grasp the handles with an overhand grip, slightly wider than shoulder-width apart.",
+        "Hang with your arms fully extended and your feet off the ground.",
+        "Engage your back muscles and pull your body up towards the handles, keeping your elbows close to your body.",
+        "Continue pulling until your chin is above the handles.",
+        "Pause for a moment at the top, then slowly lower your body back down to the starting position.",
+        "Repeat for the desired number of repetitions."
+      ],
+      "it": [
+        "Regola la macchina in base alle impostazioni di peso e altezza desiderate.",
+        "Afferrare le maniglie con una presa prona, leggermente più larga della larghezza delle spalle.",
+        "Appendere con le braccia completamente distese e i piedi sollevati da terra.",
+        "Coinvolgi i muscoli della schiena e solleva il corpo verso le maniglie, mantenendo i gomiti vicini al corpo.",
+        "Continua a tirare finché il mento non è sopra le maniglie.",
+        "Fai una pausa per un momento in alto, quindi abbassa lentamente il corpo fino alla posizione di partenza.",
+        "Ripetere per il numero di ripetizioni desiderato."
+      ],
+      "tr": [
+        "Makineyi istediğiniz ağırlık ve boy ayarlarına ayarlayın.",
+        "Tutamaçları omuz genişliğinden biraz daha geniş olacak şekilde üstten kavrayın.",
+        "Kollarınız tamamen uzatılmış ve ayaklarınız yerden yukarıda olacak şekilde asın.",
+        "Sırt kaslarınızı çalıştırın ve dirseklerinizi vücudunuza yakın tutarak vücudunuzu tutamaçlara doğru yukarı çekin.",
+        "Çeneniz tutamakların üzerine gelene kadar çekmeye devam edin.",
+        "Tepe noktasında bir an duraklayın, ardından vücudunuzu yavaşça başlangıç ​​pozisyonuna indirin.",
+        "İstenilen sayıda tekrar için tekrarlayın."
+      ],
+      "es": [
+        "Ajusta la máquina a los valores de peso y altura deseados.",
+        "Agarra las agarraderas con un agarre prono, un poco más separadas que el ancho de los hombros.",
+        "Cuélgate con los brazos completamente extendidos y los pies sin tocar el suelo.",
+        "Activa los músculos de la espalda y lleva el cuerpo hacia arriba hacia las agarraderas, manteniendo los codos cerca del cuerpo.",
+        "Continúa subiendo hasta que la barbilla quede por encima de las agarraderas.",
+        "Haz una pausa por un momento en la parte superior, luego baja lentamente el cuerpo de vuelta a la posición inicial.",
+        "Repite el número de repeticiones deseado."
+      ],
+      "ru": [
+        "Настройте машину на желаемые параметры веса и роста.",
+        "Возьмитесь за ручки хватом сверху, на расстоянии чуть шире плеч.",
+        "Висите, полностью вытянув руки и оторвав ноги от земли.",
+        "Задействуйте мышцы спины и подтяните тело к ручкам, держа локти близко к телу.",
+        "Продолжайте тянуть, пока подбородок не окажется над ручками.",
+        "Задержитесь на мгновение в верхней точке, затем медленно опустите тело обратно в исходное положение.",
+        "Повторите необходимое количество повторений."
+      ],
+      "zh": [
+        "将机器调整至您所需的体重和高度设置。",
+        "正手握住手柄，握距略宽于肩宽。",
+        "双臂完全伸展，双脚离开地面。",
+        "收紧背部肌肉，将身体拉向手柄，保持肘部靠近身体。",
+        "继续拉，直到下巴位于手柄上方。",
+        "在顶部停顿片刻，然后慢慢将身体放回起始位置。",
+        "重复所需的重复次数。"
+      ],
+      "hi": [
+        "मशीन को अपनी वांछित वजन और ऊंचाई सेटिंग्स के अनुसार समायोजित करें।",
+        "हैंडल को कंधे की चौड़ाई से थोड़ा अधिक चौड़े ओवरहैंड ग्रिप से पकड़ें।",
+        "अपनी बाहों को पूरी तरह फैलाकर और अपने पैरों को ज़मीन से ऊपर रखकर लटकें।",
+        "अपनी पीठ की मांसपेशियों को शामिल करें और अपनी कोहनियों को अपने शरीर के करीब रखते हुए, अपने शरीर को हैंडल की ओर ऊपर खींचें।",
+        "तब तक खींचते रहें जब तक आपकी ठुड्डी हैंडल के ऊपर न आ जाए।",
+        "शीर्ष पर एक पल के लिए रुकें, फिर धीरे-धीरे अपने शरीर को वापस प्रारंभिक स्थिति में ले आएं।",
+        "दोहराव की वांछित संख्या के लिए दोहराएँ।"
+      ],
+      "pl": [
+        "Ustaw maszynę na odpowiedni ciężar i wysokość.",
+        "Chwyć uchwyty nachwytem, nieco szerzej niż na szerokość barków.",
+        "Zwiśnij z rękami w pełni wyprostowanymi i stopami uniesionymi nad podłogę.",
+        "Napnij mięśnie pleców i podciągnij ciało w kierunku uchwytów, trzymając łokcie blisko ciała.",
+        "Kontynuuj podciąganie, aż broda znajdzie się nad uchwytami.",
+        "Zatrzymaj się na chwilę w górnej pozycji, a następnie powoli opuść ciało z powrotem do pozycji wyjściowej.",
+        "Powtórz zalecaną liczbę razy."
+      ],
+      "ko": [
+        "머신을 원하는 무게와 높이 설정으로 조정합니다.",
+        "손바닥이 앞을 향하도록 손잡이를 어깨너비보다 약간 넓게 잡습니다.",
+        "팔을 완전히 펼친 상태로 발이 바닥에서 떨어져 매달립니다.",
+        "등 근육을 활성화하고 팔꿈치를 몸 옆에 붙이며 몸을 위로 당겨 손잡이 방향으로 올립니다.",
+        "턱이 손잡이 위로 올라올 때까지 계속 당깁니다.",
+        "맨 위에서 잠깐 멈춘 후 천천히 시작 위치로 몸을 내려갑니다.",
+        "원하는 횟수만큼 반복합니다."
+      ],
+      "fr": [
+        "Règle la machine aux réglages de poids et de hauteur souhaités.",
+        "Saisis les poignées avec une prise en pronation, légèrement plus écartées que la largeur des épaules.",
+        "Suspends-toi, les bras complètement étendus et les pieds décollés du sol.",
+        "Sollicite les muscles de ton dos et tire ton corps vers les poignées, en gardant tes coudes près de ton corps.",
+        "Continue à tirer jusqu'à ce que ton menton soit au-dessus des poignées.",
+        "Marque une pause en haut, puis abaisse lentement ton corps pour revenir à la position de départ.",
+        "Répète le nombre de répétitions souhaité."
+      ]
+    },
+    "muscle_group": "biceps",
+    "secondary_muscles": [
+      "biceps",
+      "forearms"
+    ],
+    "target": "lats",
+    "image": "images/0017-kiJ4Z2K.jpg",
+    "gif_url": "videos/0017-kiJ4Z2K.gif",
+    "media_id": "kiJ4Z2K",
+    "created_at": "2026-03-18T12:31:32.855436+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "3544",
+    "name": "bodyweight incline side plank",
+    "category": "waist",
+    "body_part": "waist",
+    "equipment": "body weight",
+    "instructions": {
+      "en": "Start by lying on your side with your legs extended and stacked on top of each other. Place your forearm on the ground directly below your shoulder, with your elbow bent at a 90-degree angle. Engage your core and lift your hips off the ground, creating a straight line from your head to your feet. Hold this position for the desired amount of time. Lower your hips back down to the ground and repeat on the other side.",
+      "it": "Inizia sdraiandoti su un fianco con le gambe distese e sovrapposte una sopra l'altra. Appoggia l'avambraccio a terra direttamente sotto la spalla, con il gomito piegato a 90 gradi. Attiva il core e solleva i fianchi da terra, creando una linea retta dalla testa ai piedi. Mantieni questa posizione per il tempo desiderato. Abbassa i fianchi di nuovo a terra e ripeti dall'altro lato.",
+      "tr": "Bacaklarınız uzatılmış ve üst üste istiflenmiş halde yan yatarak başlayın. Dirseğiniz 90 derecelik bir açıyla bükülmüş halde ön kolunuzu doğrudan omzunuzun altına yere koyun. Merkez bölgenizi devreye sokun ve kalçalarınızı yerden kaldırın, başınızdan ayaklarınıza kadar düz bir çizgi oluşturun. Bu konumu istediğiniz süre boyunca basılı tutun. Kalçalarınızı yere indirin ve diğer tarafta tekrarlayın.",
+      "es": "Comienza tumbado de lado con las piernas extendidas y apiladas una sobre la otra. Coloca el antebrazo en el suelo justo debajo del hombro, con el codo flexionado en un ángulo de 90 grados. Activa el core y levanta las caderas del suelo, formando una línea recta desde la cabeza hasta los pies. Mantén esta posición durante el tiempo deseado. Baja las caderas de nuevo al suelo y repite hacia el otro lado.",
+      "ru": "Начните с того, что лягте на бок, вытянув ноги и положив их друг на друга. Положите предплечье на землю прямо под плечом, согнув локоть под углом 90 градусов. Напрягите корпус и поднимите бедра от земли, создавая прямую линию от головы до ступней. Удерживайте это положение желаемое время. Опустите бедра обратно на землю и повторите то же самое с другой стороны.",
+      "zh": "首先侧躺，双腿伸展并叠放在一起。 将前臂放在肩膀正下方的地面上，肘部弯曲成 90 度角。 启动你的核心并将臀部抬离地面，从头到脚形成一条直线。 保持此位置所需的时间。 将臀部放回到地面，然后在另一侧重复。",
+      "hi": "अपने पैरों को फैलाकर और एक दूसरे के ऊपर रखकर अपनी तरफ लेटकर शुरुआत करें। अपनी कोहनी को 90 डिग्री के कोण पर मोड़ते हुए अपने अग्रबाहु को सीधे अपने कंधे के नीचे जमीन पर रखें। अपने कोर को संलग्न करें और अपने कूल्हों को जमीन से ऊपर उठाएं, जिससे आपके सिर से आपके पैरों तक एक सीधी रेखा बन जाए। वांछित समय तक इस स्थिति में रहें। अपने कूल्हों को वापस ज़मीन पर टिकाएँ और दूसरी तरफ भी दोहराएँ।",
+      "pl": "Zacznij, leżąc na boku, z nogami wyprostowanymi i ułożonymi jedna na drugiej. Umieść przedramię na podłodze bezpośrednio pod barkiem, z łokciem zgiętym pod kątem 90 stopni. Napnij mięśnie brzucha i unieś biodra nad podłogę, tworząc prostą linię od głowy do stóp. Przytrzymaj tę pozycję przez zadany czas. Opuść biodra z powrotem na podłogę i powtórz po drugiej stronie.",
+      "ko": "옆으로 누운 자세에서 다리를 쭉 펼친 후 겹쳐 놓습니다. 전완을 어깨 바로 아래 바닥에 놓고 팔꿈치가 90도 각도가 되도록 합니다. 코어를 engaged 하고 엉덩이를 바닥에서 들어 올려 머리에서 발까지 일직선을 만듭니다. 이 자세를 원하는 시간 동안 유지합니다. 엉덩이를 바닥으로 내린 후 다른 쪽에서 반복합니다.",
+      "fr": "Commence allongé sur le côté, les jambes tendues et superposées l'une sur l'autre. Place ton avant-bras au sol directement sous ton épaule, avec ton coude plié à un angle de 90 degrés. Gaine ta sangle abdominale et lève tes hanches du sol, en créant une ligne droite de ta tête à tes pieds. Maintiens cette position pendant la durée souhaitée. Redescends tes hanches jusqu'au sol et répète de l'autre côté."
+    },
+    "instruction_steps": {
+      "en": [
+        "Start by lying on your side with your legs extended and stacked on top of each other.",
+        "Place your forearm on the ground directly below your shoulder, with your elbow bent at a 90-degree angle.",
+        "Engage your core and lift your hips off the ground, creating a straight line from your head to your feet.",
+        "Hold this position for the desired amount of time.",
+        "Lower your hips back down to the ground and repeat on the other side."
+      ],
+      "it": [
+        "Inizia sdraiandoti su un fianco con le gambe distese e sovrapposte una sopra l'altra.",
+        "Appoggia l'avambraccio a terra direttamente sotto la spalla, con il gomito piegato a 90 gradi.",
+        "Attiva il core e solleva i fianchi da terra, creando una linea retta dalla testa ai piedi.",
+        "Mantieni questa posizione per il tempo desiderato.",
+        "Abbassa i fianchi di nuovo a terra e ripeti dall'altro lato."
+      ],
+      "tr": [
+        "Bacaklarınız uzatılmış ve üst üste istiflenmiş halde yan yatarak başlayın.",
+        "Dirseğiniz 90 derecelik bir açıyla bükülmüş halde ön kolunuzu doğrudan omzunuzun altına yere koyun.",
+        "Merkez bölgenizi devreye sokun ve kalçalarınızı yerden kaldırın, başınızdan ayaklarınıza kadar düz bir çizgi oluşturun.",
+        "Bu konumu istediğiniz süre boyunca basılı tutun.",
+        "Kalçalarınızı yere indirin ve diğer tarafta tekrarlayın."
+      ],
+      "es": [
+        "Comienza tumbado de lado con las piernas extendidas y apiladas una sobre la otra.",
+        "Coloca el antebrazo en el suelo justo debajo del hombro, con el codo flexionado en un ángulo de 90 grados.",
+        "Activa el core y levanta las caderas del suelo, formando una línea recta desde la cabeza hasta los pies.",
+        "Mantén esta posición durante el tiempo deseado.",
+        "Baja las caderas de nuevo al suelo y repite hacia el otro lado."
+      ],
+      "ru": [
+        "Начните с того, что лягте на бок, вытянув ноги и положив их друг на друга.",
+        "Положите предплечье на землю прямо под плечом, согнув локоть под углом 90 градусов.",
+        "Напрягите корпус и поднимите бедра от земли, создавая прямую линию от головы до ступней.",
+        "Удерживайте это положение желаемое время.",
+        "Опустите бедра обратно на землю и повторите то же самое с другой стороны."
+      ],
+      "zh": [
+        "首先侧躺，双腿伸展并叠放在一起。",
+        "将前臂放在肩膀正下方的地面上，肘部弯曲成 90 度角。",
+        "启动你的核心并将臀部抬离地面，从头到脚形成一条直线。",
+        "保持此位置所需的时间。",
+        "将臀部放回到地面，然后在另一侧重复。"
+      ],
+      "hi": [
+        "अपने पैरों को फैलाकर और एक दूसरे के ऊपर रखकर अपनी तरफ लेटकर शुरुआत करें।",
+        "अपनी कोहनी को 90 डिग्री के कोण पर मोड़ते हुए अपने अग्रबाहु को सीधे अपने कंधे के नीचे जमीन पर रखें।",
+        "अपने कोर को संलग्न करें और अपने कूल्हों को जमीन से ऊपर उठाएं, जिससे आपके सिर से आपके पैरों तक एक सीधी रेखा बन जाए।",
+        "वांछित समय तक इस स्थिति में रहें।",
+        "अपने कूल्हों को वापस ज़मीन पर टिकाएँ और दूसरी तरफ भी दोहराएँ।"
+      ],
+      "pl": [
+        "Zacznij, leżąc na boku, z nogami wyprostowanymi i ułożonymi jedna na drugiej.",
+        "Umieść przedramię na podłodze bezpośrednio pod barkiem, z łokciem zgiętym pod kątem 90 stopni.",
+        "Napnij mięśnie brzucha i unieś biodra nad podłogę, tworząc prostą linię od głowy do stóp.",
+        "Przytrzymaj tę pozycję przez zadany czas.",
+        "Opuść biodra z powrotem na podłogę i powtórz po drugiej stronie."
+      ],
+      "ko": [
+        "옆으로 누운 자세에서 다리를 쭉 펼친 후 겹쳐 놓습니다.",
+        "전완을 어깨 바로 아래 바닥에 놓고 팔꿈치가 90도 각도가 되도록 합니다.",
+        "코어를 engaged 하고 엉덩이를 바닥에서 들어 올려 머리에서 발까지 일직선을 만듭니다.",
+        "이 자세를 원하는 시간 동안 유지합니다.",
+        "엉덩이를 바닥으로 내린 후 다른 쪽에서 반복합니다."
+      ],
+      "fr": [
+        "Commence allongé sur le côté, les jambes tendues et superposées l'une sur l'autre.",
+        "Place ton avant-bras au sol directement sous ton épaule, avec ton coude plié à un angle de 90 degrés.",
+        "Gaine ta sangle abdominale et lève tes hanches du sol, en créant une ligne droite de ta tête à tes pieds.",
+        "Maintiens cette position pendant la durée souhaitée.",
+        "Redescends tes hanches jusqu'au sol et répète de l'autre côté."
+      ]
+    },
+    "muscle_group": "obliques",
+    "secondary_muscles": [
+      "obliques",
+      "shoulders"
+    ],
+    "target": "abs",
+    "image": "images/3544-5VXmnV5.jpg",
+    "gif_url": "videos/3544-5VXmnV5.gif",
+    "media_id": "5VXmnV5",
+    "created_at": "2026-03-18T12:31:32.873793+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "0858",
+    "name": "wind sprints",
+    "category": "waist",
+    "body_part": "waist",
+    "equipment": "body weight",
+    "instructions": {
+      "en": "Find an open space or a track to perform the exercise. Start by standing with your feet shoulder-width apart. Begin running as fast as you can, pumping your arms and driving your knees up. Continue sprinting for a specific distance or time period. Rest and repeat for the desired number of repetitions.",
+      "it": "Trova uno spazio aperto o una pista per eseguire l'esercizio. Inizia stando in piedi con i piedi alla larghezza delle spalle. Inizia a correre il più velocemente possibile, pompando le braccia e sollevando le ginocchia. Continua a correre per una distanza o un periodo di tempo specifico. Riposa e ripeti per il numero di ripetizioni desiderato.",
+      "tr": "Egzersizi gerçekleştirmek için açık bir alan veya parkur bulun. Ayaklarınızı omuz genişliğinde açarak ayakta durmaya başlayın. Olabildiğince hızlı koşmaya başlayın, kollarınızı pompalayın ve dizlerinizi yukarı kaldırın. Belirli bir mesafe veya süre boyunca sprint yapmaya devam edin. İstenilen sayıda tekrar için dinlenin ve tekrarlayın.",
+      "es": "Busca un espacio abierto o una pista para realizar el ejercicio. Comienza de pie con los pies separados a la altura de los hombros. Comienza a correr lo más rápido que puedas, bombeando los brazos y elevando las rodillas. Continúa el sprint durante una distancia o periodo de tiempo específico. Descansa y repite el número de repeticiones deseado.",
+      "ru": "Найдите открытое пространство или дорожку для выполнения упражнения. Начните с того, что встаньте, поставив ноги на ширине плеч. Начните бежать как можно быстрее, размахивая руками и поднимая колени. Продолжайте бежать на определенную дистанцию ​​или в течение определенного периода времени. Отдохните и повторите необходимое количество повторений.",
+      "zh": "找一个空地或跑道来进行练习。 首先站立，双脚分开与肩同宽。 开始尽可能快地跑步，挥动手臂并抬起膝盖。 继续冲刺特定的距离或时间。 休息并重复所需的重复次数。",
+      "hi": "व्यायाम करने के लिए एक खुली जगह या ट्रैक ढूंढें। अपने पैरों को कंधे की चौड़ाई से अलग करके खड़े होकर शुरुआत करें। जितना हो सके उतनी तेजी से दौड़ना शुरू करें, अपनी बाहों को पंप करें और अपने घुटनों को ऊपर उठाएं। एक विशिष्ट दूरी या समय अवधि तक दौड़ना जारी रखें। आराम करें और दोहराव की वांछित संख्या के लिए दोहराएं।",
+      "pl": "Znajdź otwartą przestrzeń lub bieżnię, aby wykonać ćwiczenie. Zacznij, stojąc ze stopami rozstawionymi na szerokość barków. Zacznij biec tak szybko, jak potrafisz, pompując ramionami i unosząc kolana. Kontynuuj sprint przez określony dystans lub czas. Odpocznij i powtórz zgodnie z żądaną liczbą powtórzeń.",
+      "ko": "운동을 수행할 열린 공간이나 트랙을 찾습니다. 발을 어깨 너비만큼 떨어뜨리고 서 있는 상태로 시작합니다. 팔을 펌프질하고 무릎을 높이 올리면서 최대한 빠르게 달립니다. 특정 거리나 시간 동안 스프린트를 계속합니다. 휴식을 취하고 원하는 반복 횟수만큼 반복합니다.",
+      "fr": "Trouve un espace dégagé ou une piste pour effectuer l'exercice. Commence debout, les pieds écartés à la largeur des épaules. Commence à courir aussi vite que possible en pompant avec tes bras et en montant tes genoux. Continue à sprinter pendant une distance ou une durée précise. Repose-toi et répète le nombre de répétitions souhaité."
+    },
+    "instruction_steps": {
+      "en": [
+        "Find an open space or a track to perform the exercise.",
+        "Start by standing with your feet shoulder-width apart.",
+        "Begin running as fast as you can, pumping your arms and driving your knees up.",
+        "Continue sprinting for a specific distance or time period.",
+        "Rest and repeat for the desired number of repetitions."
+      ],
+      "it": [
+        "Trova uno spazio aperto o una pista per eseguire l'esercizio.",
+        "Inizia stando in piedi con i piedi alla larghezza delle spalle.",
+        "Inizia a correre il più velocemente possibile, pompando le braccia e sollevando le ginocchia.",
+        "Continua a correre per una distanza o un periodo di tempo specifico.",
+        "Riposa e ripeti per il numero di ripetizioni desiderato."
+      ],
+      "tr": [
+        "Egzersizi gerçekleştirmek için açık bir alan veya parkur bulun.",
+        "Ayaklarınızı omuz genişliğinde açarak ayakta durmaya başlayın.",
+        "Olabildiğince hızlı koşmaya başlayın, kollarınızı pompalayın ve dizlerinizi yukarı kaldırın.",
+        "Belirli bir mesafe veya süre boyunca sprint yapmaya devam edin.",
+        "İstenilen sayıda tekrar için dinlenin ve tekrarlayın."
+      ],
+      "es": [
+        "Busca un espacio abierto o una pista para realizar el ejercicio.",
+        "Comienza de pie con los pies separados a la altura de los hombros.",
+        "Comienza a correr lo más rápido que puedas, bombeando los brazos y elevando las rodillas.",
+        "Continúa el sprint durante una distancia o periodo de tiempo específico.",
+        "Descansa y repite el número de repeticiones deseado."
+      ],
+      "ru": [
+        "Найдите открытое пространство или дорожку для выполнения упражнения.",
+        "Начните с того, что встаньте, поставив ноги на ширине плеч.",
+        "Начните бежать как можно быстрее, размахивая руками и поднимая колени.",
+        "Продолжайте бежать на определенную дистанцию ​​или в течение определенного периода времени.",
+        "Отдохните и повторите необходимое количество повторений."
+      ],
+      "zh": [
+        "找一个空地或跑道来进行练习。",
+        "首先站立，双脚分开与肩同宽。",
+        "开始尽可能快地跑步，挥动手臂并抬起膝盖。",
+        "继续冲刺特定的距离或时间。",
+        "休息并重复所需的重复次数。"
+      ],
+      "hi": [
+        "व्यायाम करने के लिए एक खुली जगह या ट्रैक ढूंढें।",
+        "अपने पैरों को कंधे की चौड़ाई से अलग करके खड़े होकर शुरुआत करें।",
+        "जितना हो सके उतनी तेजी से दौड़ना शुरू करें, अपनी बाहों को पंप करें और अपने घुटनों को ऊपर उठाएं।",
+        "एक विशिष्ट दूरी या समय अवधि तक दौड़ना जारी रखें।",
+        "आराम करें और दोहराव की वांछित संख्या के लिए दोहराएं।"
+      ],
+      "pl": [
+        "Znajdź otwartą przestrzeń lub bieżnię, aby wykonać ćwiczenie.",
+        "Zacznij, stojąc ze stopami rozstawionymi na szerokość barków.",
+        "Zacznij biec tak szybko, jak potrafisz, pompując ramionami i unosząc kolana.",
+        "Kontynuuj sprint przez określony dystans lub czas.",
+        "Odpocznij i powtórz zgodnie z żądaną liczbą powtórzeń."
+      ],
+      "ko": [
+        "운동을 수행할 열린 공간이나 트랙을 찾습니다.",
+        "발을 어깨 너비만큼 떨어뜨리고 서 있는 상태로 시작합니다.",
+        "팔을 펌프질하고 무릎을 높이 올리면서 최대한 빠르게 달립니다.",
+        "특정 거리나 시간 동안 스프린트를 계속합니다.",
+        "휴식을 취하고 원하는 반복 횟수만큼 반복합니다."
+      ],
+      "fr": [
+        "Trouve un espace dégagé ou une piste pour effectuer l'exercice.",
+        "Commence debout, les pieds écartés à la largeur des épaules.",
+        "Commence à courir aussi vite que possible en pompant avec tes bras et en montant tes genoux.",
+        "Continue à sprinter pendant une distance ou une durée précise.",
+        "Repose-toi et répète le nombre de répétitions souhaité."
+      ]
+    },
+    "muscle_group": "quadriceps",
+    "secondary_muscles": [
+      "quadriceps",
+      "hamstrings",
+      "calves"
+    ],
+    "target": "abs",
+    "image": "images/0858-Qoujh3Q.jpg",
+    "gif_url": "videos/0858-Qoujh3Q.gif",
+    "media_id": "Qoujh3Q",
+    "created_at": "2026-03-18T12:31:32.906568+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  },
+  {
+    "id": "3666",
+    "name": "walking on incline treadmill",
+    "category": "cardio",
+    "body_part": "cardio",
+    "equipment": "leverage machine",
+    "instructions": {
+      "en": "Adjust the incline level on the treadmill to your desired intensity. Stand on the treadmill with your feet shoulder-width apart. Start walking at a comfortable pace, ensuring that you maintain proper form. Engage your core muscles and keep your back straight throughout the exercise. Continue walking on the incline treadmill for the desired duration of your cardio workout. Gradually decrease the incline and speed of the treadmill to cool down before stopping.",
+      "it": "Regola il livello di inclinazione del tapis roulant all'intensità desiderata. Stare sul tapis roulant con i piedi alla larghezza delle spalle. Inizia a camminare a un ritmo confortevole, assicurandoti di mantenere la forma corretta. Coinvolgi i muscoli centrali e mantieni la schiena dritta durante l'esercizio. Continua a camminare sul tapis roulant inclinato per la durata desiderata del tuo allenamento cardio. Diminuire gradualmente l'inclinazione e la velocità del tapis roulant per raffreddarlo prima di fermarsi.",
+      "tr": "Koşu bandındaki eğim seviyesini istediğiniz yoğunluğa ayarlayın. Ayaklarınız omuz genişliğinde açık olacak şekilde koşu bandının üzerinde durun. Uygun formu koruduğunuzdan emin olarak rahat bir tempoda yürümeye başlayın. Çekirdek kaslarınızı çalıştırın ve egzersiz boyunca sırtınızı düz tutun. Kardiyo egzersizinizin istediğiniz süresi boyunca eğimli koşu bandında yürümeye devam edin. Durmadan önce soğuması için koşu bandının eğimini ve hızını kademeli olarak azaltın.",
+      "es": "Ajusta el nivel de inclinación de la cinta de correr a la intensidad deseada. Ponte de pie sobre la cinta de correr con los pies separados a la altura de los hombros. Comienza a caminar a un ritmo cómodo, asegurándote de mantener una forma correcta. Activa los músculos del core y mantén la espalda recta durante todo el ejercicio. Continúa caminando en la cinta inclinada durante la duración deseada de tu entrenamiento cardiovascular. Disminuye gradualmente la inclinación y la velocidad de la cinta para enfriar antes de detenerte.",
+      "ru": "Отрегулируйте уровень наклона беговой дорожки до желаемой интенсивности. Встаньте на беговую дорожку, поставив ноги на ширине плеч. Начните ходить в удобном темпе, следя за тем, чтобы поддерживать правильную форму. Задействуйте мышцы корпуса и держите спину прямо на протяжении всего упражнения. Продолжайте ходить по наклонной беговой дорожке в течение желаемой продолжительности кардиотренировки. Постепенно уменьшайте наклон и скорость беговой дорожки, чтобы она остыла перед остановкой.",
+      "zh": "将跑步机的倾斜度调整到您想要的强度。 站在跑步机上，双脚分开与肩同宽。 开始以舒适的步伐行走，确保保持正确的姿势。 在整个练习过程中，调动核心肌肉并保持背部挺直。 继续在倾斜跑步机上行走，完成有氧运动所需的时间。 逐渐降低跑步机的坡度和速度，使其冷却后再停止。",
+      "hi": "ट्रेडमिल पर झुकाव स्तर को अपनी वांछित तीव्रता के अनुसार समायोजित करें। अपने पैरों को कंधे की चौड़ाई से अलग रखते हुए ट्रेडमिल पर खड़े हो जाएं। आरामदायक गति से चलना शुरू करें, यह सुनिश्चित करते हुए कि आप उचित फॉर्म बनाए रखें। अपनी मुख्य मांसपेशियों को शामिल करें और पूरे अभ्यास के दौरान अपनी पीठ सीधी रखें। अपने कार्डियो वर्कआउट की वांछित अवधि के लिए इनक्लाइन ट्रेडमिल पर चलना जारी रखें। रुकने से पहले ठंडा होने के लिए ट्रेडमिल का झुकाव और गति धीरे-धीरे कम करें।",
+      "pl": "Wyreguluj poziom nachylenia bieżni na żądaną intensywność. Stań na bieżni ze stopami rozstawionymi na szerokość barków. Zacznij iść w komfortowym tempie, dbając o zachowanie prawidłowej techniki. Napnij mięśnie brzucha i trzymaj plecy proste przez cały czas trwania ćwiczenia. Kontynuuj chodzenie po bieżni z nachyleniem przez żądany czas trwania treningu kardio. Stopniowo zmniejszaj nachylenie i prędkość bieżni, aby się schłodzić przed zatrzymaniem.",
+      "ko": "트레드밀의 경사도를 원하는 강도로 조정합니다. 발을 어깨 너비로 벌리고 트레드밀 위에 서십시오. 편안한 속도로 걷기를 시작하여 올바른 자세를 유지합니다. 운동 내내 코어 근육에 힘을 주고 등을 곧게 유지합니다. 원하는 유산소 운동 시간 동안 인클라인 트레드밀 위에서 계속 걷습니다. 운동을 멈추기 전에 경사도와 속도를 점차 낮추어 정리 운동을 합니다.",
+      "fr": "Règle le niveau d'inclinaison du tapis de course selon l'intensité souhaitée. Tiens-toi sur le tapis de course, les pieds écartés à la largeur des épaules. Commence à marcher à un rythme confortable, en veillant à conserver une bonne posture. Gaine tes muscles abdominaux et garde le dos droit tout au long de l'exercice. Continue à marcher sur le tapis incliné pendant la durée souhaitée de ton entraînement cardio. Diminue progressivement l'inclinaison et la vitesse du tapis de course pour récupérer avant de t'arrêter."
+    },
+    "instruction_steps": {
+      "en": [
+        "Adjust the incline level on the treadmill to your desired intensity.",
+        "Stand on the treadmill with your feet shoulder-width apart.",
+        "Start walking at a comfortable pace, ensuring that you maintain proper form.",
+        "Engage your core muscles and keep your back straight throughout the exercise.",
+        "Continue walking on the incline treadmill for the desired duration of your cardio workout.",
+        "Gradually decrease the incline and speed of the treadmill to cool down before stopping."
+      ],
+      "it": [
+        "Regola il livello di inclinazione del tapis roulant all'intensità desiderata.",
+        "Stare sul tapis roulant con i piedi alla larghezza delle spalle.",
+        "Inizia a camminare a un ritmo confortevole, assicurandoti di mantenere la forma corretta.",
+        "Coinvolgi i muscoli centrali e mantieni la schiena dritta durante l'esercizio.",
+        "Continua a camminare sul tapis roulant inclinato per la durata desiderata del tuo allenamento cardio.",
+        "Diminuire gradualmente l'inclinazione e la velocità del tapis roulant per raffreddarlo prima di fermarsi."
+      ],
+      "tr": [
+        "Koşu bandındaki eğim seviyesini istediğiniz yoğunluğa ayarlayın.",
+        "Ayaklarınız omuz genişliğinde açık olacak şekilde koşu bandının üzerinde durun.",
+        "Uygun formu koruduğunuzdan emin olarak rahat bir tempoda yürümeye başlayın.",
+        "Çekirdek kaslarınızı çalıştırın ve egzersiz boyunca sırtınızı düz tutun.",
+        "Kardiyo egzersizinizin istediğiniz süresi boyunca eğimli koşu bandında yürümeye devam edin.",
+        "Durmadan önce soğuması için koşu bandının eğimini ve hızını kademeli olarak azaltın."
+      ],
+      "es": [
+        "Ajusta el nivel de inclinación de la cinta de correr a la intensidad deseada.",
+        "Ponte de pie sobre la cinta de correr con los pies separados a la altura de los hombros.",
+        "Comienza a caminar a un ritmo cómodo, asegurándote de mantener una forma correcta.",
+        "Activa los músculos del core y mantén la espalda recta durante todo el ejercicio.",
+        "Continúa caminando en la cinta inclinada durante la duración deseada de tu entrenamiento cardiovascular.",
+        "Disminuye gradualmente la inclinación y la velocidad de la cinta para enfriar antes de detenerte."
+      ],
+      "ru": [
+        "Отрегулируйте уровень наклона беговой дорожки до желаемой интенсивности.",
+        "Встаньте на беговую дорожку, поставив ноги на ширине плеч.",
+        "Начните ходить в удобном темпе, следя за тем, чтобы поддерживать правильную форму.",
+        "Задействуйте мышцы корпуса и держите спину прямо на протяжении всего упражнения.",
+        "Продолжайте ходить по наклонной беговой дорожке в течение желаемой продолжительности кардиотренировки.",
+        "Постепенно уменьшайте наклон и скорость беговой дорожки, чтобы она остыла перед остановкой."
+      ],
+      "zh": [
+        "将跑步机的倾斜度调整到您想要的强度。",
+        "站在跑步机上，双脚分开与肩同宽。",
+        "开始以舒适的步伐行走，确保保持正确的姿势。",
+        "在整个练习过程中，调动核心肌肉并保持背部挺直。",
+        "继续在倾斜跑步机上行走，完成有氧运动所需的时间。",
+        "逐渐降低跑步机的坡度和速度，使其冷却后再停止。"
+      ],
+      "hi": [
+        "ट्रेडमिल पर झुकाव स्तर को अपनी वांछित तीव्रता के अनुसार समायोजित करें।",
+        "अपने पैरों को कंधे की चौड़ाई से अलग रखते हुए ट्रेडमिल पर खड़े हो जाएं।",
+        "आरामदायक गति से चलना शुरू करें, यह सुनिश्चित करते हुए कि आप उचित फॉर्म बनाए रखें।",
+        "अपनी मुख्य मांसपेशियों को शामिल करें और पूरे अभ्यास के दौरान अपनी पीठ सीधी रखें।",
+        "अपने कार्डियो वर्कआउट की वांछित अवधि के लिए इनक्लाइन ट्रेडमिल पर चलना जारी रखें।",
+        "रुकने से पहले ठंडा होने के लिए ट्रेडमिल का झुकाव और गति धीरे-धीरे कम करें।"
+      ],
+      "pl": [
+        "Wyreguluj poziom nachylenia bieżni na żądaną intensywność.",
+        "Stań na bieżni ze stopami rozstawionymi na szerokość barków.",
+        "Zacznij iść w komfortowym tempie, dbając o zachowanie prawidłowej techniki.",
+        "Napnij mięśnie brzucha i trzymaj plecy proste przez cały czas trwania ćwiczenia.",
+        "Kontynuuj chodzenie po bieżni z nachyleniem przez żądany czas trwania treningu kardio.",
+        "Stopniowo zmniejszaj nachylenie i prędkość bieżni, aby się schłodzić przed zatrzymaniem."
+      ],
+      "ko": [
+        "트레드밀의 경사도를 원하는 강도로 조정합니다.",
+        "발을 어깨 너비로 벌리고 트레드밀 위에 서십시오.",
+        "편안한 속도로 걷기를 시작하여 올바른 자세를 유지합니다.",
+        "운동 내내 코어 근육에 힘을 주고 등을 곧게 유지합니다.",
+        "원하는 유산소 운동 시간 동안 인클라인 트레드밀 위에서 계속 걷습니다.",
+        "운동을 멈추기 전에 경사도와 속도를 점차 낮추어 정리 운동을 합니다."
+      ],
+      "fr": [
+        "Règle le niveau d'inclinaison du tapis de course selon l'intensité souhaitée.",
+        "Tiens-toi sur le tapis de course, les pieds écartés à la largeur des épaules.",
+        "Commence à marcher à un rythme confortable, en veillant à conserver une bonne posture.",
+        "Gaine tes muscles abdominaux et garde le dos droit tout au long de l'exercice.",
+        "Continue à marcher sur le tapis incliné pendant la durée souhaitée de ton entraînement cardio.",
+        "Diminue progressivement l'inclinaison et la vitesse du tapis de course pour récupérer avant de t'arrêter."
+      ]
+    },
+    "muscle_group": "quadriceps",
+    "secondary_muscles": [
+      "quadriceps",
+      "hamstrings",
+      "calves"
+    ],
+    "target": "cardiovascular system",
+    "image": "images/3666-rjiM4L3.jpg",
+    "gif_url": "videos/3666-rjiM4L3.gif",
+    "media_id": "rjiM4L3",
+    "created_at": "2026-03-18T12:31:32.905681+00:00",
+    "attribution": "© Gym visual — https://gymvisual.com/"
+  }
+]

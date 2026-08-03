@@ -1,0 +1,15 @@
+{
+  "source": "hasaneyldrm/exercises-dataset",
+  "upstream": {
+    "repository": "hasaneyldrm/exercises-dataset",
+    "commit": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+    "dataFile": "data/exercises.json",
+    "snapshotFile": "snapshot.json",
+    "sha256": "d2cb4c2da2aa0bffcbc8d5994fdce23030b61cf435a31fec2602cbd94af5aeb4"
+  },
+  "review": {
+    "revision": "2026-08-03.1",
+    "reviewedAt": "2026-08-03",
+    "reviewFile": "review.json"
+  }
+}

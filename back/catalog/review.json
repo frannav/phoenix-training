@@ -1,0 +1,92 @@
+{
+  "exercises": [
+    {
+      "upstreamId": "0025",
+      "nameEs": "Press de banca con barra",
+      "recordingMode": "fuerza_con_carga",
+      "categoryEs": "Pecho",
+      "bodyPartEs": "Pecho",
+      "equipmentEs": "Barra"
+    },
+    {
+      "upstreamId": "0043",
+      "nameEs": "Sentadilla completa con barra",
+      "recordingMode": "fuerza_con_carga",
+      "categoryEs": "Piernas",
+      "bodyPartEs": "Piernas",
+      "equipmentEs": "Barra"
+    },
+    {
+      "upstreamId": "0032",
+      "nameEs": "Peso muerto con barra",
+      "recordingMode": "fuerza_con_carga",
+      "categoryEs": "Espalda",
+      "bodyPartEs": "Espalda",
+      "equipmentEs": "Barra"
+    },
+    {
+      "upstreamId": "0054",
+      "nameEs": "Zancada con barra",
+      "recordingMode": "fuerza_con_carga",
+      "categoryEs": "Piernas",
+      "bodyPartEs": "Piernas",
+      "equipmentEs": "Barra"
+    },
+    {
+      "upstreamId": "0148",
+      "nameEs": "Press de hombros alterno con polea",
+      "recordingMode": "fuerza_con_carga",
+      "categoryEs": "Hombros",
+      "bodyPartEs": "Hombros",
+      "equipmentEs": "Polea"
+    },
+    {
+      "upstreamId": "1638",
+      "nameEs": "Curl de bíceps en polea",
+      "recordingMode": "fuerza_con_carga",
+      "categoryEs": "Brazos",
+      "bodyPartEs": "Brazos",
+      "equipmentEs": "Polea"
+    },
+    {
+      "upstreamId": "3216",
+      "nameEs": "Flexión con toque de pecho",
+      "recordingMode": "repeticiones_sin_carga",
+      "categoryEs": "Pecho",
+      "bodyPartEs": "Pecho",
+      "equipmentEs": "Peso corporal"
+    },
+    {
+      "upstreamId": "0017",
+      "nameEs": "Dominada asistida",
+      "recordingMode": "repeticiones_sin_carga",
+      "categoryEs": "Espalda",
+      "bodyPartEs": "Espalda",
+      "equipmentEs": "Máquina de dominadas"
+    },
+    {
+      "upstreamId": "3544",
+      "nameEs": "Plancha lateral inclinada",
+      "recordingMode": "tiempo_por_serie",
+      "categoryEs": "Núcleo",
+      "bodyPartEs": "Núcleo",
+      "equipmentEs": "Peso corporal"
+    },
+    {
+      "upstreamId": "0858",
+      "nameEs": "Sprints",
+      "recordingMode": "cardio_continuo",
+      "categoryEs": "Cardio",
+      "bodyPartEs": "Cardio",
+      "equipmentEs": "Peso corporal"
+    },
+    {
+      "upstreamId": "3666",
+      "nameEs": "Caminar en cinta con inclinación",
+      "recordingMode": "cardio_continuo",
+      "categoryEs": "Cardio",
+      "bodyPartEs": "Cardio",
+      "equipmentEs": "Cinta"
+    }
+  ]
+}

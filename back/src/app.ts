@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { extname, join, resolve, sep } from "node:path";
 import { z } from "zod";
 import { createAuth } from "./auth/auth";
@@ -10,8 +10,9 @@ import {
   issuePasswordResetToken,
   issueVerificationToken,
 } from "./auth/verification-tokens";
-import { appMetadata, passwordResetToken, user, verification } from "./db/schema";
+import { appMetadata, exercise, passwordResetToken, recordingModes, user, verification } from "./db/schema";
 import type { AppDatabase } from "./db/open-database";
+import { listExercises } from "./exercises/list-exercises";
 import { apiError, type ApiError, type ApiErrorCode } from "./http/api-error";
 import type { MailAdapter } from "./mail/mail-adapter";
 
@@ -44,6 +45,43 @@ const noOpMailAdapter: MailAdapter = {
 
 const verificationTokenLifetimeMsDefault = 60 * 60 * 1000;
 const passwordResetTokenLifetimeMsDefault = 60 * 60 * 1000;
+
+const exercisesDefaultLimit = 20;
+const exercisesMaxLimit = 50;
+const exercisesQuerySchema = z
+  .object({
+    q: z.string().max(100).optional(),
+    recordingMode: z.enum(recordingModes).optional(),
+    category: z.string().max(50).optional(),
+    cursor: z.string().max(200).optional(),
+    limit: z.coerce.number().int().min(1).max(exercisesMaxLimit).optional(),
+  })
+  .strict();
+
+function encodeOpaqueCursor(offset: number): string {
+  return Buffer.from(JSON.stringify({ offset })).toString("base64url");
+}
+
+function decodeOpaqueCursor(cursor: string | undefined): number {
+  if (cursor === undefined) {
+    return 0;
+  }
+  try {
+    const decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+      offset?: unknown;
+    };
+    if (
+      typeof decoded.offset === "number" &&
+      Number.isInteger(decoded.offset) &&
+      decoded.offset >= 0
+    ) {
+      return decoded.offset;
+    }
+  } catch {
+    // cursor opaco no válido: se trata como comienzo
+  }
+  return 0;
+}
 
 /**
  * Endpoints de autenticación cuyas respuestas JSON no deben revelar el token
@@ -171,6 +209,13 @@ export function createApp({
       const estado = outcome === "success" ? "verificado" : "invalido";
       return context.redirect(`${appBaseUrl}/verificar?estado=${estado}`);
     });
+
+    const authenticatedUserId = async (request: Request): Promise<string | null> => {
+      const session = await auth.api
+        .getSession({ headers: request.headers })
+        .catch(() => null);
+      return session ? session.user.id : null;
+    };
 
     const requestPasswordReset = async (request: Request): Promise<Response> => {
       const body = await request.clone().json().catch(() => null);
@@ -323,8 +368,7 @@ export function createApp({
       }
     };
 
-    app.all("/api/auth/*", async (context) => {
-      const pathname = new URL(context.req.url).pathname;
+    app.all("/api/auth/*", async (context) => {      const pathname = new URL(context.req.url).pathname;
       const response =
         pathname === "/api/auth/request-password-reset"
           ? await requestPasswordReset(context.req.raw)
@@ -366,6 +410,64 @@ export function createApp({
         status: response.status,
         headers: { "Content-Type": "application/json" },
       });
+    });
+
+    app.get("/api/exercises", async (context) => {
+      const userId = await authenticatedUserId(context.req.raw);
+      if (!userId) {
+        return context.json(
+          apiError("UNAUTHORIZED", "Debes iniciar sesión para consultar los Ejercicios."),
+          401,
+        );
+      }
+
+      const parsed = exercisesQuerySchema.safeParse(context.req.query());
+      if (!parsed.success) {
+        return context.json(apiError("VALIDATION_ERROR", "La petición no es válida."), 400);
+      }
+
+      const { q, recordingMode, category, limit = exercisesDefaultLimit } = parsed.data;
+      const offset = decodeOpaqueCursor(parsed.data.cursor);
+      const items = await listExercises(database, {
+        accountId: userId,
+        q,
+        recordingMode,
+        category,
+        limit: limit + 1,
+        offset,
+      });
+      const hasMore = items.length > limit;
+      const page = items.slice(0, limit);
+
+      return context.json({
+        items: page,
+        nextCursor: hasMore ? encodeOpaqueCursor(offset + limit) : null,
+      });
+    });
+
+    app.get("/api/exercises/categories", async (context) => {
+      const userId = await authenticatedUserId(context.req.raw);
+      if (!userId) {
+        return context.json(
+          apiError("UNAUTHORIZED", "Debes iniciar sesión para consultar los Ejercicios."),
+          401,
+        );
+      }
+
+      const rows = await database
+        .selectDistinct({ category: exercise.category })
+        .from(exercise)
+        .where(
+          and(
+            eq(exercise.available, true),
+            or(isNull(exercise.accountId), eq(exercise.accountId, userId)),
+          ),
+        );
+      const categories = rows
+        .map((row) => row.category)
+        .filter((category): category is string => category !== null)
+        .sort((a, b) => a.localeCompare(b, "es"));
+      return context.json({ categories });
     });
   }
 
