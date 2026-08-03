@@ -140,16 +140,10 @@
   color: var(--color-danger-dark, #b42318);
 }
 
-.result,
-.goal {
+.result {
   margin: 0.5rem 0 0;
   font-size: 0.9rem;
   font-weight: 800;
-}
-
-.goal {
-  color: var(--color-ink-muted);
-  font-size: 0.82rem;
 }
 
 .addSeriesButton {

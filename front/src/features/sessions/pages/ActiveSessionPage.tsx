@@ -126,9 +126,11 @@ export function ActiveSessionPage() {
     }
   }, [sessionQuery.data]);
 
-  // Un borrador por Serie pendiente del documento confirmado, inicializado
-  // desde sus Objetivos. Las entradas parciales solo viven aquí y se pierden
-  // al recargar o al recuperar una versión vigente tras un conflicto.
+  // Un borrador por Serie pendiente u omitida del documento confirmado,
+  // inicializado desde sus Objetivos: los campos de una omitida permiten
+  // restaurarla como completada con un resultado completo en el mismo flujo.
+  // Las entradas parciales solo viven aquí y se pierden al recargar o al
+  // recuperar una versión vigente tras un conflicto.
   useEffect(() => {
     if (!session) {
       return;
@@ -138,7 +140,8 @@ export function ActiveSessionPage() {
       const next = { ...current };
       for (const occurrence of session.exercises) {
         for (const series of occurrence.series) {
-          if (series.status !== "pendiente" || next[series.id] !== undefined) {
+          const editable = series.status === "pendiente" || series.status === "omitida";
+          if (!editable || next[series.id] !== undefined) {
             continue;
           }
           next[series.id] = draftFromSeries(series);
@@ -262,7 +265,8 @@ export function ActiveSessionPage() {
     void persist(exercises);
   };
 
-  const restoreSeries = (
+  /** Devolver una Serie completada a pendiente: elimina resultado y RPE y exige confirmación. */
+  const returnToPending = (
     occurrence: SessionExerciseDocument,
     series: SessionSeriesDocument,
   ) => {
@@ -470,7 +474,10 @@ export function ActiveSessionPage() {
   };
 
   const toggleExercise = (id: string) => {
-    setExpandedId((current) => (current === id ? null : id));
+    // La pantalla mantiene un Ejercicio desplegado (spec «Experiencia de la
+    // Sesión activa»): abrir otro intercambia el único desplegado y pulsar el
+    // actual no pliega el último.
+    setExpandedId((current) => (current === id ? current : id));
   };
 
   /** Diálogo de confirmación destructiva: cada acción explica qué se perderá. */
@@ -495,7 +502,7 @@ export function ActiveSessionPage() {
         title = "Volver la Serie a pendiente";
         text = "Volver la Serie a pendiente eliminará su Resultado y su RPE.";
         confirmLabel = "Volver a pendiente";
-        onConfirm = () => restoreSeries(confirmation.occurrence, confirmation.series);
+        onConfirm = () => returnToPending(confirmation.occurrence, confirmation.series);
         break;
       }
       case "delete-series": {
@@ -821,7 +828,12 @@ export function ActiveSessionPage() {
                                       series,
                                     })
                                   }
-                                  onRestore={() => restoreSeries(occurrence, series)}
+                                  // Restaurar una Serie omitida como completada
+                                  // exige introducir a la vez un resultado
+                                  // completo: se valida el borrador de forma
+                                  // atómica y solo con un resultado válido se
+                                  // sustituye el agregado como completada.
+                                  onRestore={() => completeSeries(occurrence, series)}
                                   onDelete={() => {
                                     if (seriesHasResult(series)) {
                                       setConfirmation({

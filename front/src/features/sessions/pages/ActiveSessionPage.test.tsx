@@ -15,6 +15,7 @@ import type {
   SessionDocument,
   SessionExerciseDocument,
   SessionSeriesDocument,
+  SeriesMagnitudes,
   SeriesStatus,
 } from "../api/sessions-api";
 import type { RecordingMode } from "../../exercises/api/exercises-api";
@@ -629,19 +630,24 @@ describe("registrar resultados por Serie en la interfaz", () => {
     ).not.toBeInTheDocument();
   });
 
-  test("omitir una Serie pendiente y restaurarla conservan los objetivos", async () => {
+  test("omitir una Serie y restaurarla como completada conservan los objetivos en los campos", async () => {
     const occurrence = occurrenceDoc(benchPress, [
       seriesDoc({ id: "serie-1", goal: { carga: 60, repeticiones: 8, duracion: null } }),
     ]);
-    let mode: SeriesStatus = "pendiente";
     const putBodies: unknown[] = [];
     stubFetch((url, init) => {
       if (url === "/api/sessions/sesion-activa" && (init.method ?? "GET") === "PUT") {
-        const body = JSON.parse(String(init.body)) as {
-          exercises: { series: { id: string; status: SeriesStatus }[] }[];
-        };
-        putBodies.push(body);
-        mode = body.exercises[0]!.series[0]!.status;
+        putBodies.push(JSON.parse(String(init.body)));
+        const sent = (putBodies[putBodies.length - 1] as {
+          exercises: {
+            series: {
+              id: string;
+              status: SeriesStatus;
+              result: SeriesMagnitudes | null;
+              rpe: number | null;
+            }[];
+          }[];
+        }).exercises[0]!.series[0]!;
         return {
           status: 200,
           body: {
@@ -649,8 +655,13 @@ describe("registrar resultados por Serie en la interfaz", () => {
               occurrenceDoc(benchPress, [
                 seriesDoc({
                   id: "serie-1",
-                  status: mode,
+                  status: sent.status,
                   goal: { carga: 60, repeticiones: 8, duracion: null },
+                  result:
+                    sent.status === "completada"
+                      ? (sent.result ?? { carga: null, repeticiones: null, duracion: null })
+                      : { carga: null, repeticiones: null, duracion: null },
+                  rpe: sent.rpe,
                 }),
               ]),
             ),
@@ -672,22 +683,27 @@ describe("registrar resultados por Serie en la interfaz", () => {
     await user.click(within(row).getByRole("button", { name: "Omitir" }));
 
     expect(await screen.findByText("Omitida")).toBeInTheDocument();
-    expect((putBodies[0] as { exercises: { series: { status: SeriesStatus }[] }[] })
-      .exercises[0]!.series[0]!.status).toBe("omitida");
-    expect(
-      (putBodies[0] as { exercises: { series: { result: unknown; rpe: unknown }[] }[] })
-        .exercises[0]!.series[0]!.rpe,
-    ).toBeNull();
+    const omitSent = (putBodies[0] as {
+      exercises: { series: { status: SeriesStatus; result: unknown; rpe: unknown }[] }[];
+    }).exercises[0]!.series[0]!;
+    expect(omitSent.status).toBe("omitida");
+    expect(omitSent.result).toBeNull();
+    expect(omitSent.rpe).toBeNull();
 
+    // la fila omitida conserva los Objetivos como borrador de los campos
     row = await screen.findByRole("group", { name: "Serie 1" });
+    expect((within(row).getByLabelText("Carga (kg)") as HTMLInputElement).value).toBe("60");
+    expect((within(row).getByLabelText("Repeticiones") as HTMLInputElement).value).toBe("8");
+
+    // restaurar exige el resultado completo y completa en la misma sustitución
     await user.click(within(row).getByRole("button", { name: "Restaurar" }));
 
-    expect(await screen.findByText("Pendiente")).toBeInTheDocument();
-    expect((putBodies[1] as { exercises: { series: { status: SeriesStatus }[] }[] })
-      .exercises[0]!.series[0]!.status).toBe("pendiente");
-    // los objetivos vuelven a inicializar los campos
-    const restoredRow = await screen.findByRole("group", { name: "Serie 1" });
-    expect((within(restoredRow).getByLabelText("Carga (kg)") as HTMLInputElement).value).toBe("60");
+    expect(await screen.findByText("Completada")).toBeInTheDocument();
+    const restoreSent = (putBodies[1] as {
+      exercises: { series: { status: SeriesStatus; result: SeriesMagnitudes | null }[] }[];
+    }).exercises[0]!.series[0]!;
+    expect(restoreSent.status).toBe("completada");
+    expect(restoreSent.result).toEqual({ carga: 60, repeticiones: 8, duracion: null });
   });
 
   test("un RPE fuera de los pasos de 0,5 señala el campo sin guardar", async () => {
@@ -1168,7 +1184,7 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
     ).toBeInTheDocument();
   });
 
-  test("restaurar una Serie omitida exige un resultado completo para completarla", async () => {
+  test("restaurar una Serie omitida como completada exige un resultado completo en el mismo flujo", async () => {
     const occurrence = occurrenceDoc(benchPress, [
       seriesDoc({ id: "serie-1", status: "omitida", goal: { carga: 60, repeticiones: null, duracion: null } }),
     ]);
@@ -1176,19 +1192,15 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
     stubFetch((url, init) => {
       if (url === "/api/sessions/sesion-activa" && (init.method ?? "GET") === "PUT") {
         putBodies.push(JSON.parse(String(init.body)));
-        // la primera sustitución restaura a pendiente; la segunda completa
-        if (putBodies.length === 1) {
-          return {
-            status: 200,
-            body: {
-              session: sessionWithOccurrence(
-                occurrenceDoc(benchPress, [
-                  seriesDoc({ id: "serie-1", status: "pendiente", goal: { carga: 60, repeticiones: null, duracion: null } }),
-                ]),
-              ),
-            },
-          };
-        }
+        const sent = (putBodies[putBodies.length - 1] as {
+          exercises: {
+            series: {
+              status: SeriesStatus;
+              result: SeriesMagnitudes | null;
+              rpe: number | null;
+            }[];
+          }[];
+        }).exercises[0]!.series[0]!;
         return {
           status: 200,
           body: {
@@ -1196,9 +1208,13 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
               occurrenceDoc(benchPress, [
                 seriesDoc({
                   id: "serie-1",
-                  status: "completada",
+                  status: sent.status,
                   goal: { carga: 60, repeticiones: null, duracion: null },
-                  result: { carga: 62.5, repeticiones: 8, duracion: null },
+                  result:
+                    sent.status === "completada"
+                      ? (sent.result ?? { carga: null, repeticiones: null, duracion: null })
+                      : { carga: null, repeticiones: null, duracion: null },
+                  rpe: sent.rpe,
                 }),
               ]),
             ),
@@ -1216,24 +1232,100 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
     await user.click(
       await screen.findByRole("button", { name: /Press de banca con barra/ }),
     );
+    // la fila omitida ofrece los campos de resultado inicializados con los Objetivos
     const row = await screen.findByRole("group", { name: "Serie 1" });
-    await user.click(within(row).getByRole("button", { name: "Restaurar" }));
+    expect(within(row).getByText("Omitida")).toBeInTheDocument();
+    expect((within(row).getByLabelText("Carga (kg)") as HTMLInputElement).value).toBe("60");
 
-    // la fila vuelve a pendiente con los campos editables; completar sin un
-    // resultado completo señala el campo y no guarda
-    const restored = await screen.findByRole("group", { name: "Serie 1" });
-    expect(within(restored).getByText("Pendiente")).toBeInTheDocument();
-    await user.click(within(restored).getByRole("button", { name: "Completar" }));
-    expect(putBodies).toHaveLength(1);
+    // restaurar sin un resultado completo señala el campo y no guarda
+    await user.click(within(row).getByRole("button", { name: "Restaurar" }));
+    expect(putBodies).toHaveLength(0);
     expect(
-      await within(restored).findByText("Las repeticiones son obligatorias para completar la Serie."),
+      await within(row).findByText("Las repeticiones son obligatorias para completar la Serie."),
     ).toBeInTheDocument();
 
-    // introducir el resultado completo restaura como completada
-    await user.type(within(restored).getByLabelText(/Repeticiones/), "8");
-    await user.click(within(restored).getByRole("button", { name: "Completar" }));
+    // el resultado completo restaura como completada en una sola sustitución
+    await user.type(within(row).getByLabelText(/Repeticiones/), "8");
+    await user.click(within(row).getByRole("button", { name: "Restaurar" }));
+
     expect(await screen.findByText("Completada")).toBeInTheDocument();
-    expect(within(screen.getByRole("group", { name: "Serie 1" })).getByText(/62\.5 kg × 8 rep/)).toBeInTheDocument();
+    expect(putBodies).toHaveLength(1);
+    const restoreSent = (putBodies[0] as {
+      exercises: { series: { status: SeriesStatus; result: SeriesMagnitudes | null }[] }[];
+    }).exercises[0]!.series[0]!;
+    expect(restoreSent.status).toBe("completada");
+    expect(restoreSent.result).toEqual({ carga: 60, repeticiones: 8, duracion: null });
+    expect(
+      within(screen.getByRole("group", { name: "Serie 1" })).getByText(/60 kg × 8 rep/),
+    ).toBeInTheDocument();
+  });
+
+  test("restaurar una Serie omitida respeta la regla del RPE opcional y no guarda con uno inválido", async () => {
+    const occurrence = occurrenceDoc(pushUps, [
+      seriesDoc({ id: "serie-1", status: "omitida", goal: { carga: null, repeticiones: 8, duracion: null } }),
+    ]);
+    const putBodies: unknown[] = [];
+    stubFetch((url, init) => {
+      if (url === "/api/sessions/sesion-activa" && (init.method ?? "GET") === "PUT") {
+        putBodies.push(JSON.parse(String(init.body)));
+        const sent = (putBodies[putBodies.length - 1] as {
+          exercises: {
+            series: { status: SeriesStatus; result: SeriesMagnitudes | null; rpe: number | null }[];
+          }[];
+        }).exercises[0]!.series[0]!;
+        return {
+          status: 200,
+          body: {
+            session: sessionWithOccurrence(
+              occurrenceDoc(pushUps, [
+                seriesDoc({
+                  id: "serie-1",
+                  status: sent.status,
+                  goal: { carga: null, repeticiones: 8, duracion: null },
+                  result:
+                    sent.status === "completada"
+                      ? (sent.result ?? { carga: null, repeticiones: null, duracion: null })
+                      : { carga: null, repeticiones: null, duracion: null },
+                  rpe: sent.rpe,
+                }),
+              ]),
+            ),
+          },
+        };
+      }
+      if (url === "/api/sessions/sesion-activa") {
+        return { status: 200, body: { session: sessionWithOccurrence(occurrence) } };
+      }
+      return { status: 404, body: { error: { code: "NOT_FOUND", message: "no" } } };
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: /Flexiones/ }),
+    );
+    const row = await screen.findByRole("group", { name: "Serie 1" });
+    expect((within(row).getByLabelText("Repeticiones") as HTMLInputElement).value).toBe("8");
+
+    // un RPE fuera de los pasos de 0,5 señala el campo y no restaura
+    await user.type(within(row).getByLabelText(/RPE \(1-10\)/), "7.3");
+    await user.click(within(row).getByRole("button", { name: "Restaurar" }));
+    expect(putBodies).toHaveLength(0);
+    expect(
+      await within(row).findByText("El RPE admite pasos de 0,5."),
+    ).toBeInTheDocument();
+
+    // sin RPE el resultado completo restaura como completada
+    await user.clear(within(row).getByLabelText(/RPE \(1-10\)/));
+    await user.click(within(row).getByRole("button", { name: "Restaurar" }));
+
+    expect(await screen.findByText("Completada")).toBeInTheDocument();
+    const restoreSent = (putBodies[0] as {
+      exercises: { series: { status: SeriesStatus; result: SeriesMagnitudes | null; rpe: number | null }[] }[];
+    }).exercises[0]!.series[0]!;
+    expect(restoreSent.status).toBe("completada");
+    expect(restoreSent.result).toEqual({ carga: null, repeticiones: 8, duracion: null });
+    expect(restoreSent.rpe).toBeNull();
   });
 
   test("un Ejercicio añadido sin resultados en sus Series se elimina sin confirmación", async () => {
@@ -1354,6 +1446,12 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
     await user.click(bench);
     expect(screen.getByRole("button", { name: /Press de banca con barra/ })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("1 completadas · 1 pendientes")).toBeInTheDocument();
+
+    // pulsar el Ejercicio desplegado no pliega el último: la Sesión mantiene
+    // un Ejercicio desplegado en todo momento
+    await user.click(screen.getByRole("button", { name: /Press de banca con barra/ }));
+    expect(screen.getByRole("button", { name: /Press de banca con barra/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Sentadilla búlgara/ })).toHaveAttribute("aria-expanded", "false");
 
     await user.click(squats);
     expect(screen.getByRole("button", { name: /Press de banca con barra/ })).toHaveAttribute("aria-expanded", "false");
