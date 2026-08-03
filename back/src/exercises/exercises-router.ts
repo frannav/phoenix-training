@@ -16,6 +16,16 @@ import {
   type ExerciseUpdate,
 } from "./custom-exercises";
 import { listExercises } from "./list-exercises";
+import {
+  createRecordedMax,
+  deleteRecordedMax,
+  effectiveRecordedMax,
+  findOwnRecordedMax,
+  isDomainDate,
+  listRecordedMaxes,
+  toRecordedMaxDocument,
+  updateRecordedMax,
+} from "./recorded-max";
 
 export type ExercisesRouterDependencies = {
   database: AppDatabase;
@@ -98,8 +108,64 @@ const updateExerciseSchema = z
 
 const unauthorizedMessage = "Debes iniciar sesión para consultar los Ejercicios.";
 const notFoundMessage = "El Ejercicio solicitado no existe o no pertenece a tu Cuenta.";
+const recordedMaxNotFoundMessage = "El RM solicitado no existe o no pertenece a tu Cuenta.";
 const recordingModeImmutableMessage =
   "La Forma de registro de un Ejercicio publicado o utilizado no puede cambiar.";
+
+/** La carga admite de 0 a 9999,99 kg y como máximo dos decimales. */
+function hasAtMostTwoDecimals(value: number): boolean {
+  return Math.abs(Math.round(value * 100) - value * 100) < 1e-6;
+}
+
+const domainDateSchema = z
+  .string({ message: "Indica la fecha del RM." })
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener el formato AAAA-MM-DD.")
+  .refine(isDomainDate, "La fecha no es un día válido.");
+
+const recordedMaxLoadSchema = z
+  .number({ message: "Indica la carga en kilogramos." })
+  .min(0, "La carga no puede ser negativa.")
+  .max(9999.99, "La carga no puede superar los 9999,99 kg.")
+  .refine(hasAtMostTwoDecimals, "La carga admite como máximo dos decimales.");
+
+const recordedMaxRepetitionsSchema = z
+  .number({ message: "Indica el número de repeticiones." })
+  .int("Las repeticiones deben ser un número entero.")
+  .min(1, "Las repeticiones deben ser al menos 1.")
+  .max(9999, "Las repeticiones no pueden superar 9999.");
+
+const createRecordedMaxSchema = z
+  .object({
+    exerciseId: z
+      .string()
+      .trim()
+      .min(1, "Elige un Ejercicio.")
+      .max(200, "El identificador del Ejercicio no es válido."),
+    load: recordedMaxLoadSchema,
+    repetitions: recordedMaxRepetitionsSchema,
+    date: domainDateSchema,
+  })
+  .strict();
+
+const updateRecordedMaxSchema = z
+  .object({
+    load: recordedMaxLoadSchema.optional(),
+    repetitions: recordedMaxRepetitionsSchema.optional(),
+    date: domainDateSchema.optional(),
+  })
+  .strict();
+
+const effectiveRecordedMaxQuerySchema = z
+  .object({
+    exerciseId: z.string().trim().min(1).max(200),
+    repetitions: z.coerce
+      .number()
+      .int("Las repeticiones deben ser un número entero.")
+      .min(1, "Las repeticiones deben ser al menos 1.")
+      .max(9999, "Las repeticiones no pueden superar 9999."),
+    date: domainDateSchema,
+  })
+  .strict();
 
 function validationError(error: z.ZodError): ReturnType<typeof apiError> {
   const flattened = z.flattenError(error);
@@ -124,18 +190,25 @@ export function createExercisesRouter({
   // Toda la API de Ejercicios exige una Cuenta autenticada: la sesión se
   // obtiene del sistema de autenticación, nunca de un identificador del
   // cliente, y la ausencia de sesión responde 401 antes de tocar el dominio.
-  // Los patrones limitan el middleware a los destinos del módulo (la raíz y
-  // sus subrutas) para no interceptar otros sub-enrutadores montados en /api.
-  const requireAccount = async (context: Context<ExercisesRouterEnv>, next: () => Promise<void>) => {
+  // El middleware sin patrón se ejecuta para todas las peticiones bajo /api
+  // (los sub-enrutadores montados de Hono no ejecutan middleware con patrón),
+  // así que el prefijo de ruta acota la comprobación a los destinos del módulo
+  // y evita responder 401 por recursos de otros módulos.
+  router.use(async (context, next) => {
+    if (
+      !context.req.path.startsWith("/api/exercises") &&
+      !context.req.path.startsWith("/api/rms")
+    ) {
+      await next();
+      return;
+    }
     const userId = await authenticatedUserId(context.req.raw);
     if (!userId) {
       return context.json(apiError("UNAUTHORIZED", unauthorizedMessage), 401);
     }
     context.set("accountId", userId);
     await next();
-  };
-  router.use("/exercises", requireAccount);
-  router.use("/exercises/*", requireAccount);
+  });
 
   router.get("/exercises", async (context) => {
     const userId = context.get("accountId");
@@ -273,6 +346,116 @@ export function createExercisesRouter({
 
   router.post("/exercises/:exerciseId/restore", async (context) => {
     return setAvailability(context, true);
+  });
+
+  // ---- RM registrados ---------------------------------------------------
+  //
+  // Los RM los introduce expresamente el Deportista para un Ejercicio, una
+  // carga, un número de repeticiones y una fecha. Registrar una Serie nunca
+  // crea ni actualiza un RM automáticamente, y la aplicación no calcula ni
+  // presenta 1RM estimado: no existe ninguna ruta que derive RM.
+
+  router.get("/rms", async (context) => {
+    const items = await listRecordedMaxes(database, {
+      accountId: context.get("accountId"),
+    });
+    return context.json({ items });
+  });
+
+  // Antes de /rms/:recordedMaxId para que "effective" no se capture como id.
+  router.get("/rms/effective", async (context) => {
+    const parsed = effectiveRecordedMaxQuerySchema.safeParse(context.req.query());
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
+    const target = await findExerciseForAccount(database, {
+      accountId: context.get("accountId"),
+      exerciseId: parsed.data.exerciseId,
+    });
+    if (!target) {
+      return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
+    }
+
+    const rm = await effectiveRecordedMax(database, {
+      accountId: context.get("accountId"),
+      exerciseId: parsed.data.exerciseId,
+      repetitions: parsed.data.repetitions,
+      date: parsed.data.date,
+    });
+    return context.json({ rm });
+  });
+
+  router.post("/rms", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = createRecordedMaxSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
+    const outcome = await createRecordedMax(database, {
+      accountId: context.get("accountId"),
+      input: parsed.data,
+      now: now(),
+    });
+    if (!outcome.ok) {
+      return context.json(
+        apiError("VALIDATION_ERROR", "La petición no es válida.", {
+          exerciseId: [notFoundMessage],
+        }),
+        400,
+      );
+    }
+    return context.json({ rm: outcome.rm }, 201);
+  });
+
+  router.get("/rms/:recordedMaxId", async (context) => {
+    const row = await findOwnRecordedMax(database, {
+      accountId: context.get("accountId"),
+      recordedMaxId: context.req.param("recordedMaxId"),
+    });
+    if (!row) {
+      return context.json(apiError("NOT_FOUND", recordedMaxNotFoundMessage), 404);
+    }
+    return context.json({ rm: toRecordedMaxDocument(row) });
+  });
+
+  router.put("/rms/:recordedMaxId", async (context) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = updateRecordedMaxSchema.safeParse(body);
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+    if (Object.keys(parsed.data).length === 0) {
+      return context.json(
+        apiError("VALIDATION_ERROR", "La petición no es válida.", {
+          form: ["Indica al menos un dato para editar el RM."],
+        }),
+        400,
+      );
+    }
+
+    const outcome = await updateRecordedMax(database, {
+      accountId: context.get("accountId"),
+      recordedMaxId: context.req.param("recordedMaxId"),
+      update: parsed.data,
+      now: now(),
+    });
+    if (!outcome.ok) {
+      return context.json(apiError("NOT_FOUND", recordedMaxNotFoundMessage), 404);
+    }
+    return context.json({ rm: outcome.rm });
+  });
+
+  router.delete("/rms/:recordedMaxId", async (context) => {
+    const outcome = await deleteRecordedMax(database, {
+      accountId: context.get("accountId"),
+      recordedMaxId: context.req.param("recordedMaxId"),
+    });
+    if (!outcome.ok) {
+      return context.json(apiError("NOT_FOUND", recordedMaxNotFoundMessage), 404);
+    }
+    return context.json({ rm: outcome.rm });
   });
 
   return router;

@@ -16,6 +16,7 @@ import { apiError, type ApiError, type ApiErrorCode } from "./http/api-error";
 import { opaqueCursorKey } from "./http/opaque-cursor";
 import { createExercisesRouter } from "./exercises/exercises-router";
 import { createSessionsRouter } from "./sessions/sessions-router";
+import { createRoutinesRouter } from "./routines/routines-router";
 import type { MailAdapter } from "./mail/mail-adapter";
 
 export type AuthDependencies = {
@@ -391,6 +392,15 @@ export function createApp({
     app.route(
       "/api",
       createSessionsRouter({
+        database,
+        authenticatedUserId,
+        now,
+      }),
+    );
+
+    app.route(
+      "/api",
+      createRoutinesRouter({
         database,
         authenticatedUserId,
         now,

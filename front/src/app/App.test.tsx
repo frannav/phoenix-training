@@ -61,6 +61,22 @@ describe("application navigation", () => {
         if (url.startsWith("/api/exercises")) {
           return Response.json({ items: [], nextCursor: null });
         }
+        if (url === "/api/routines") {
+          return Response.json({ items: [] });
+        }
+        if (url === "/api/routines/rutina-opaca") {
+          return Response.json({
+            routine: {
+              id: "rutina-opaca",
+              name: "Detalle de la Rutina",
+              revision: 1,
+              archived: false,
+              createdAt: "2025-08-01T10:00:00.000Z",
+              updatedAt: "2025-08-01T10:00:00.000Z",
+              exercises: [],
+            },
+          });
+        }
         return Response.json({
           status: "ok",
           database: "ready",

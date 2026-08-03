@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * Formas de registro del dominio: determinan qué magnitudes se prescriben y
@@ -146,10 +146,118 @@ export const exercise = sqliteTable(
 );
 
 /**
+ * Rutina reutilizable privada de una Cuenta: plantilla compuesta por
+ * Ejercicios ordenados con sus Series previstas y Objetivos de serie. La
+ * revisión entera habilita la concurrencia optimista: toda sustitución
+ * envía la revisión leída y recibe el documento canónico con la revisión
+ * incrementada. Archivada retira la Rutina de los usos nuevos sin romper
+ * las referencias existentes; no se elimina definitivamente en el MVP.
+ */
+export const routine = sqliteTable(
+  "routine",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    revision: integer("revision").notNull().default(1),
+    archived: integer("archived", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("routine_account_idx").on(table.accountId)],
+);
+
+/**
+ * Aparición de un Ejercicio dentro de una Rutina, en orden. La identidad
+ * es opaca y la conserva la edición que reutiliza la misma entrada; los
+ * nuevos Ejercicios reciben su identidad del servidor.
+ */
+export const routineExercise = sqliteTable(
+  "routine_exercise",
+  {
+    id: text("id").primaryKey(),
+    routineId: text("routine_id")
+      .notNull()
+      .references(() => routine.id, { onDelete: "cascade" }),
+    exerciseId: text("exercise_id")
+      .notNull()
+      .references(() => exercise.id),
+    position: integer("position").notNull(),
+  },
+  (table) => [index("routine_exercise_routine_idx").on(table.routineId)],
+);
+
+/**
+ * Objetivos de serie previstos de una aparición: carga, repeticiones y
+ * duración se omiten de manera independiente y, cuando existen, cumplen
+ * los límites de dominio de la Forma de registro correspondiente.
+ */
+export const routineSeriesGoal = sqliteTable(
+  "routine_series_goal",
+  {
+    id: text("id").primaryKey(),
+    routineExerciseId: text("routine_exercise_id")
+      .notNull()
+      .references(() => routineExercise.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    carga: real("carga"),
+    repeticiones: integer("repeticiones"),
+    duracion: integer("duracion"),
+  },
+  (table) => [index("routine_series_goal_exercise_idx").on(table.routineExerciseId)],
+);
+
+/**
  * Manifiesto del catálogo: fija la revisión y el checksum del snapshot de
  * origen auditado. La carga versionada verifica estos datos antes de
  * publicar cualquier Ejercicio.
  */
+/**
+ * RM registrado: mejor marca real de un Ejercicio declarada expresamente por
+ * el Deportista, asociada a una fecha y un número de repeticiones. Pertenece
+ * a la Cuenta autenticada y puede referenciar Ejercicios del catálogo o
+ * personalizados, incluso si después dejan de estar disponibles para usos
+ * nuevos: el Ejercicio no se elimina nunca de forma definitiva.
+ *
+ * El RM vigente para un Ejercicio y número de repeticiones en una fecha es
+ * el registro más reciente de esa fecha o anterior. Registrar una Serie no
+ * crea ni actualiza RM automáticamente: solo existen los que el Deportista
+ * introduce expresamente, y la aplicación no calcula 1RM estimado.
+ */
+export const recordedMax = sqliteTable(
+  "recorded_max",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    exerciseId: text("exercise_id")
+      .notNull()
+      .references(() => exercise.id, { onDelete: "cascade" }),
+    /** Carga en kilogramos, de 0 a 9999,99 con como máximo dos decimales. */
+    load: real("load").notNull(),
+    /** Número de repeticiones, entero de 1 a 9999. */
+    repetitions: integer("repetitions").notNull(),
+    /** Fecha de dominio del RM en formato YYYY-MM-DD. */
+    date: text("date").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    // Sirve a la vigencia por Ejercicio, repeticiones y fecha (WHERE cuenta,
+    // ejercicio, repeticiones y fecha <= ... ORDER BY fecha DESC) y al
+    // listado de la Cuenta (prefijo account_id + orden por fecha).
+    index("recorded_max_account_exercise_reps_date_idx").on(
+      table.accountId,
+      table.exerciseId,
+      table.repetitions,
+      table.date,
+    ),
+  ],
+);
+
 /**
  * Sesión de entrenamiento del dominio. Una Sesión libre comienza sin origen;
  * más adelante podrá originarse en un Entrenamiento planificado o una Rutina.
