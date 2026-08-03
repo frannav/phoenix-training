@@ -743,8 +743,14 @@ describe("gestión de RM registrados", () => {
     await user.click(form.getByRole("button", { name: "Guardar cambios" }));
 
     await waitFor(() => expect(payloads).toHaveLength(1));
-    expect(payloads[0]).toMatchObject({ id: recordedMax.id });
-    expect(payloads[0]).toMatchObject({ body: { load: 142.5, repetitions: 4, date: "2025-06-12" } });
+    // El cuerpo del PUT es exacto: la edición no envía exerciseId porque el
+    // servidor valida con un esquema estricto y la marca no puede moverse a
+    // otro Ejercicio. toEqual sobre el payload completo detecta el extra.
+    expect(payloads[0]).toEqual({
+      id: recordedMax.id,
+      body: { load: 142.5, repetitions: 4, date: "2025-06-12" },
+    });
+    expect(payloads[0]).not.toHaveProperty("body.exerciseId");
     expect(
       await screen.findByText("142,5 kg × 4 rep · 12/06/2025"),
     ).toBeInTheDocument();

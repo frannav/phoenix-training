@@ -94,7 +94,14 @@ export function RecordedMaxSection() {
 
   const handleFormSubmit = async (values: RecordedMaxFormValues) => {
     if (formState?.mode === "edit") {
-      await updateMutation.mutateAsync({ id: formState.rm.id, values });
+      // El servidor valida la edición con un esquema estricto que rechaza
+      // exerciseId: la marca no puede moverse a otro Ejercicio. Se envía
+      // solo carga, repeticiones y fecha.
+      const { load, repetitions, date } = values;
+      await updateMutation.mutateAsync({
+        id: formState.rm.id,
+        values: { load, repetitions, date },
+      });
       return;
     }
     await createMutation.mutateAsync(values);
