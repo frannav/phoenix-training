@@ -11,11 +11,9 @@ import { HomePage } from "../features/dashboard/pages/HomePage";
 import { ExercisesPage } from "../features/exercises/pages/ExercisesPage";
 import { HistoryDetailPage, HistoryPage } from "../features/history/pages/HistoryPage";
 import { NewPlanPage, PlanDetailPage, PlansPage } from "../features/plans/pages/PlansPage";
-import {
-  NewRoutinePage,
-  RoutineDetailPage,
-  RoutinesPage,
-} from "../features/routines/pages/RoutinesPage";
+import { RoutinesPage } from "../features/routines/pages/RoutinesPage";
+import { NewRoutinePage } from "../features/routines/pages/NewRoutinePage";
+import { RoutineDetailPage } from "../features/routines/pages/RoutineDetailPage";
 import { ActiveSessionPage } from "../features/sessions/pages/ActiveSessionPage";
 import { AppShell } from "./AppShell";
 import { RequireAccount } from "./RequireAccount";

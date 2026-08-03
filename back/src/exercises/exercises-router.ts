@@ -124,9 +124,15 @@ export function createExercisesRouter({
   // Toda la API de Ejercicios exige una Cuenta autenticada: la sesión se
   // obtiene del sistema de autenticación, nunca de un identificador del
   // cliente, y la ausencia de sesión responde 401 antes de tocar el dominio.
-  // El sub-enrutador solo recibe rutas /exercises (montado bajo /api), así
-  // que el middleware sin patrón cubre exactamente los destinos del módulo.
+  // El middleware sin patrón se ejecuta para todas las peticiones bajo /api
+  // (los sub-enrutadores montados de Hono no ejecutan middleware con patrón),
+  // así que el prefijo de ruta acota la comprobación a los destinos del módulo
+  // y evita responder 401 por recursos de otros módulos.
   router.use(async (context, next) => {
+    if (!context.req.path.startsWith("/api/exercises")) {
+      await next();
+      return;
+    }
     const userId = await authenticatedUserId(context.req.raw);
     if (!userId) {
       return context.json(apiError("UNAUTHORIZED", unauthorizedMessage), 401);
