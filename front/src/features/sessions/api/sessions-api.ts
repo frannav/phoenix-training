@@ -105,8 +105,25 @@ export async function getActiveSession(): Promise<{ session: SessionDocument | n
   return { session: body.session ?? null };
 }
 
+/** Entrada de inicio de una Sesión según su Origen de sesión: libre, desde una Rutina o desde un Entrenamiento planificado. */
+export type SessionStartInput =
+  | { origin: "libre" }
+  | { origin: "rutina"; routineId: string }
+  | { origin: "plan"; planId: string; trainingId: string };
+
+/**
+ * Inicia una Sesión desde un Origen —Rutina o Entrenamiento planificado
+ * pendiente— o libre. Si la Cuenta ya tiene una Sesión activa, la respuesta
+ * es un conflicto recuperable con su identificador para abrir la existente.
+ */
+export async function startSession(
+  input: SessionStartInput,
+): Promise<{ session: SessionDocument }> {
+  return apiPost<{ session: SessionDocument }>("/api/sessions", input);
+}
+
 export async function startFreeSession(): Promise<{ session: SessionDocument }> {
-  return apiPost<{ session: SessionDocument }>("/api/sessions", { origin: "libre" });
+  return startSession({ origin: "libre" });
 }
 
 export async function getSession(id: string): Promise<{ session: SessionDocument }> {

@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { stubFetch } from "../../../test/mock-fetch";
 import type { ExerciseItem } from "../../exercises/api/exercises-api";
+import type { SessionDocument } from "../../sessions/api/sessions-api";
 import type { RoutineItem } from "../api/routines-api";
 import { NewRoutinePage } from "./NewRoutinePage";
 import { RoutineDetailPage } from "./RoutineDetailPage";
@@ -73,6 +74,10 @@ type RoutineHandlers = {
   archive?: (id: string) => RoutineItem;
   restore?: (id: string) => RoutineItem;
   availableExercises?: (q: string) => ExerciseItem[];
+  /** Inicio de una Sesión desde un Origen: responde al POST /api/sessions. */
+  startSession?: (body: unknown) => { status: number; body: unknown };
+  /** Sesión activa vigente de la Cuenta para el conflicto recuperable. */
+  activeSession?: () => SessionDocument | null;
 };
 
 function stubRoutines(handlers: RoutineHandlers) {
@@ -112,6 +117,12 @@ function stubRoutines(handlers: RoutineHandlers) {
         },
       };
     }
+    if (parsed.pathname === "/api/sessions" && method === "POST") {
+      return handlers.startSession!(body);
+    }
+    if (parsed.pathname === "/api/sessions/active" && method === "GET") {
+      return { status: 200, body: { session: handlers.activeSession?.() ?? null } };
+    }
     return { status: 404, body: { error: { code: "NOT_FOUND", message: "no" } } };
   });
 }
@@ -123,6 +134,31 @@ function renderWithRoutes(initialPath: string, routes: ReactNode) {
       <MemoryRouter initialEntries={[initialPath]}>{routes}</MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+/** Sesión activa creada desde una Rutina, tal como la entrega la API. */
+function sessionFixture(overrides: Partial<SessionDocument> = {}): SessionDocument {
+  return {
+    id: "77777777777777777777777777777777",
+    revision: 1,
+    origin: "rutina",
+    status: "activa",
+    datePerformed: "2025-08-06",
+    plannedDate: null,
+    routineId: "11111111111111111111111111111111",
+    planTrainingId: null,
+    lastExerciseId: null,
+    exercises: [],
+    startedAt: "2025-08-06T09:00:00.000Z",
+    updatedAt: "2025-08-06T09:00:00.000Z",
+    ...overrides,
+  };
+}
+
+/** Destino de la Sesión: muestra el identificador al que se navegó. */
+function SessionRoute() {
+  const { sesionId } = useParams<{ sesionId: string }>();
+  return <div>Sesión {sesionId}</div>;
 }
 
 describe("listado de Rutinas", () => {
@@ -485,5 +521,124 @@ describe("editar una Rutina", () => {
     );
     await waitFor(() => expect(refetches.count).toBeGreaterThan(fetchesBefore));
     expect(await screen.findByLabelText("Nombre de la Rutina")).toHaveValue("Día de empuje");
+  });
+});
+
+describe("iniciar una Sesión desde una Rutina", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  test("una Rutina disponible ofrece Iniciar y abre la Sesión creada desde ella", async () => {
+    const user = userEvent.setup();
+    const routine = routineFixture();
+    const posts: unknown[] = [];
+    const created = sessionFixture();
+    stubRoutines({
+      list: () => [routine],
+      get: () => routine,
+      startSession: (body) => {
+        posts.push(body);
+        return { status: 201, body: { session: created } };
+      },
+    });
+    renderWithRoutes(
+      `/rutinas/${routine.id}`,
+      <Routes>
+        <Route path="/rutinas/:rutinaId" element={<RoutineDetailPage />} />
+        <Route path="/sesion/:sesionId" element={<SessionRoute />} />
+      </Routes>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Iniciar" }));
+
+    expect(posts).toEqual([{ origin: "rutina", routineId: routine.id }]);
+    expect(await screen.findByText(`Sesión ${created.id}`)).toBeInTheDocument();
+  });
+
+  test("si ya existe una Sesión activa, Iniciar conduce a ella sin crear otra", async () => {
+    const user = userEvent.setup();
+    const routine = routineFixture();
+    const existing = sessionFixture({
+      id: "99999999999999999999999999999999",
+      revision: 3,
+    });
+    stubRoutines({
+      list: () => [routine],
+      get: () => routine,
+      startSession: () => ({
+        status: 409,
+        body: {
+          error: {
+            code: "ACTIVE_SESSION_EXISTS",
+            message: "Ya tienes una Sesión activa.",
+            sessionId: existing.id,
+          },
+        },
+      }),
+      activeSession: () => existing,
+    });
+    renderWithRoutes(
+      `/rutinas/${routine.id}`,
+      <Routes>
+        <Route path="/rutinas/:rutinaId" element={<RoutineDetailPage />} />
+        <Route path="/sesion/:sesionId" element={<SessionRoute />} />
+      </Routes>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Iniciar" }));
+
+    expect(await screen.findByText(`Sesión ${existing.id}`)).toBeInTheDocument();
+  });
+
+  test("una Rutina archivada no ofrece Iniciar para usos nuevos", async () => {
+    const archived = routineFixture({ archived: true });
+    stubRoutines({ list: () => [archived], get: () => archived });
+    renderWithRoutes(
+      `/rutinas/${archived.id}`,
+      <Routes>
+        <Route path="/rutinas/:rutinaId" element={<RoutineDetailPage />} />
+      </Routes>,
+    );
+
+    expect(await screen.findByLabelText("Nombre de la Rutina")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Iniciar" })).not.toBeInTheDocument();
+  });
+
+  test("un fallo al iniciar muestra el error del servidor sin navegar", async () => {
+    const user = userEvent.setup();
+    const routine = routineFixture();
+    stubRoutines({
+      list: () => [routine],
+      get: () => routine,
+      startSession: () => ({
+        status: 404,
+        body: {
+          error: {
+            code: "NOT_FOUND",
+            message: "La Rutina no existe o no pertenece a tu Cuenta.",
+          },
+        },
+      }),
+    });
+    renderWithRoutes(
+      `/rutinas/${routine.id}`,
+      <Routes>
+        <Route path="/rutinas/:rutinaId" element={<RoutineDetailPage />} />
+        <Route path="/sesion/:sesionId" element={<SessionRoute />} />
+      </Routes>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Iniciar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /no existe o no pertenece/i,
+    );
+    expect(screen.queryByText(/^Sesión /)).not.toBeInTheDocument();
   });
 });

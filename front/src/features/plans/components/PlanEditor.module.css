@@ -118,6 +118,28 @@
   color: var(--color-accent-strong);
 }
 
+/* Acciones de un Entrenamiento pendiente de un Plan activo: iniciar la
+   Sesión desde él u omitirlo. */
+.trainingActions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-self: start;
+}
+
+.startTraining {
+  border: 0;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+}
+
+.startTraining:disabled {
+  opacity: 0.6;
+}
+
 /* Fecha prevista de un Entrenamiento pendiente de un Plan activo: se
    presenta etiquetada como «Prevista» para no confundirla con una Fecha
    realizada. */

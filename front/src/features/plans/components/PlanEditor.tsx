@@ -447,6 +447,10 @@ type PlanEditorProps = {
   onRequestOmit?: (training: { id: string; day: number; plannedDate: string | null }) => void;
   /** Pide al padre devolver a pendiente un día omitido de un Plan activo. */
   onRequestRestore?: (training: { id: string; day: number; plannedDate: string | null }) => void;
+  /** Pide al padre iniciar una Sesión desde un Entrenamiento planificado pendiente. */
+  onRequestStart?: (training: { id: string; day: number; plannedDate: string | null }) => void;
+  /** El padre está iniciando una Sesión: deshabilita los botones de inicio. */
+  startPending?: boolean;
 };
 
 export function PlanEditor({
@@ -457,6 +461,8 @@ export function PlanEditor({
   onConflict,
   onRequestOmit,
   onRequestRestore,
+  onRequestStart,
+  startPending,
 }: PlanEditorProps) {
   const [name, setName] = useState(plan?.name ?? "");
   const [weeks, setWeeks] = useState<EditorWeek[]>(() =>
@@ -822,6 +828,17 @@ export function PlanEditor({
               const isClosed =
                 isActive &&
                 (training.status === "omitido" || training.status === "realizado");
+              // Identificador persistido del Entrenamiento pendiente: solo un
+              // día pendiente con identidad puede iniciar una Sesión (una
+              // entrada recién añadida sin guardar todavía no existe en el
+              // servidor). Se captura en una constante para conservar el
+              // estrechamiento dentro del manejador del botón.
+              const startTrainingId =
+                isActive &&
+                onRequestStart !== undefined &&
+                training.status === "pendiente"
+                  ? training.id
+                  : undefined;
               if (isClosed) {
                 const plannedLabel =
                   training.plannedDate === null ? "" : formatDomainDate(training.plannedDate);
@@ -935,20 +952,40 @@ export function PlanEditor({
                     </p>
                   )}
 
-                  {isActive && onRequestOmit && (
-                    <button
-                      type="button"
-                      className={styles.omitTraining}
-                      onClick={() =>
-                        onRequestOmit({
-                          id: training.id ?? "",
-                          day: Number(training.day),
-                          plannedDate: training.plannedDate,
-                        })
-                      }
-                    >
-                      Omitir este día
-                    </button>
+                  {isActive && (onRequestOmit || startTrainingId !== undefined) && (
+                    <div className={styles.trainingActions}>
+                      {onRequestStart && startTrainingId !== undefined && (
+                        <button
+                          type="button"
+                          className={styles.startTraining}
+                          disabled={startPending}
+                          onClick={() =>
+                            onRequestStart({
+                              id: startTrainingId,
+                              day: Number(training.day),
+                              plannedDate: training.plannedDate,
+                            })
+                          }
+                        >
+                          {startPending ? "Iniciando…" : "Iniciar"}
+                        </button>
+                      )}
+                      {onRequestOmit && (
+                        <button
+                          type="button"
+                          className={styles.omitTraining}
+                          onClick={() =>
+                            onRequestOmit({
+                              id: training.id ?? "",
+                              day: Number(training.day),
+                              plannedDate: training.plannedDate,
+                            })
+                          }
+                        >
+                          Omitir este día
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   <div className={styles.sourceToggle} role="group" aria-label="Contenido del Entrenamiento">

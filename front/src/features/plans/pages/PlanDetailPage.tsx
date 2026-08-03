@@ -19,6 +19,7 @@ import {
 } from "../api/plans-api";
 import { ActivatePlanPanel } from "../components/ActivatePlanPanel";
 import { PlanEditor } from "../components/PlanEditor";
+import { useStartSession } from "../../sessions/api/use-start-session";
 import styles from "./PlansPage.module.css";
 
 type ConfirmTarget =
@@ -83,6 +84,8 @@ export function PlanDetailPage() {
     queryFn: () => getPlan(planId ?? ""),
     retry: false,
   });
+
+  const startMutation = useStartSession();
 
   if (planQuery.isPending) {
     return <p className={styles.status}>Cargando el Plan…</p>;
@@ -170,6 +173,14 @@ export function PlanDetailPage() {
         </p>
       )}
 
+      {startMutation.isError && (
+        <p className={styles.error} role="alert">
+          {startMutation.error instanceof ApiRequestError
+            ? startMutation.error.message
+            : "No se pudo iniciar la Sesión. Inténtalo de nuevo."}
+        </p>
+      )}
+
       {plan.status === "borrador" && (
         <>
           <ActivatePlanPanel
@@ -218,6 +229,14 @@ export function PlanDetailPage() {
             onRequestRestore={(training) => {
               void runAction(() => restoreTraining(plan.id, training.id, plan.revision));
             }}
+            onRequestStart={(training) => {
+              startMutation.mutate({
+                origin: "plan",
+                planId: plan.id,
+                trainingId: training.id,
+              });
+            }}
+            startPending={startMutation.isPending}
           />
           <div className={styles.planActions}>
             <button
