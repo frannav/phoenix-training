@@ -72,7 +72,7 @@ type RoutineHandlers = {
   replace?: (id: string, body: unknown) => { status: number; body: unknown };
   archive?: (id: string) => RoutineItem;
   restore?: (id: string) => RoutineItem;
-  availableExercises?: () => ExerciseItem[];
+  availableExercises?: (q: string) => ExerciseItem[];
 };
 
 function stubRoutines(handlers: RoutineHandlers) {
@@ -106,7 +106,10 @@ function stubRoutines(handlers: RoutineHandlers) {
     if (parsed.pathname === "/api/exercises" && method === "GET") {
       return {
         status: 200,
-        body: { items: handlers.availableExercises?.() ?? [press, sprints], nextCursor: null },
+        body: {
+          items: handlers.availableExercises?.(parsed.searchParams.get("q") ?? "") ?? [press, sprints],
+          nextCursor: null,
+        },
       };
     }
     return { status: 404, body: { error: { code: "NOT_FOUND", message: "no" } } };
@@ -248,6 +251,43 @@ describe("crear una Rutina", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+  });
+
+  test("buscar un Ejercicio filtra el listado sin enviar el formulario de la Rutina", async () => {
+    const user = userEvent.setup();
+    const queries: string[] = [];
+    const createCalls: unknown[] = [];
+    stubRoutines({
+      list: () => [],
+      create: (body) => {
+        createCalls.push(body);
+        return routineFixture();
+      },
+      availableExercises: (q) => {
+        queries.push(q);
+        return q.toLowerCase().includes("press") ? [press] : [press, sprints];
+      },
+    });
+    renderWithRoutes(
+      "/rutinas/nueva",
+      <Routes>
+        <Route path="/rutinas/nueva" element={<NewRoutinePage />} />
+      </Routes>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Añadir ejercicio" }));
+    const picker = screen.getByRole("region", { name: "Añadir Ejercicio a la Rutina" });
+    const search = within(picker).getByRole("searchbox", {
+      name: "Buscar Ejercicios disponibles",
+    });
+    await user.type(search, "press");
+    await user.click(within(picker).getByRole("button", { name: "Buscar" }));
+
+    expect(await within(picker).findByText("Press de banca con barra")).toBeInTheDocument();
+    expect(within(picker).queryByText("Sprints")).not.toBeInTheDocument();
+    expect(queries).toContain("press");
+    expect(screen.queryByText("Escribe un nombre para la Rutina.")).not.toBeInTheDocument();
+    expect(createCalls).toHaveLength(0);
   });
 
   test("valida el borrador y envía el agregado con Ejercicios ordenados y Objetivos", async () => {

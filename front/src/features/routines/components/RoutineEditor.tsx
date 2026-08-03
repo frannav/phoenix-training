@@ -230,14 +230,13 @@ function ExercisePicker({ selectedExerciseIds, onPick, onClose }: ExercisePicker
     retry: false,
   });
 
-  const applySearch = (event: FormEvent) => {
-    event.preventDefault();
+  const applySearch = () => {
     setQ(search.trim());
   };
 
   return (
     <div className={styles.pickerPanel} role="region" aria-label="Añadir Ejercicio a la Rutina">
-      <form className={styles.pickerSearch} onSubmit={applySearch} role="search">
+      <div className={styles.pickerSearch} role="search">
         <label className={styles.visuallyHidden} htmlFor="rutina-picker-busqueda">
           Buscar Ejercicios disponibles
         </label>
@@ -248,11 +247,17 @@ function ExercisePicker({ selectedExerciseIds, onPick, onClose }: ExercisePicker
           placeholder="Buscar por nombre (p. ej. «press»)"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              applySearch();
+            }
+          }}
         />
-        <button className={styles.pickerButton} type="submit">
+        <button className={styles.pickerButton} type="button" onClick={applySearch}>
           Buscar
         </button>
-      </form>
+      </div>
 
       {exercisesQuery.isPending && (
         <p className={styles.pickerStatus}>Buscando Ejercicios…</p>
