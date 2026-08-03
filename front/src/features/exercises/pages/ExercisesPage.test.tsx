@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -10,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { stubFetch } from "../../../test/mock-fetch";
-import type { ExerciseItem } from "../api/exercises-api";
+import type { ExerciseItem, RecordedMax } from "../api/exercises-api";
 import { ExercisesPage } from "./ExercisesPage";
 
 function renderPage() {
@@ -534,6 +535,268 @@ describe("gestión de Ejercicios personalizados", () => {
     );
     expect(
       await screen.findByRole("button", { name: "Archivar Peso muerto rumano" }),
+    ).toBeInTheDocument();
+  });
+});
+
+const recordedMax: RecordedMax = {
+  id: "11111111111111111111111111111111",
+  exerciseId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  exerciseName: "Press de banca con barra",
+  load: 140,
+  repetitions: 5,
+  date: "2025-06-10",
+};
+
+const customExerciseForRm: ExerciseItem = {
+  id: "22222222222222222222222222222222",
+  name: "Peso muerto rumano",
+  instructions:
+    "Baja la barra hasta la mitad de la espinilla manteniendo la espalda recta.",
+  recordingMode: "fuerza_con_carga",
+  category: "Pierna",
+  bodyPart: "Isquiotibiales",
+  equipment: "Barra",
+  provenance: "personalizado",
+  available: true,
+};
+
+function stubRmFlows(handlers: {
+  exercises: () => ExerciseItem[];
+  rms: () => RecordedMax[];
+  onCreate?: (body: unknown) => RecordedMax;
+  onUpdate?: (id: string, body: unknown) => RecordedMax;
+  onDelete?: (id: string) => RecordedMax;
+}) {
+  stubFetch((url, init) => {
+    const parsed = new URL(url, "http://test");
+    const method = init.method ?? "GET";
+    if (parsed.pathname === "/api/exercises/categories") {
+      return { status: 200, body: { categories: ["Pecho", "Pierna"] } };
+    }
+    if (parsed.pathname === "/api/exercises/archived") {
+      return { status: 200, body: { items: [] } };
+    }
+    if (parsed.pathname === "/api/exercises" && method === "GET") {
+      return { status: 200, body: { items: handlers.exercises(), nextCursor: null } };
+    }
+    if (parsed.pathname === "/api/rms" && method === "GET") {
+      return { status: 200, body: { items: handlers.rms() } };
+    }
+    if (parsed.pathname === "/api/rms" && method === "POST") {
+      const body = JSON.parse(String(init.body)) as unknown;
+      return { status: 201, body: { rm: handlers.onCreate!(body) } };
+    }
+    const rmMatch = parsed.pathname.match(/^\/api\/rms\/([0-9a-f]+)$/);
+    if (rmMatch && method === "PUT") {
+      const body = JSON.parse(String(init.body)) as unknown;
+      return { status: 200, body: { rm: handlers.onUpdate!(rmMatch[1]!, body) } };
+    }
+    if (rmMatch && method === "DELETE") {
+      return { status: 200, body: { rm: handlers.onDelete!(rmMatch[1]!) } };
+    }
+    return { status: 404, body: { error: { code: "NOT_FOUND", message: "no" } } };
+  });
+}
+
+describe("gestión de RM registrados", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  test("lista los RM con Ejercicio, carga, repeticiones y fecha", async () => {
+    stubRmFlows({
+      exercises: () => [benchPress, customExerciseForRm],
+      rms: () => [recordedMax],
+    });
+    renderPage();
+
+    const item = await screen.findByText("Press de banca con barra");
+    expect(item).toBeInTheDocument();
+    const row = within(item.closest("li")!);
+    expect(row.getByText("140 kg × 5 rep · 10/06/2025")).toBeInTheDocument();
+    expect(
+      row.getByRole("button", { name: "Editar RM de Press de banca con barra" }),
+    ).toBeInTheDocument();
+    expect(
+      row.getByRole("button", { name: "Eliminar RM de Press de banca con barra" }),
+    ).toBeInTheDocument();
+  });
+
+  test("muestra un estado vacío cuando no hay marcas registradas", async () => {
+    stubRmFlows({ exercises: () => [benchPress], rms: () => [] });
+    renderPage();
+
+    expect(
+      await screen.findByText(/Aún no has registrado ninguna marca real/i),
+    ).toBeInTheDocument();
+  });
+
+  test("crea un RM con validación explícita de Ejercicio, carga, repeticiones y fecha", async () => {
+    const user = userEvent.setup();
+    let rms: RecordedMax[] = [];
+    const payloads: unknown[] = [];
+    stubRmFlows({
+      exercises: () => [benchPress, customExerciseForRm],
+      rms: () => rms,
+      onCreate: (body) => {
+        payloads.push(body);
+        const values = body as { exerciseId: string; load: number; repetitions: number; date: string };
+        const rm: RecordedMax = {
+          id: "33333333333333333333333333333333",
+          exerciseId: values.exerciseId,
+          exerciseName:
+            values.exerciseId === benchPress.id
+              ? benchPress.name
+              : customExerciseForRm.name,
+          load: values.load,
+          repetitions: values.repetitions,
+          date: values.date,
+        };
+        rms = [rm];
+        return rm;
+      },
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Nuevo RM" }));
+    const form = within(await screen.findByRole("region", { name: "Nuevo RM" }));
+
+    // enviar vacío muestra las validaciones junto a cada campo
+    await user.click(form.getByRole("button", { name: "Registrar RM" }));
+    expect(await form.findByText("Elige un Ejercicio.")).toBeInTheDocument();
+    expect(form.getByText("Indica la carga en kilogramos.")).toBeInTheDocument();
+    expect(form.getByText("Indica el número de repeticiones.")).toBeInTheDocument();
+    expect(form.getByText("Indica la fecha del RM.")).toBeInTheDocument();
+
+    // el selector ofrece los Ejercicios disponibles
+    const exerciseSelect = form.getByLabelText("Ejercicio") as HTMLSelectElement;
+    const optionNames = [...exerciseSelect.options].map((option) => option.text);
+    expect(optionNames).toContain("Press de banca con barra");
+    expect(optionNames).toContain("Peso muerto rumano");
+
+    await user.selectOptions(exerciseSelect, benchPress.id);
+    await user.type(form.getByLabelText("Carga (kg)"), "140");
+    await user.type(form.getByLabelText("Repeticiones"), "5");
+    fireEvent.change(form.getByLabelText("Fecha"), {
+      target: { value: "2025-06-10" },
+    });
+    await user.click(form.getByRole("button", { name: "Registrar RM" }));
+
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    expect(payloads[0]).toEqual({
+      exerciseId: benchPress.id,
+      load: 140,
+      repetitions: 5,
+      date: "2025-06-10",
+    });
+    expect(
+      await screen.findByRole("button", { name: "Eliminar RM de Press de banca con barra" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Nuevo RM" }),
+    ).not.toBeInTheDocument();
+  });
+
+  test("edita un RM con prellenado sin permitir cambiar de Ejercicio", async () => {
+    const user = userEvent.setup();
+    let rms: RecordedMax[] = [recordedMax];
+    const payloads: unknown[] = [];
+    stubRmFlows({
+      exercises: () => [benchPress, customExerciseForRm],
+      rms: () => rms,
+      onUpdate: (id, body) => {
+        payloads.push({ id, body });
+        const values = body as { load: number; repetitions: number; date: string };
+        const rm: RecordedMax = { ...recordedMax, ...values };
+        rms = [rm];
+        return rm;
+      },
+    });
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Editar RM de Press de banca con barra" }),
+    );
+    const form = within(await screen.findByRole("region", { name: "Editar RM" }));
+
+    // prellenado desde el documento canónico
+    expect(form.getByLabelText("Ejercicio")).toHaveValue(benchPress.id);
+    expect(form.getByLabelText("Ejercicio")).toBeDisabled();
+    expect(form.getByLabelText("Carga (kg)")).toHaveValue(140);
+    expect(form.getByLabelText("Repeticiones")).toHaveValue(5);
+    expect(form.getByLabelText("Fecha")).toHaveValue("2025-06-10");
+    expect(form.getByText(/El Ejercicio de un RM no puede cambiar/)).toBeInTheDocument();
+
+    await user.clear(form.getByLabelText("Carga (kg)"));
+    await user.type(form.getByLabelText("Carga (kg)"), "142.5");
+    await user.clear(form.getByLabelText("Repeticiones"));
+    await user.type(form.getByLabelText("Repeticiones"), "4");
+    fireEvent.change(form.getByLabelText("Fecha"), {
+      target: { value: "2025-06-12" },
+    });
+    await user.click(form.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    expect(payloads[0]).toMatchObject({ id: recordedMax.id });
+    expect(payloads[0]).toMatchObject({ body: { load: 142.5, repetitions: 4, date: "2025-06-12" } });
+    expect(
+      await screen.findByText("142,5 kg × 4 rep · 12/06/2025"),
+    ).toBeInTheDocument();
+  });
+
+  test("elimina un RM con confirmación y cancela sin cambiar nada", async () => {
+    const user = userEvent.setup();
+    let rms: RecordedMax[] = [recordedMax];
+    const deleted: string[] = [];
+    stubRmFlows({
+      exercises: () => [benchPress],
+      rms: () => rms,
+      onDelete: (id) => {
+        deleted.push(id);
+        rms = [];
+        return recordedMax;
+      },
+    });
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Eliminar RM de Press de banca con barra" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: /Eliminar RM de «Press de banca con barra»/i,
+    });
+
+    // cancelar conserva el RM
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Eliminar RM de Press de banca con barra" }),
+    ).toBeInTheDocument();
+    expect(deleted).toHaveLength(0);
+
+    // confirmar lo elimina definitivamente
+    await user.click(
+      screen.getByRole("button", { name: "Eliminar RM de Press de banca con barra" }),
+    );
+    const confirmed = await screen.findByRole("dialog", {
+      name: /Eliminar RM de «Press de banca con barra»/i,
+    });
+    await user.click(within(confirmed).getByRole("button", { name: "Eliminar" }));
+
+    await waitFor(() => expect(deleted).toEqual([recordedMax.id]));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Eliminar RM de Press de banca con barra" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      await screen.findByText(/Aún no has registrado ninguna marca real/i),
     ).toBeInTheDocument();
   });
 });

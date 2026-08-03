@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "../../../shared/http/api-client";
+import { apiDelete, apiGet, apiPost, apiPut } from "../../../shared/http/api-client";
 
 export type RecordingMode =
   | "fuerza_con_carga"
@@ -39,6 +39,7 @@ export type ExerciseListParams = {
   recordingMode?: RecordingMode | "";
   category?: string;
   cursor?: string | null;
+  limit?: number;
 };
 
 export type ExerciseFormValues = {
@@ -93,4 +94,67 @@ export async function archiveExercise(id: string): Promise<{ exercise: ExerciseI
 
 export async function restoreExercise(id: string): Promise<{ exercise: ExerciseItem }> {
   return apiPost<{ exercise: ExerciseItem }>(`/api/exercises/${id}/restore`, {});
+}
+
+// ---- RM registrados ------------------------------------------------------
+
+/**
+ * RM registrado: mejor marca real de un Ejercicio declarada expresamente por
+ * el Deportista, asociada a una fecha y un número de repeticiones. La misma
+ * forma se entrega al listar, registrar, editar, eliminar y resolver la
+ * vigencia; el nombre del Ejercicio se conserva aunque deje de estar
+ * disponible para usos nuevos.
+ */
+export type RecordedMax = {
+  id: string;
+  exerciseId: string;
+  exerciseName: string;
+  load: number;
+  repetitions: number;
+  date: string;
+};
+
+/** Valores del formulario de RM: Ejercicio, carga, repeticiones y fecha. */
+export type RecordedMaxFormValues = {
+  exerciseId: string;
+  load: number;
+  repetitions: number;
+  date: string;
+};
+
+export async function listRecordedMaxes(): Promise<{ items: RecordedMax[] }> {
+  return apiGet<{ items: RecordedMax[] }>("/api/rms");
+}
+
+export async function createRecordedMax(
+  values: RecordedMaxFormValues,
+): Promise<{ rm: RecordedMax }> {
+  return apiPost<{ rm: RecordedMax }>("/api/rms", values);
+}
+
+export async function updateRecordedMax(
+  id: string,
+  values: Omit<RecordedMaxFormValues, "exerciseId">,
+): Promise<{ rm: RecordedMax }> {
+  return apiPut<{ rm: RecordedMax }>(`/api/rms/${id}`, values);
+}
+
+export async function deleteRecordedMax(id: string): Promise<{ rm: RecordedMax }> {
+  return apiDelete<{ rm: RecordedMax }>(`/api/rms/${id}`);
+}
+
+/**
+ * Todos los Ejercicios disponibles para la Cuenta (catálogo y personalizados
+ * propios), recorriendo la paginación por cursor del listado. Sirve al
+ * selector de Ejercicio del formulario de RM.
+ */
+export async function listAllAvailableExercises(): Promise<ExerciseItem[]> {
+  let items: ExerciseItem[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await listExercises({ limit: 50, cursor });
+    items = [...items, ...page.items];
+    cursor = page.nextCursor;
+  } while (cursor);
+  return items;
 }

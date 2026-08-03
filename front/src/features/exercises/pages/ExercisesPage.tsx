@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ExercisePlaceholder } from "../../../shared/ui/ExercisePlaceholder";
 import { PageIntro } from "../../../shared/ui/PageIntro";
 import { ExerciseForm } from "../components/ExerciseForm";
+import { RecordedMaxSection } from "../components/RecordedMaxSection";
 import {
   archiveExercise,
   createExercise,
@@ -82,6 +83,7 @@ export function ExercisesPage() {
       setSelectedId(exercise.id);
       refreshListings();
       void queryClient.invalidateQueries({ queryKey: ["exercises", "categories"] });
+      void queryClient.invalidateQueries({ queryKey: ["rms"] });
     },
   });
 
@@ -92,6 +94,7 @@ export function ExercisesPage() {
       setFormState(null);
       setItems((previous) => sortByName(previous.map((item) => (item.id === exercise.id ? exercise : item))));
       refreshListings();
+      void queryClient.invalidateQueries({ queryKey: ["rms"] });
     },
   });
 
@@ -104,6 +107,7 @@ export function ExercisesPage() {
         setSelectedId(null);
       }
       refreshListings();
+      void queryClient.invalidateQueries({ queryKey: ["rms"] });
     },
   });
 
@@ -112,6 +116,7 @@ export function ExercisesPage() {
     onSuccess: ({ exercise }) => {
       setItems((previous) => sortByName([...previous, exercise]));
       refreshListings();
+      void queryClient.invalidateQueries({ queryKey: ["rms"] });
     },
   });
 
@@ -407,6 +412,8 @@ export function ExercisesPage() {
           </ul>
         )}
       </section>
+
+      <RecordedMaxSection />
     </>
   );
 }
