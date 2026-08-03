@@ -6,15 +6,15 @@ injected lifecycle preamble intact.
 
 ## Shared worker contract
 
-Apply the loaded `$implement` skill. Read `AGENTS.md`, the ticket, the feature
+Apply the loaded `$implement-worker` skill. Read `AGENTS.md`, the ticket, the feature
 spec, relevant domain docs, and relevant ADRs. Use `$tdd` in vertical red ->
 green slices at the approved public seams; ask the coordinator before adding a
-new seam. Run focused tests and typechecking regularly, then the full suite
-once at the end. Apply `$code-review` as far as the Pi runtime supports it and
-report any parallel-subagent limitation; the coordinator owns the definitive
-review. Invoke another project skill when its trigger matches the ticket,
-especially `diagnosing-bugs` for a reported failure and `codebase-design` for a
-module seam.
+new seam. Run typechecking and focused tests regularly. Do not require the full
+suite: complete validation belongs to the coordinator. Apply `$code-review` as
+far as the Pi runtime supports it and report any parallel-subagent limitation;
+the coordinator owns the definitive review. Invoke another project skill when
+its trigger matches the ticket, especially `diagnosing-bugs` for a reported
+failure and `codebase-design` for a module seam.
 
 Preserve pre-existing work. Stage only paths and hunks authored by this attempt.
 On success, commit the implementation or repair separately on the current
@@ -24,8 +24,9 @@ that no commit exists; never leave ticket-owned edits uncommitted.
 
 Write the detailed report at `<attempt-report-path>`. Include the commit SHA
 when one exists, authored paths, seam-by-seam TDD evidence or why TDD was
-inapplicable, focused checks, final full-suite result, self-review findings, and
-anything left. For repair attempts, also record the resolution of every finding.
+inapplicable, typecheck and focused checks, self-review findings, and anything
+left. Do not claim a full-suite result unless the coordinator explicitly asked
+for one. For repair attempts, also record the resolution of every finding.
 
 Send `worker_done` exactly once with an explicit `succeeded` or `failed`
 outcome, a concise summary, `--files-modified` for authored paths, and
@@ -44,7 +45,7 @@ Attempt report: <attempt-report-path>
 <shared worker contract>
 
 Repository commands:
-<typecheck-and-full-suite-commands>
+<typecheck-and-focused-test-commands>
 ```
 
 ## Repair worker
@@ -62,5 +63,5 @@ Attempt report: <attempt-report-path>
 <shared worker contract>
 
 Fix every blocking finding without expanding ticket scope. Repository commands:
-<typecheck-and-full-suite-commands>
+<typecheck-and-focused-test-commands>
 ```

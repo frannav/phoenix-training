@@ -27,28 +27,48 @@ coordinator owns validation, review, queue advancement, and final approval.
 
 ## 1. Select the queue
 
-Accept one of these inputs:
+Accept one of these inputs, and keep the exploration scope matched to that
+input:
 
-- **Explicit ticket:** select that ticket plus the transitive unresolved
-  `Blocked by` closure. Read the ticket, its feature `spec.md`, direct
-  dependency issues, and only the relevant domain/ADR sections.
-- **Feature directory:** discover implementation tickets under
+- **Numeric ticket** such as `19`: resolve exactly one file matching
+  `.scratch/*/issues/<number>-*.md`. If there are zero or multiple matches,
+  stop and ask for an unambiguous ticket path or feature directory. Read only
+  the selected ticket first. Extract its direct `Blocked by` dependencies, then
+  inspect each blocker only far enough to read its header, `Status`, `Blocked
+  by`, `Answer`, and comments needed to establish whether it is resolved. Do not
+  traverse dependencies of a blocker whose status is `resolved`.
+- **Explicit ticket path**: use exactly that file and apply the same direct
+  dependency and unresolved-blocker closure rules as for a numeric ticket.
+- **Feature directory**: discover implementation tickets under
   `.scratch/<feature>/issues/`, select `ready-for-agent` tickets, and order them
-  topologically by `Blocked by`.
-- **Ordered queue:** validate the supplied order against `Blocked by`; reject an
-  unresolved dependency or use the dependency order when the supplied order is
-  incomplete.
+  topologically by `Blocked by`. Broad discovery is permitted within the named
+  feature.
+- **Ordered queue**: validate the supplied ticket paths or numbers against
+  `Blocked by`; reject an unresolved dependency or use dependency order when the
+  supplied order is incomplete. Broad discovery is permitted within the supplied
+  queue and its dependency information, not unrelated features.
 
-For a feature or queue input, also read the issue-tracker and triage-label docs,
-the selected tickets and spec, relevant context docs, and relevant ADRs. Do not
-scan unrelated tickets, history, or the whole repository. Follow ticket links
-to research or domain documents only when an acceptance criterion needs them.
+For a numeric ticket or explicit path, do not load worker references during
+selection. Read the ticket, then its unresolved dependency closure as described
+above. Search only terms relevant to the ticket's acceptance criteria in the
+feature `spec.md`, `CONTEXT.md` or `CONTEXT-MAP.md`, and applicable ADRs; read
+only the matching sections. Follow links to research or domain documents only
+when an acceptance criterion needs them. For a feature directory or ordered
+queue, also read the issue-tracker and triage-label docs, selected tickets and
+spec, relevant context docs, and relevant ADRs.
+
+For a concrete ticket, never run `rg --files .scratch` in full, search all
+issues, read all of `spec.md` when relevant sections suffice, enumerate `back`,
+`front`, or the whole repository, or run `git log --all`. A targeted history
+check for one blocker is allowed only when its status cannot otherwise be
+established. Stop exploration as soon as the route, dependencies, approved
+seams, and commands are resolved.
 
 Record, for every selected ticket:
 
 - dependency parents and the queue position;
 - one or more public test seams;
-- the repository typecheck and full-suite commands.
+- the repository typecheck, focused-test, and full-suite commands.
 
 Seams already stated by the user or ticket are accepted without another approval
 round. Ask only when a seam is missing or ambiguous, or when a review finding
@@ -74,21 +94,35 @@ the terminal and dispatch details are in [runtime-contract.md](references/runtim
 
 In one preflight pass:
 
-- verify the `implement`, `tdd`, and `code-review` skill directories;
+- verify the `implement-worker`, `tdd`, and `code-review` skill directories;
 - capture `git status --short` and `git rev-parse HEAD`;
 - read the root `package.json` to locate validation scripts, inspecting deeper
   manifests only when those scripts are absent or insufficient.
 
-Before a ticket's first attempt, capture its fixed point and run typecheck plus
-the full suite there. A failing baseline blocks dispatch; isolate unrelated
-work or ask the user for a scope decision. When the preceding ticket was just
-approved and no external change occurred, its coordinator validation may serve
-as the next baseline instead of being rerun.
+Before a ticket's first attempt, capture its fixed point and run the coordinator
+typecheck plus the full suite there. A failing baseline blocks dispatch; isolate
+unrelated work or ask the user for a scope decision. When the preceding ticket
+was just approved and no external change occurred, reuse its approved
+coordinator validation as the next baseline instead of rerunning it. If any
+external change occurred, rerun the baseline.
 
 After preflight succeeds, create the single Run and the parent Task DAG in
 dependency order. Record each ticket's fixed point immediately before its
 first child is dispatched. Stop preflight at this point; extra confidence scans
 are outside the contract.
+
+Load references in this order:
+
+1. Select the ticket or queue without loading worker references.
+2. Complete Orca, model, skill, Git, and command preflight.
+3. Establish or reuse the coordinator baseline.
+4. Create the single Run and parent Task DAG.
+5. Immediately before preparing a worker terminal, load
+   [runtime-contract.md](references/runtime-contract.md).
+6. Immediately before dispatch, load
+   [worker-prompts.md](references/worker-prompts.md).
+
+Do not load either worker reference earlier just for additional confidence.
 
 ## 3. Process each ticket
 
@@ -115,14 +149,17 @@ commands, and a durable report path:
 ```
 
 Create a fresh terminal and child Task as described by the runtime contract.
-Run only one editing worker in the current worktree. Process every Orca
-Delivery batch, acknowledge each Delivery, and continue until `worker_done`,
-`escalation`, or `question` is handled.
+Run only one editing worker in the current worktree. Use the runtime contract's
+blocking `orchestration check --wait` flow after dispatch and after each
+Delivery; do not replace it with frequent polling. Process every Delivery and
+continue waiting until `worker_done`, `escalation`, or `question` is handled.
 
 Accept a succeeded attempt only when its report and message identify the commit,
-authored paths, seam-by-seam TDD evidence or an exception, focused checks, final
-full-suite result, self-review, and runtime limitations. Inspect the commit and
-working tree; reject unrelated changes or uncommitted ticket-owned edits.
+authored paths, seam-by-seam TDD evidence or an exception, typecheck and focused
+checks, self-review, and runtime limitations. The worker is not required to run
+the full suite; inspect the commit and working tree, then run the coordinator's
+full validation independently. Reject unrelated changes or uncommitted
+ticket-owned edits.
 
 Treat a failed outcome as an operational failure, not a review rejection. Inspect
 partial work before retrying. Retry with a fresh terminal on the same child Task

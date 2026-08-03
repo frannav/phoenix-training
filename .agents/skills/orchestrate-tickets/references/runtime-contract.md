@@ -17,7 +17,7 @@ Require `nan / deepseek-v4-flash-0731`, then use this exact command as the
 
 ```bash
 rtk proxy script -q /dev/null pi --approve --model nan/deepseek-v4-flash-0731 \
-  --skill .agents/skills/implement \
+  --skill .agents/skills/implement-worker \
   --skill .agents/skills/tdd \
   --skill .agents/skills/code-review
 ```
@@ -34,8 +34,33 @@ to `/dev/tty` is not a substitute.
    the terminal and recreate it; do not dispatch into that terminal.
 4. Create a child Task under the ticket parent and attach it with the
    version-matched `orchestration dispatch --inject` command.
-5. Retain the child Task and Dispatch IDs. Process every Delivery batch and
-   acknowledge every Delivery before waiting again.
+5. Retain the child Task and Dispatch IDs. After dispatch, wait using:
+
+   ```bash
+   <resolved-executable> orchestration check \
+     --wait \
+     --types worker_done,escalation,question \
+     --timeout-ms 900000 \
+     --json
+   ```
+
+   Process every Delivery batch. After each Delivery, answer any question
+   before acknowledging it, then acknowledge and wait again using:
+
+   ```bash
+   <resolved-executable> orchestration check \
+     --ack <delivery_id> \
+     --wait \
+     --types worker_done,escalation,question \
+     --timeout-ms 900000 \
+     --json
+   ```
+
+   The 15-minute timeout is a liveness checkpoint, not an operational failure.
+   Continue with rolling waits until `worker_done`, `question`, or
+   `escalation`. Do not query the terminal, transcript, task list, Run status,
+   or use `sleep`/short polling while Pi is working. Visible activity and
+   heartbeats show that Pi is alive, not that it has finished.
 6. Require exactly one `worker_done` with an explicit succeeded or failed
    outcome.
 
