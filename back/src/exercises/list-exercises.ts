@@ -22,6 +22,7 @@ export type ExerciseListItem = {
   bodyPart: string | null;
   equipment: string | null;
   provenance: "catalogo" | "personalizado";
+  available: boolean;
 };
 
 /**
@@ -60,6 +61,7 @@ export async function listExercises(
       bodyPart: exercise.bodyPart,
       equipment: exercise.equipment,
       accountId: exercise.accountId,
+      available: exercise.available,
     })
     .from(exercise)
     .where(and(...conditions))
@@ -76,5 +78,6 @@ export async function listExercises(
     bodyPart: row.bodyPart,
     equipment: row.equipment,
     provenance: row.accountId === null ? ("catalogo" as const) : ("personalizado" as const),
+    available: row.available,
   }));
 }

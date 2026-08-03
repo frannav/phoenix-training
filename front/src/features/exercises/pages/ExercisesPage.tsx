@@ -1,11 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
 import { ExercisePlaceholder } from "../../../shared/ui/ExercisePlaceholder";
 import { PageIntro } from "../../../shared/ui/PageIntro";
+import { ExerciseForm } from "../components/ExerciseForm";
 import {
+  archiveExercise,
+  createExercise,
+  listArchivedExercises,
   listExerciseCategories,
   listExercises,
   recordingModeLabels,
+  restoreExercise,
+  updateExercise,
+  type ExerciseFormValues,
   type ExerciseItem,
   type RecordingMode,
 } from "../api/exercises-api";
@@ -16,7 +23,14 @@ const provenanceLabels = {
   personalizado: "Personalizado",
 } as const;
 
+type FormState = { mode: "create" } | { mode: "edit"; exercise: ExerciseItem } | null;
+
+function sortByName(items: ExerciseItem[]): ExerciseItem[] {
+  return [...items].sort((a, b) => a.name.localeCompare(b.name, "es"));
+}
+
 export function ExercisesPage() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
   const [recordingMode, setRecordingMode] = useState<RecordingMode | "">("");
@@ -26,6 +40,8 @@ export function ExercisesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [formState, setFormState] = useState<FormState>(null);
+  const [archiveTarget, setArchiveTarget] = useState<ExerciseItem | null>(null);
 
   const categoriesQuery = useQuery({
     queryKey: ["exercises", "categories"],
@@ -39,6 +55,12 @@ export function ExercisesPage() {
     retry: false,
   });
 
+  const archivedQuery = useQuery({
+    queryKey: ["exercises", "archived"],
+    queryFn: listArchivedExercises,
+    retry: false,
+  });
+
   useEffect(() => {
     if (pageQuery.data) {
       setItems(pageQuery.data.items);
@@ -46,6 +68,60 @@ export function ExercisesPage() {
       setLoadMoreError(null);
     }
   }, [pageQuery.data]);
+
+  const refreshListings = () => {
+    void pageQuery.refetch();
+    void archivedQuery.refetch();
+  };
+
+  const createMutation = useMutation({
+    mutationFn: (values: ExerciseFormValues) => createExercise(values),
+    onSuccess: ({ exercise }) => {
+      setFormState(null);
+      setItems((previous) => sortByName([...previous, exercise]));
+      setSelectedId(exercise.id);
+      refreshListings();
+      void queryClient.invalidateQueries({ queryKey: ["exercises", "categories"] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: ExerciseFormValues }) =>
+      updateExercise(id, values),
+    onSuccess: ({ exercise }) => {
+      setFormState(null);
+      setItems((previous) => sortByName(previous.map((item) => (item.id === exercise.id ? exercise : item))));
+      refreshListings();
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => archiveExercise(id),
+    onSuccess: ({ exercise }) => {
+      setArchiveTarget(null);
+      setItems((previous) => previous.filter((item) => item.id !== exercise.id));
+      if (selectedId === exercise.id) {
+        setSelectedId(null);
+      }
+      refreshListings();
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) => restoreExercise(id),
+    onSuccess: ({ exercise }) => {
+      setItems((previous) => sortByName([...previous, exercise]));
+      refreshListings();
+    },
+  });
+
+  const handleFormSubmit = async (values: ExerciseFormValues) => {
+    if (formState?.mode === "edit") {
+      await updateMutation.mutateAsync({ id: formState.exercise.id, values });
+      return;
+    }
+    await createMutation.mutateAsync(values);
+  };
 
   const applySearch = (event: FormEvent) => {
     event.preventDefault();
@@ -80,13 +156,80 @@ export function ExercisesPage() {
     setSelectedId((current) => (current === id ? null : id));
   };
 
+  const closeForm = () => setFormState(null);
+
   return (
     <>
       <PageIntro
         eyebrow="Entrenamiento"
         title="Ejercicios"
-        description="Busca en el catálogo compartido y consulta cómo registrar cada movimiento."
+        description="Explora el catálogo compartido y mantén tus Ejercicios personalizados en un solo flujo."
       />
+
+      <section className={styles.management} aria-label="Gestionar Ejercicios personalizados">
+        <button
+          className={styles.newExercise}
+          type="button"
+          onClick={() => setFormState({ mode: "create" })}
+        >
+          Nuevo ejercicio
+        </button>
+
+        {formState && (
+          <section
+            className={styles.formPanel}
+            aria-label={formState.mode === "edit" ? "Editar Ejercicio" : "Nuevo Ejercicio personalizado"}
+          >
+            <h2 className={styles.formHeading}>
+              {formState.mode === "edit" ? "Editar Ejercicio" : "Nuevo Ejercicio personalizado"}
+            </h2>
+            <ExerciseForm
+              exercise={formState.mode === "edit" ? formState.exercise : null}
+              categories={categoriesQuery.data?.categories ?? []}
+              submitLabel={formState.mode === "edit" ? "Guardar cambios" : "Crear Ejercicio"}
+              onCancel={closeForm}
+              onSubmit={handleFormSubmit}
+            />
+          </section>
+        )}
+
+        {archiveTarget && (
+          <div
+            className={styles.dialogBackdrop}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirmar-archivo-titulo"
+            aria-describedby="confirmar-archivo-descripcion"
+          >
+            <div className={styles.dialog}>
+              <h2 id="confirmar-archivo-titulo">Archivar «{archiveTarget.name}»</h2>
+              <p id="confirmar-archivo-descripcion">
+                El Ejercicio dejará de ofrecerse en los usos nuevos, pero conservará su
+                identidad y podrás restaurarlo cuando quieras.
+              </p>
+              <div className={styles.dialogActions}>
+                <button
+                  className={styles.dialogDanger}
+                  type="button"
+                  onClick={() => archiveMutation.mutate(archiveTarget.id)}
+                  disabled={archiveMutation.isPending}
+                >
+                  {archiveMutation.isPending ? "Archivando…" : "Archivar"}
+                </button>
+                <button
+                  className={styles.dialogCancel}
+                  type="button"
+                  onClick={() => setArchiveTarget(null)}
+                  disabled={archiveMutation.isPending}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
       <section className={styles.toolbar} aria-label="Buscar y filtrar Ejercicios">
         <form className={styles.searchForm} onSubmit={applySearch} role="search">
           <label className={styles.visuallyHidden} htmlFor="ejercicios-busqueda">
@@ -148,7 +291,7 @@ export function ExercisesPage() {
             <p>
               {hasActiveFilters
                 ? "Ningún Ejercicio coincide con la búsqueda o los filtros."
-                : "El catálogo todavía no tiene Ejercicios disponibles."}
+                : "El catálogo todavía no tiene Ejercicios disponibles. Crea uno personalizado o revisa el catálogo más adelante."}
             </p>
             {hasActiveFilters && (
               <button className={styles.clearFilters} type="button" onClick={clearFilters}>
@@ -179,6 +322,24 @@ export function ExercisesPage() {
                     {provenanceLabels[item.provenance]}
                   </span>
                 </button>
+                {item.provenance === "personalizado" && (
+                  <div className={styles.itemActions}>
+                    <button
+                      type="button"
+                      aria-label={`Editar ${item.name}`}
+                      onClick={() => setFormState({ mode: "edit", exercise: item })}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Archivar ${item.name}`}
+                      onClick={() => setArchiveTarget(item)}
+                    >
+                      Archivar
+                    </button>
+                  </div>
+                )}
                 {selectedId === item.id && (
                   <div className={styles.details}>
                     <h3 className={styles.detailsHeading}>Cómo se registra</h3>
@@ -208,6 +369,41 @@ export function ExercisesPage() {
           <p className={styles.error} role="alert">
             {loadMoreError}
           </p>
+        )}
+      </section>
+
+      <section className={styles.archivedSection} aria-labelledby="archivados-titulo">
+        <h2 id="archivados-titulo">Ejercicios archivados</h2>
+        {archivedQuery.isPending && <p className={styles.status}>Cargando archivados…</p>}
+        {archivedQuery.isError && (
+          <p className={styles.error} role="alert">
+            No se pudieron cargar los Ejercicios archivados.
+          </p>
+        )}
+        {archivedQuery.isSuccess && archivedQuery.data.items.length === 0 && (
+          <p className={styles.archivedEmpty}>
+            No tienes Ejercicios personalizados archivados.
+          </p>
+        )}
+        {archivedQuery.isSuccess && archivedQuery.data.items.length > 0 && (
+          <ul className={styles.archivedList}>
+            {archivedQuery.data.items.map((item) => (
+              <li key={item.id} className={styles.archivedItem}>
+                <span className={styles.archivedName}>{item.name}</span>
+                <span className={styles.archivedMeta}>
+                  {recordingModeLabels[item.recordingMode]} · {item.category}
+                </span>
+                <button
+                  className={styles.restoreButton}
+                  type="button"
+                  onClick={() => restoreMutation.mutate(item.id)}
+                  disabled={restoreMutation.isPending}
+                >
+                  Restaurar
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </>

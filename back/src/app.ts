@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { extname, join, resolve, sep } from "node:path";
 import { z } from "zod";
 import { createAuth } from "./auth/auth";
@@ -10,15 +10,11 @@ import {
   issuePasswordResetToken,
   issueVerificationToken,
 } from "./auth/verification-tokens";
-import { appMetadata, exercise, passwordResetToken, recordingModes, user, verification } from "./db/schema";
+import { appMetadata, passwordResetToken, user, verification } from "./db/schema";
 import type { AppDatabase } from "./db/open-database";
-import { listExercises } from "./exercises/list-exercises";
 import { apiError, type ApiError, type ApiErrorCode } from "./http/api-error";
-import {
-  decodeOpaqueCursor,
-  encodeOpaqueCursor,
-  opaqueCursorKey,
-} from "./http/opaque-cursor";
+import { opaqueCursorKey } from "./http/opaque-cursor";
+import { createExercisesRouter } from "./exercises/exercises-router";
 import type { MailAdapter } from "./mail/mail-adapter";
 
 export type AuthDependencies = {
@@ -50,18 +46,6 @@ const noOpMailAdapter: MailAdapter = {
 
 const verificationTokenLifetimeMsDefault = 60 * 60 * 1000;
 const passwordResetTokenLifetimeMsDefault = 60 * 60 * 1000;
-
-const exercisesDefaultLimit = 20;
-const exercisesMaxLimit = 50;
-const exercisesQuerySchema = z
-  .object({
-    q: z.string().max(100).optional(),
-    recordingMode: z.enum(recordingModes).optional(),
-    category: z.string().max(50).optional(),
-    cursor: z.string().max(200).optional(),
-    limit: z.coerce.number().int().min(1).max(exercisesMaxLimit).optional(),
-  })
-  .strict();
 
 /**
  * Endpoints de autenticación cuyas respuestas JSON no deben revelar el token
@@ -393,66 +377,15 @@ export function createApp({
       });
     });
 
-    app.get("/api/exercises", async (context) => {
-      const userId = await authenticatedUserId(context.req.raw);
-      if (!userId) {
-        return context.json(
-          apiError("UNAUTHORIZED", "Debes iniciar sesión para consultar los Ejercicios."),
-          401,
-        );
-      }
-
-      const parsed = exercisesQuerySchema.safeParse(context.req.query());
-      if (!parsed.success) {
-        return context.json(apiError("VALIDATION_ERROR", "La petición no es válida."), 400);
-      }
-
-      const { q, recordingMode, category, limit = exercisesDefaultLimit } = parsed.data;
-      const offset = decodeOpaqueCursor(parsed.data.cursor, cursorKey);
-      if (offset === null) {
-        return context.json(apiError("VALIDATION_ERROR", "La petición no es válida."), 400);
-      }
-      const items = await listExercises(database, {
-        accountId: userId,
-        q,
-        recordingMode,
-        category,
-        limit: limit + 1,
-        offset,
-      });
-      const hasMore = items.length > limit;
-      const page = items.slice(0, limit);
-
-      return context.json({
-        items: page,
-        nextCursor: hasMore ? encodeOpaqueCursor(offset + limit, cursorKey) : null,
-      });
-    });
-
-    app.get("/api/exercises/categories", async (context) => {
-      const userId = await authenticatedUserId(context.req.raw);
-      if (!userId) {
-        return context.json(
-          apiError("UNAUTHORIZED", "Debes iniciar sesión para consultar los Ejercicios."),
-          401,
-        );
-      }
-
-      const rows = await database
-        .selectDistinct({ category: exercise.category })
-        .from(exercise)
-        .where(
-          and(
-            eq(exercise.available, true),
-            or(isNull(exercise.accountId), eq(exercise.accountId, userId)),
-          ),
-        );
-      const categories = rows
-        .map((row) => row.category)
-        .filter((category): category is string => category !== null)
-        .sort((a, b) => a.localeCompare(b, "es"));
-      return context.json({ categories });
-    });
+    app.route(
+      "/api",
+      createExercisesRouter({
+        database,
+        cursorKey,
+        authenticatedUserId,
+        now,
+      }),
+    );
   }
 
   if (frontendRoot) {

@@ -1,4 +1,4 @@
-import { apiGet } from "../../../shared/http/api-client";
+import { apiGet, apiPost, apiPut } from "../../../shared/http/api-client";
 
 export type RecordingMode =
   | "fuerza_con_carga"
@@ -6,6 +6,10 @@ export type RecordingMode =
   | "tiempo_por_serie"
   | "cardio_continuo";
 
+/**
+ * Documento canónico de un Ejercicio. La misma forma se entrega al listar,
+ * crear, editar, archivar, restaurar y resolver una referencia existente.
+ */
 export type ExerciseItem = {
   id: string;
   name: string;
@@ -15,6 +19,7 @@ export type ExerciseItem = {
   bodyPart: string | null;
   equipment: string | null;
   provenance: "catalogo" | "personalizado";
+  available: boolean;
 };
 
 export type ExerciseListResponse = {
@@ -36,6 +41,15 @@ export type ExerciseListParams = {
   cursor?: string | null;
 };
 
+export type ExerciseFormValues = {
+  name: string;
+  instructions: string;
+  recordingMode: RecordingMode;
+  category: string;
+  bodyPart: string;
+  equipment: string;
+};
+
 export async function listExercises(
   params: ExerciseListParams = {},
 ): Promise<ExerciseListResponse> {
@@ -50,4 +64,33 @@ export async function listExercises(
 
 export async function listExerciseCategories(): Promise<{ categories: string[] }> {
   return apiGet<{ categories: string[] }>("/api/exercises/categories");
+}
+
+export async function listArchivedExercises(): Promise<{ items: ExerciseItem[] }> {
+  return apiGet<{ items: ExerciseItem[] }>("/api/exercises/archived");
+}
+
+export async function getExercise(id: string): Promise<{ exercise: ExerciseItem }> {
+  return apiGet<{ exercise: ExerciseItem }>(`/api/exercises/${id}`);
+}
+
+export async function createExercise(
+  values: ExerciseFormValues,
+): Promise<{ exercise: ExerciseItem }> {
+  return apiPost<{ exercise: ExerciseItem }>("/api/exercises", values);
+}
+
+export async function updateExercise(
+  id: string,
+  values: ExerciseFormValues,
+): Promise<{ exercise: ExerciseItem }> {
+  return apiPut<{ exercise: ExerciseItem }>(`/api/exercises/${id}`, values);
+}
+
+export async function archiveExercise(id: string): Promise<{ exercise: ExerciseItem }> {
+  return apiPost<{ exercise: ExerciseItem }>(`/api/exercises/${id}/archive`, {});
+}
+
+export async function restoreExercise(id: string): Promise<{ exercise: ExerciseItem }> {
+  return apiPost<{ exercise: ExerciseItem }>(`/api/exercises/${id}/restore`, {});
 }

@@ -1,9 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { stubFetch } from "../../../test/mock-fetch";
+import type { ExerciseItem } from "../api/exercises-api";
 import { ExercisesPage } from "./ExercisesPage";
 
 function renderPage() {
@@ -28,6 +35,7 @@ const benchPress = {
   bodyPart: "Pecho",
   equipment: "Barra",
   provenance: "catalogo",
+  available: true,
 } as const;
 
 const sprints = {
@@ -39,6 +47,7 @@ const sprints = {
   bodyPart: "Cardio",
   equipment: "Peso corporal",
   provenance: "catalogo",
+  available: true,
 } as const;
 
 function stubCatalog(handler: (url: URL) => { status: number; body: unknown }) {
@@ -155,6 +164,7 @@ describe("pantalla de Ejercicios del catálogo", () => {
       bodyPart: "Espalda",
       equipment: "Máquina de dominadas",
       provenance: "catalogo",
+      available: true,
     } as const;
     const requestedCursors: string[] = [];
     stubCatalog((parsed) => {
@@ -198,7 +208,268 @@ describe("pantalla de Ejercicios del catálogo", () => {
     renderPage();
 
     expect(
-      await screen.findByRole("alert"),
-    ).toHaveTextContent(/No se pudo cargar el catálogo/i);
+      await screen.findByText(/No se pudo cargar el catálogo/i),
+    ).toBeInTheDocument();
+  });
+});
+
+const customExercise: ExerciseItem = {
+  id: "dddddddddddddddddddddddddddddddd",
+  name: "Peso muerto rumano",
+  instructions:
+    "Baja la barra hasta la mitad de la espinilla manteniendo la espalda recta.",
+  recordingMode: "fuerza_con_carga",
+  category: "Pierna",
+  bodyPart: "Isquiotibiales",
+  equipment: "Barra",
+  provenance: "personalizado",
+  available: true,
+};
+
+function stubCustomFlows(handlers: {
+  list: () => ExerciseItem[];
+  archived: () => ExerciseItem[];
+  onCreate?: (body: unknown) => ExerciseItem;
+  onUpdate?: (id: string, body: unknown) => ExerciseItem;
+  onArchive?: (id: string) => ExerciseItem;
+  onRestore?: (id: string) => ExerciseItem;
+}) {
+  stubFetch((url, init) => {
+    const parsed = new URL(url, "http://test");
+    const method = init.method ?? "GET";
+    if (parsed.pathname === "/api/exercises/categories") {
+      return { status: 200, body: { categories: ["Pecho", "Pierna"] } };
+    }
+    if (parsed.pathname === "/api/exercises/archived") {
+      return { status: 200, body: { items: handlers.archived() } };
+    }
+    if (parsed.pathname === "/api/exercises" && method === "GET") {
+      return { status: 200, body: { items: handlers.list(), nextCursor: null } };
+    }
+    if (parsed.pathname === "/api/exercises" && method === "POST") {
+      const body = JSON.parse(String(init.body)) as unknown;
+      return { status: 201, body: { exercise: handlers.onCreate!(body) } };
+    }
+    const updateMatch = parsed.pathname.match(/^\/api\/exercises\/([0-9a-f]+)$/);
+    if (updateMatch && method === "PUT") {
+      const body = JSON.parse(String(init.body)) as unknown;
+      return { status: 200, body: { exercise: handlers.onUpdate!(updateMatch[1]!, body) } };
+    }
+    const archiveMatch = parsed.pathname.match(/^\/api\/exercises\/([0-9a-f]+)\/archive$/);
+    if (archiveMatch) {
+      return { status: 200, body: { exercise: handlers.onArchive!(archiveMatch[1]!) } };
+    }
+    const restoreMatch = parsed.pathname.match(/^\/api\/exercises\/([0-9a-f]+)\/restore$/);
+    if (restoreMatch) {
+      return { status: 200, body: { exercise: handlers.onRestore!(restoreMatch[1]!) } };
+    }
+    return { status: 404, body: { error: { code: "NOT_FOUND", message: "no" } } };
+  });
+}
+
+describe("gestión de Ejercicios personalizados", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  test("el flujo combinado muestra la procedencia de cada Ejercicio", async () => {
+    stubCustomFlows({
+      list: () => [benchPress, customExercise],
+      archived: () => [],
+    });
+    renderPage();
+
+    expect(await screen.findByText("Peso muerto rumano")).toBeInTheDocument();
+    expect(screen.getAllByText("Personalizado")).toHaveLength(1);
+    expect(screen.getAllByText("Catálogo")).toHaveLength(1);
+  });
+
+  test("crea un Ejercicio personalizado validando el formulario", async () => {
+    const user = userEvent.setup();
+    let list: ExerciseItem[] = [benchPress];
+    const payloads: unknown[] = [];
+    stubCustomFlows({
+      list: () => list,
+      archived: () => [],
+      onCreate: (body) => {
+        payloads.push(body);
+        const values = body as {
+          name: string;
+          instructions: string;
+          recordingMode: ExerciseItem["recordingMode"];
+          category: string;
+        };
+        const exercise: ExerciseItem = {
+          ...customExercise,
+          name: values.name,
+          instructions: values.instructions,
+          recordingMode: values.recordingMode,
+          category: values.category,
+        };
+        list = [benchPress, exercise];
+        return exercise;
+      },
+    });
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Nuevo ejercicio" }),
+    );
+    const form = within(
+      await screen.findByRole("region", { name: "Nuevo Ejercicio personalizado" }),
+    );
+
+    // las validaciones aparecen junto al campo afectado
+    await user.click(form.getByRole("button", { name: "Crear Ejercicio" }));
+    expect(
+      await form.findByText("Escribe un nombre para el Ejercicio."),
+    ).toBeInTheDocument();
+    expect(
+      form.getByText("Escribe las instrucciones del Ejercicio."),
+    ).toBeInTheDocument();
+
+    await user.type(form.getByLabelText("Nombre"), "Peso muerto rumano");
+    await user.type(
+      form.getByLabelText("Instrucciones"),
+      "Baja la barra hasta la mitad de la espinilla.",
+    );
+    await user.selectOptions(
+      form.getByLabelText("Forma de registro"),
+      "fuerza_con_carga",
+    );
+    await user.type(form.getByLabelText("Categoría"), "Pierna");
+    await user.click(form.getByRole("button", { name: "Crear Ejercicio" }));
+
+    expect(await screen.findByText("Peso muerto rumano")).toBeInTheDocument();
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]).toMatchObject({
+      name: "Peso muerto rumano",
+      recordingMode: "fuerza_con_carga",
+      category: "Pierna",
+    });
+    expect(
+      screen.queryByRole("heading", { name: "Nuevo Ejercicio personalizado" }),
+    ).not.toBeInTheDocument();
+  });
+
+  test("edita un Ejercicio personalizado con la respuesta canónica", async () => {
+    const user = userEvent.setup();
+    let list: ExerciseItem[] = [customExercise];
+    const payloads: unknown[] = [];
+    stubCustomFlows({
+      list: () => list,
+      archived: () => [],
+      onUpdate: (id, body) => {
+        payloads.push({ id, body });
+        const values = body as { name: string; category: string };
+        const exercise: ExerciseItem = {
+          ...customExercise,
+          name: values.name,
+          category: values.category,
+        };
+        list = [exercise];
+        return exercise;
+      },
+    });
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Editar Peso muerto rumano" }),
+    );
+    const form = within(
+      await screen.findByRole("region", { name: "Editar Ejercicio" }),
+    );
+
+    const nameInput = form.getByLabelText("Nombre") as HTMLInputElement;
+    expect(nameInput).toHaveValue("Peso muerto rumano");
+    expect(form.getByLabelText("Forma de registro")).toBeDisabled();
+    expect(form.getByText(/La Forma de registro no puede cambiar/)).toBeInTheDocument();
+
+    await user.clear(nameInput);
+    await user.type(nameInput, "Peso muerto con piernas semiflexionadas");
+    await user.click(form.getByRole("button", { name: "Guardar cambios" }));
+
+    expect(
+      await screen.findByText("Peso muerto con piernas semiflexionadas"),
+    ).toBeInTheDocument();
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]).toMatchObject({ id: customExercise.id });
+  });
+
+  test("archiva con confirmación accesible y cancela sin cambiar nada", async () => {
+    const user = userEvent.setup();
+    const archived: ExerciseItem[] = [];
+    const list: ExerciseItem[] = [customExercise];
+    stubCustomFlows({
+      list: () => list,
+      archived: () => archived,
+      onArchive: () => {
+        archived.push(customExercise);
+        list.length = 0;
+        return { ...customExercise, available: false };
+      },
+    });
+    renderPage();
+    await screen.findByRole("button", { name: "Archivar Peso muerto rumano" });
+
+    // cancelar la confirmación conserva el Ejercicio en los usos nuevos
+    await user.click(screen.getByRole("button", { name: "Archivar Peso muerto rumano" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: /Archivar «Peso muerto rumano»/i,
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Archivar Peso muerto rumano" }),
+    ).toBeInTheDocument();
+
+    // confirmar lo archiva: deja los usos nuevos y pasa a los archivados
+    await user.click(screen.getByRole("button", { name: "Archivar Peso muerto rumano" }));
+    const confirmed = await screen.findByRole("dialog", {
+      name: /Archivar «Peso muerto rumano»/i,
+    });
+    await user.click(within(confirmed).getByRole("button", { name: "Archivar" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Archivar Peso muerto rumano" }),
+      ).not.toBeInTheDocument(),
+    );
+    const archivedHeading = await screen.findByRole("heading", {
+      name: "Ejercicios archivados",
+    });
+    await waitFor(() =>
+      expect(
+        within(archivedHeading.closest("section")!).getByText("Peso muerto rumano"),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  test("restaura un Ejercicio archivado y vuelve a ofrecerlo", async () => {
+    const user = userEvent.setup();
+    const archived: ExerciseItem[] = [{ ...customExercise, available: false }];
+    const list: ExerciseItem[] = [benchPress];
+    stubCustomFlows({
+      list: () => list,
+      archived: () => archived,
+      onRestore: () => {
+        archived.length = 0;
+        list.push(customExercise);
+        return customExercise;
+      },
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Restaurar" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Restaurar" })).not.toBeInTheDocument(),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Archivar Peso muerto rumano" }),
+    ).toBeInTheDocument();
   });
 });
