@@ -4,7 +4,7 @@
 
 **Blocked by:** 18 — Explorar el catálogo revisado de Ejercicios.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Una Cuenta puede crear un Ejercicio personalizado con identidad opaca, nombre, instrucciones, Forma de registro y taxonomía necesaria.
 - [ ] La Cuenta propietaria puede renombrar y editar los datos compatibles de su Ejercicio personalizado.
@@ -15,3 +15,9 @@
 - [ ] Leer o mutar un Ejercicio personalizado ajeno responde como recurso inexistente y no permite inferir sus datos.
 - [ ] La edición usa respuestas canónicas y presenta validaciones y confirmaciones accesibles en móvil y escritorio.
 - [ ] Las pruebas HTTP integradas demuestran creación, edición, archivo, restauración, referencias conservadas y aislamiento estricto entre dos Cuentas.
+
+## Answer
+
+Implementado y validado en `229a0de` con la reparación `484a388`. El informe
+`.scratch/gym-training-mvp/orchestration/19/attempt-2.md` confirma typecheck,
+suite completa y build correctos; queda resuelto como dependencia del ticket 21.
