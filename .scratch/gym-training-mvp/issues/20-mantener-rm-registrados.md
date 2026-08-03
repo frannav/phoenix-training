@@ -4,7 +4,7 @@
 
 **Blocked by:** 19 — Gestionar Ejercicios personalizados.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Una Cuenta puede registrar un RM indicando Ejercicio, carga, número de repeticiones y fecha.
 - [ ] La Cuenta puede listar, editar y eliminar sus RM registrados desde el área de Ejercicios.
@@ -15,3 +15,9 @@
 - [ ] Los RM pertenecen a la Cuenta autenticada; otra Cuenta no puede leerlos, modificarlos ni inferir su existencia.
 - [ ] La interfaz muestra Ejercicio, carga, repeticiones y fecha con validación explícita y confirmación antes de eliminar.
 - [ ] Las pruebas HTTP integradas cubren vigencia por fecha y repeticiones, edición, eliminación y aislamiento usando SQLite migrada.
+
+## Answer
+
+Implementado y aprobado en `92e8302` con una reparación posterior en `bd134b3`.
+La validación final pasa: typecheck, backend 98/98 y frontend 64/64. El Task
+padre de Orca quedó completado tras revisión Standards/Spec aprobada.

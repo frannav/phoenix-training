@@ -1,0 +1,78 @@
+.form {
+  display: grid;
+  gap: 1rem;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  font: inherit;
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 6rem;
+}
+
+.input:disabled,
+.textarea:disabled {
+  background: var(--color-surface-muted);
+  color: var(--color-ink-muted);
+}
+
+.help {
+  margin: 0.35rem 0 0;
+  color: var(--color-ink-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.row {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 40rem) {
+  .row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.formError {
+  margin: 0;
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.submit {
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.7rem 1.2rem;
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+}
+
+.submit:disabled {
+  opacity: 0.6;
+}
+
+.cancel {
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.7rem 1.2rem;
+  font-weight: 700;
+  background: var(--color-surface);
+}
