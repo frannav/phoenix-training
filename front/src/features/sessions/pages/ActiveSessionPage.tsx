@@ -9,14 +9,26 @@ import {
 } from "../../exercises/api/exercises-api";
 import {
   activeSessionQueryKey,
+  countSeriesByStatus,
   getSession,
+  occurrenceProgressLabel,
   saveSession,
   sessionDetailQueryKey,
   sessionProgressLabel,
   sessionTitle,
   type SessionDocument,
+  type SessionExerciseDocument,
   type SessionExerciseInput,
+  type SessionSeriesDocument,
 } from "../api/sessions-api";
+import {
+  draftFromSeries,
+  resultFromDraft,
+  rpeFromDraft,
+  validateCompletion,
+  type SeriesDraft,
+} from "../series-draft";
+import { SeriesRow } from "../components/SeriesRow";
 import styles from "./ActiveSessionPage.module.css";
 
 type SaveState = "saved" | "saving" | "error";
@@ -32,12 +44,48 @@ function occurrenceIdFor(
   return matches.length > 0 ? matches[matches.length - 1]!.id : null;
 }
 
+/** Resumen de Series de toda la Sesión para la cabecera del contenido. */
+function sessionSeriesSummary(session: SessionDocument): string {
+  const series = session.exercises.flatMap((occurrence) => occurrence.series);
+  if (series.length === 0) {
+    return "Sin Series";
+  }
+  const { completada, omitida, pendiente } = countSeriesByStatus(series);
+  const parts = [];
+  if (completada > 0) {
+    parts.push(`${completada} completadas`);
+  }
+  if (omitida > 0) {
+    parts.push(`${omitida} omitidas`);
+  }
+  if (pendiente > 0) {
+    parts.push(`${pendiente} pendientes`);
+  }
+  return parts.join(" · ");
+}
+
+/** Entrada canónica del agregado completo desde el documento confirmado. */
+function toAggregateInput(session: SessionDocument): SessionExerciseInput[] {
+  return session.exercises.map((occurrence) => ({
+    id: occurrence.id,
+    exerciseId: occurrence.exerciseId,
+    series: occurrence.series.map((series) => ({
+      id: series.id,
+      status: series.status,
+      goal: series.goal,
+      result: series.result,
+      rpe: series.rpe,
+    })),
+  }));
+}
+
 /**
  * Pantalla completa de la Sesión activa. Ocupa toda la ventana sin la
  * navegación del AppShell y mantiene su propia cabecera con el Origen de
  * sesión y el estado de guardado. Una Sesión vacía abre de inmediato el
- * selector combinado de Ejercicios para añadir el primero; al reanudar se
- * abre el último Ejercicio confirmado.
+ * selector combinado de Ejercicios; al reanudar se abre el último Ejercicio
+ * confirmado y dentro de cada Ejercicio se registran las Series con sus
+ * estados, validación y guardado inmediato.
  */
 export function ActiveSessionPage() {
   const { sesionId } = useParams<{ sesionId: string }>();
@@ -50,6 +98,8 @@ export function ActiveSessionPage() {
   const [retryTarget, setRetryTarget] = useState<SessionExerciseInput[] | null>(null);
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, SeriesDraft>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, Record<string, string>>>({});
 
   const sessionQuery = useQuery({
     queryKey: sessionDetailQueryKey(sesionId ?? ""),
@@ -65,6 +115,29 @@ export function ActiveSessionPage() {
       setPickerOpen(loaded.exercises.length === 0);
     }
   }, [sessionQuery.data]);
+
+  // Un borrador por Serie pendiente del documento confirmado, inicializado
+  // desde sus Objetivos. Las entradas parciales solo viven aquí y se pierden
+  // al recargar o al recuperar una versión vigente tras un conflicto.
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    setDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const occurrence of session.exercises) {
+        for (const series of occurrence.series) {
+          if (series.status !== "pendiente" || next[series.id] !== undefined) {
+            continue;
+          }
+          next[series.id] = draftFromSeries(series);
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [session]);
 
   const exercisesQuery = useQuery({
     queryKey: ["sessions", "picker", { q }],
@@ -85,15 +158,24 @@ export function ActiveSessionPage() {
       setSession(next);
       setSaveState("saved");
       setPickerOpen(false);
-      setExpandedId(occurrenceIdFor(next, next.lastExerciseId));
+      // Se conserva el Ejercicio desplegado mientras siga en la Sesión: la
+      // confirmación no interrumpe el registro en curso.
+      setExpandedId((current) =>
+        current !== null && next.exercises.some((entry) => entry.id === current)
+          ? current
+          : occurrenceIdFor(next, next.lastExerciseId),
+      );
       void queryClient.setQueryData(activeSessionQueryKey, { session: next });
     } catch (error) {
       setSaveState("error");
       if (error instanceof ApiRequestError && error.code === "REVISION_CONFLICT") {
         // Conflicto recuperable: otra pestaña guardó. Se carga la versión
-        // vigente sin mezclar cambios y no se reintenta la misma mutación.
+        // vigente sin mezclar cambios, sin reintentar la misma mutación y
+        // descartando los borradores parciales.
         setSaveError("La Sesión cambió en otra pestaña. Se cargó la versión vigente.");
         setRetryTarget(null);
+        setFieldErrors({});
+        setDrafts({});
         try {
           // Lectura directa: la caché puede conservar el documento obsoleto
           // dentro de su ventana de frescura.
@@ -110,11 +192,117 @@ export function ActiveSessionPage() {
     }
   };
 
+  const completeSeries = (
+    occurrence: SessionExerciseDocument,
+    series: SessionSeriesDocument,
+  ) => {
+    if (!session) {
+      return;
+    }
+    const mode = occurrence.exercise.recordingMode;
+    const draft = drafts[series.id] ?? draftFromSeries(series);
+    const errors = validateCompletion(mode, draft);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors((previous) => ({ ...previous, [series.id]: errors }));
+      return;
+    }
+    setFieldErrors((previous) => {
+      const next = { ...previous };
+      delete next[series.id];
+      return next;
+    });
+
+    const exercises = toAggregateInput(session).map((entry) =>
+      entry.id === occurrence.id
+        ? {
+            ...entry,
+            series: entry.series.map((input) =>
+              input.id === series.id
+                ? {
+                    id: series.id,
+                    status: "completada" as const,
+                    goal: input.goal,
+                    result: resultFromDraft(mode, draft),
+                    rpe: rpeFromDraft(draft),
+                  }
+                : input,
+            ),
+          }
+        : entry,
+    );
+    void persist(exercises);
+  };
+
+  const omitSeries = (
+    occurrence: SessionExerciseDocument,
+    series: SessionSeriesDocument,
+  ) => {
+    if (!session) {
+      return;
+    }
+    const exercises = toAggregateInput(session).map((entry) =>
+      entry.id === occurrence.id
+        ? {
+            ...entry,
+            series: entry.series.map((input) =>
+              input.id === series.id
+                ? { id: series.id, status: "omitida" as const, goal: input.goal, result: null, rpe: null }
+                : input,
+            ),
+          }
+        : entry,
+    );
+    void persist(exercises);
+  };
+
+  const restoreSeries = (
+    occurrence: SessionExerciseDocument,
+    series: SessionSeriesDocument,
+  ) => {
+    if (!session) {
+      return;
+    }
+    const exercises = toAggregateInput(session).map((entry) =>
+      entry.id === occurrence.id
+        ? {
+            ...entry,
+            series: entry.series.map((input) =>
+              input.id === series.id
+                ? { id: series.id, status: "pendiente" as const, goal: input.goal, result: null, rpe: null }
+                : input,
+            ),
+          }
+        : entry,
+    );
+    void persist(exercises);
+  };
+
+  const addSeries = (occurrence: SessionExerciseDocument) => {
+    if (!session) {
+      return;
+    }
+    const exercises = toAggregateInput(session).map((entry) =>
+      entry.id === occurrence.id
+        ? {
+            ...entry,
+            series: [...entry.series, { status: "pendiente" as const, goal: null, result: null }],
+          }
+        : entry,
+    );
+    void persist(exercises);
+  };
+
   const addExercise = (exercise: ExerciseItem) => {
     if (!session) {
       return;
     }
-    void persist([...session.exercises, { exerciseId: exercise.id }]);
+    // Cardio continuo admite exactamente una Serie por aparición: añadir el
+    // Ejercicio crea esa única Serie pendiente.
+    const series =
+      exercise.recordingMode === "cardio_continuo"
+        ? [{ status: "pendiente" as const, goal: null, result: null }]
+        : [];
+    void persist([...toAggregateInput(session), { exerciseId: exercise.id, series }]);
   };
 
   const retrySave = () => {
@@ -187,6 +375,12 @@ export function ActiveSessionPage() {
             <p className={styles.progress} role="status">
               {sessionProgressLabel(session)}
             </p>
+
+            {session.exercises.length > 0 && (
+              <p className={styles.summary} role="status">
+                {sessionSeriesSummary(session)}
+              </p>
+            )}
 
             {session.exercises.length === 0 && (
               <p className={styles.emptyHint}>
@@ -281,14 +475,62 @@ export function ActiveSessionPage() {
                     </button>
                     {expandedId === occurrence.id && (
                       <div className={styles.exerciseDetails}>
-                        {session.lastExerciseId === occurrence.exerciseId && (
-                          <p className={styles.lastUsed}>Último Ejercicio utilizado</p>
+                        <div className={styles.exerciseDetailsHeader}>
+                          <span className={styles.exerciseProgress}>
+                            {occurrenceProgressLabel(occurrence)}
+                          </span>
+                          {session.lastExerciseId === occurrence.exerciseId && (
+                            <span className={styles.lastUsed}>
+                              Último Ejercicio utilizado
+                            </span>
+                          )}
+                        </div>
+
+                        {occurrence.series.length === 0 ? (
+                          <p className={styles.detailsNote}>
+                            Aún no hay Series. Añade la primera para empezar a registrar.
+                          </p>
+                        ) : (
+                          <ul
+                            className={styles.seriesList}
+                            aria-label={`Series de ${occurrence.exercise.name}`}
+                          >
+                            {occurrence.series.map((series) => (
+                              <li key={series.id} className={styles.seriesItem}>
+                                <SeriesRow
+                                  series={series}
+                                  mode={occurrence.exercise.recordingMode}
+                                  draft={drafts[series.id] ?? draftFromSeries(series)}
+                                  errors={fieldErrors[series.id] ?? {}}
+                                  saving={saveState === "saving"}
+                                  onDraftChange={(field, value) =>
+                                    setDrafts((previous) => ({
+                                      ...previous,
+                                      [series.id]: {
+                                        ...(previous[series.id] ?? draftFromSeries(series)),
+                                        [field]: value,
+                                      },
+                                    }))
+                                  }
+                                  onComplete={() => completeSeries(occurrence, series)}
+                                  onOmit={() => omitSeries(occurrence, series)}
+                                  onRestore={() => restoreSeries(occurrence, series)}
+                                />
+                              </li>
+                            ))}
+                          </ul>
                         )}
-                        <p className={styles.detailsNote}>
-                          Forma de registro:{" "}
-                          {recordingModeLabels[occurrence.exercise.recordingMode]}.
-                          Las Series se registrarán aquí.
-                        </p>
+
+                        {occurrence.exercise.recordingMode !== "cardio_continuo" && (
+                          <button
+                            className={styles.addSeriesButton}
+                            type="button"
+                            onClick={() => addSeries(occurrence)}
+                            disabled={saveState === "saving"}
+                          >
+                            Añadir serie
+                          </button>
+                        )}
                       </div>
                     )}
                   </li>

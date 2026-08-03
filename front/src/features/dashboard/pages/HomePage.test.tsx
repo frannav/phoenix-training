@@ -43,6 +43,7 @@ const existingSession: SessionDocument = {
         recordingMode: "fuerza_con_carga",
         provenance: "catalogo",
       },
+      series: [],
     },
   ],
 };

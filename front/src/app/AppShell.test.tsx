@@ -33,6 +33,7 @@ const activeSession: SessionDocument = {
         recordingMode: "fuerza_con_carga",
         provenance: "catalogo",
       },
+      series: [],
     },
     {
       id: "dddddddddddddddddddddddddddddddd",
@@ -44,6 +45,7 @@ const activeSession: SessionDocument = {
         recordingMode: "fuerza_con_carga",
         provenance: "personalizado",
       },
+      series: [],
     },
   ],
   startedAt: "2025-03-10T09:30:00.000Z",

@@ -1,10 +1,44 @@
 import { apiGet, apiPost, apiPut } from "../../../shared/http/api-client";
 import type { RecordingMode } from "../../exercises/api/exercises-api";
 
+/** Estado de una Serie dentro de la Sesión activa. */
+export type SeriesStatus = "pendiente" | "completada" | "omitida";
+
+/** Magnitudes de una Serie: carga, repeticiones y duración, nulas si no aplican. */
+export type SeriesMagnitudes = {
+  carga: number | null;
+  repeticiones: number | null;
+  duracion: number | null;
+};
+
+/**
+ * Serie del documento canónico de una Sesión. Los Objetivos son opcionales e
+ * independientes y no determinan el estado; el Resultado solo existe en una
+ * Serie completada y el RPE solo puede acompañar a un resultado.
+ */
+export type SessionSeriesDocument = {
+  id: string;
+  order: number;
+  status: SeriesStatus;
+  added: boolean;
+  goal: SeriesMagnitudes;
+  result: SeriesMagnitudes;
+  rpe: number | null;
+};
+
+/** Entrada de Serie para sustituir el agregado: sin `id` es nueva. */
+export type SeriesInput = {
+  id?: string;
+  status: SeriesStatus;
+  goal: SeriesMagnitudes | null;
+  result: SeriesMagnitudes | null;
+  rpe?: number | null;
+};
+
 /**
  * Aparición de un Ejercicio dentro del documento canónico de una Sesión.
- * Incluye los datos del Ejercicio resuelto para presentar la Sesión sin
- * consultas adicionales por aparición.
+ * Incluye los datos del Ejercicio resuelto y sus Series para presentar la
+ * Sesión sin consultas adicionales por aparición.
  */
 export type SessionExerciseDocument = {
   id: string;
@@ -16,6 +50,7 @@ export type SessionExerciseDocument = {
     recordingMode: RecordingMode;
     provenance: "catalogo" | "personalizado";
   };
+  series: SessionSeriesDocument[];
 };
 
 /**
@@ -35,7 +70,11 @@ export type SessionDocument = {
 };
 
 /** Entrada de aparición para sustituir el agregado: sin `id` es nueva. */
-export type SessionExerciseInput = { id?: string; exerciseId: string };
+export type SessionExerciseInput = {
+  id?: string;
+  exerciseId: string;
+  series: SeriesInput[];
+};
 
 /** Clave compartida de la Sesión activa: AppShell e Inicio leen y actualizan el mismo valor. */
 export const activeSessionQueryKey = ["sessions", "active"] as const;
@@ -80,4 +119,46 @@ export function sessionProgressLabel(session: SessionDocument): string {
     return "Sin ejercicios";
   }
   return count === 1 ? "1 ejercicio" : `${count} ejercicios`;
+}
+
+/**
+ * Recuento de Series por estado dentro de una lista de Series de la Sesión.
+ */
+export function countSeriesByStatus(series: SessionSeriesDocument[]): {
+  completada: number;
+  omitida: number;
+  pendiente: number;
+} {
+  let completada = 0;
+  let omitida = 0;
+  let pendiente = 0;
+  for (const entry of series) {
+    if (entry.status === "completada") {
+      completada += 1;
+    } else if (entry.status === "omitida") {
+      omitida += 1;
+    } else {
+      pendiente += 1;
+    }
+  }
+  return { completada, omitida, pendiente };
+}
+
+/**
+ * Progreso de una aparición para el botón plegable: series completadas,
+ * omitidas y pendientes de un Ejercicio.
+ */
+export function occurrenceProgressLabel(occurrence: SessionExerciseDocument): string {
+  if (occurrence.series.length === 0) {
+    return "Sin Series";
+  }
+  const { completada, omitida, pendiente } = countSeriesByStatus(occurrence.series);
+  const parts = [`${completada} completadas`];
+  if (omitida > 0) {
+    parts.push(`${omitida} omitidas`);
+  }
+  if (pendiente > 0) {
+    parts.push(`${pendiente} pendientes`);
+  }
+  return parts.join(" · ");
 }
