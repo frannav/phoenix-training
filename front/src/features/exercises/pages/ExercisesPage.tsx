@@ -184,6 +184,7 @@ export function ExercisesPage() {
               {formState.mode === "edit" ? "Editar Ejercicio" : "Nuevo Ejercicio personalizado"}
             </h2>
             <ExerciseForm
+              key={formState.mode === "edit" ? formState.exercise.id : "nueva"}
               exercise={formState.mode === "edit" ? formState.exercise : null}
               categories={categoriesQuery.data?.categories ?? []}
               submitLabel={formState.mode === "edit" ? "Guardar cambios" : "Crear Ejercicio"}

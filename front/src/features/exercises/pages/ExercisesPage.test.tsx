@@ -401,6 +401,70 @@ describe("gestión de Ejercicios personalizados", () => {
     expect(payloads[0]).toMatchObject({ id: customExercise.id });
   });
 
+  test("cambiar de Ejercicio en edición reinicia el formulario al nuevo destino", async () => {
+    const user = userEvent.setup();
+    const otherCustom: ExerciseItem = {
+      id: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      name: "Zancadas búlgaras",
+      instructions:
+        "Apoya el pie trasero en un banco y desciende con la pierna delantera.",
+      recordingMode: "repeticiones_sin_carga",
+      category: "Glúteo",
+      bodyPart: "Glúteo",
+      equipment: "Mancuernas",
+      provenance: "personalizado",
+      available: true,
+    };
+    let list: ExerciseItem[] = [customExercise, otherCustom];
+    const payloads: unknown[] = [];
+    stubCustomFlows({
+      list: () => list,
+      archived: () => [],
+      onUpdate: (id, body) => {
+        payloads.push({ id, body });
+        const values = body as { name: string };
+        const exercise: ExerciseItem = { ...otherCustom, name: values.name };
+        list = list.map((item) => (item.id === id ? exercise : item));
+        return exercise;
+      },
+    });
+    renderPage();
+
+    // editar A y comprobar que el formulario está prellenado con sus datos
+    await user.click(
+      await screen.findByRole("button", { name: "Editar Peso muerto rumano" }),
+    );
+    const form = within(
+      await screen.findByRole("region", { name: "Editar Ejercicio" }),
+    );
+    expect(form.getByLabelText("Nombre")).toHaveValue("Peso muerto rumano");
+
+    // cambiar a B sin desmontar el formulario: los campos deben reiniciarse
+    await user.click(
+      screen.getByRole("button", { name: "Editar Zancadas búlgaras" }),
+    );
+    await waitFor(() =>
+      expect(form.getByLabelText("Nombre")).toHaveValue("Zancadas búlgaras"),
+    );
+    expect(form.getByLabelText("Instrucciones")).toHaveValue(
+      "Apoya el pie trasero en un banco y desciende con la pierna delantera.",
+    );
+    expect(form.getByLabelText("Categoría")).toHaveValue("Glúteo");
+    expect(form.getByLabelText("Forma de registro")).toBeDisabled();
+
+    // guardar y comprobar que el payload apunta a B con sus valores
+    const nameInput = form.getByLabelText("Nombre") as HTMLInputElement;
+    await user.clear(nameInput);
+    await user.type(nameInput, "Zancadas búlgaras asistidas");
+    await user.click(form.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    expect(payloads[0]).toMatchObject({ id: otherCustom.id });
+    expect(
+      await screen.findByText("Zancadas búlgaras asistidas"),
+    ).toBeInTheDocument();
+  });
+
   test("archiva con confirmación accesible y cancela sin cambiar nada", async () => {
     const user = userEvent.setup();
     const archived: ExerciseItem[] = [];
