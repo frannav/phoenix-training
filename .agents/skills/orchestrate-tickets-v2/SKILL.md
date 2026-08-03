@@ -50,6 +50,65 @@ and wave-level reporting.
   explicitly asks for that follow-up.
 - Preserve unrelated changes in the invoking worktree. The v2 coordinator
   only reads it during discovery; implementation happens in fresh checkouts.
+- Treat the wave as resumable but not transactionally atomic: an interruption
+  can happen between two Orca mutations. Never retry a creation blindly and
+  never create a second branch for a ticket whose first checkout may already
+  exist.
+- Do not create an Orca Run, Task, terminal, worktree, branch, or ticket edit
+  until the complete read-only preflight in section 0 has passed.
+- Do not use raw `git worktree add` as a substitute for Orca worktree creation.
+
+## 0. Safety preflight and interruption recovery
+
+Run this phase after the user's explicit approval and before creating any
+Orca state. It is deliberately read-only.
+
+1. Resolve the Orca executable once using the `orca-cli` skill and load the
+   version-matched `orca-cli` and `orchestration` guides exactly once. Confirm
+   `<ORCA> status --json` reports a reachable ready runtime. `status` alone is
+   insufficient: also run the guide's read-only repo and worktree discovery
+   commands (`repo list` and `worktree list`/`worktree ps`) with the exact
+   repository selector that will be used later.
+2. If a runtime operation returns `runtime_unavailable`, stop before any
+   mutation, apply the guide's documented `ORCA open --json` recovery, and
+   retry the same read-only operation once. If the host exposes an approved
+   sandbox/IPC escalation path, request it for the Orca runtime operation;
+   never work around the failure with raw Git worktrees. If the second
+   read-only check fails, report the operational blocker and ask the user to
+   restore Orca; do not create a Run or Tasks.
+3. Capture, in one checkpoint, `git rev-parse main`, `git status --short`, the
+   invoking branch, the absolute repository path, the Orca repo selector, and
+   the exact approved ticket paths. Re-read every approved ticket's status and
+   blockers at this point. If `main` changed since recommendation, use the
+   new SHA only after recording it in the approval checkpoint and Task specs.
+4. Before creating anything, inventory partial state from an earlier or
+   interrupted attempt:
+
+   - list lightweight Runs and find any Run whose objective names exactly the
+     approved ticket set;
+   - list that Run's Tasks, if present;
+   - list Orca worktrees and `git worktree list --porcelain`;
+   - inspect `refs/heads/feature/ticket-<N>` for every approved ticket.
+
+   A matching existing Run/Task/worktree may be resumed only when its ticket
+   path, base SHA, required branch, and repository all match this approval.
+   Reuse its full worktree id and terminal handle; do not create duplicates.
+   If a branch/worktree exists without provable matching ownership, has the
+   wrong base, is dirty, is checked out elsewhere, or has a conflicting
+   display name, stop that ticket before mutation and report the exact
+   collision. Do not delete, reset, rename, or clean it automatically.
+5. Validate all approved branch names and worktree destinations as a batch
+   before creating the first checkout. A collision or unavailable destination
+   for any ticket blocks only that ticket, but no worker may be dispatched
+   until every approved ticket has either a verified reusable checkout or a
+   newly verified checkout.
+
+After every mutating Orca command, immediately read back its JSON result and
+repeat the relevant read-only inventory. If the process is interrupted after
+one worktree is created, the next invocation must reconcile and reuse that
+worktree; it must not create the other worktree and then pretend the wave was
+atomic, and it must not issue a duplicate create for the first ticket. Leave
+partial worktrees available for review and report them explicitly.
 
 ## 1. Discover and recommend a wave
 
@@ -145,6 +204,12 @@ Before creating state:
 - ensure the approved ticket files exist at the paths recorded during
   discovery.
 
+Do not create the Run until the read-only checks in section 0 succeed. If a
+matching Run already exists from an interrupted invocation, bind to and
+reconcile it instead of creating another Run. If it contains malformed or
+mismatched Tasks, do not dispatch them; report the mismatch and correct only
+after confirming the Run/task identity from the guide.
+
 Create one outer Run and one independent outer Task per approved ticket. Each
 Task spec must include the exact ticket path, the base SHA, the required branch,
 and this worker brief:
@@ -175,12 +240,16 @@ If a spec is malformed, do not dispatch it; correct or replace the Task and
 record the operational failure separately from any worker outcome.
 
 Create all independent Tasks before starting any worker. Start all approved
-workers in one wave; do not wait for ticket A before creating ticket B.
+workers in one wave; do not wait for ticket A before creating ticket B. If Task
+creation succeeds but a later preflight fails, leave the Tasks untouched and
+record the operational failure separately; do not dispatch a partial wave.
 
 ## 4. Create and verify each worktree
 
 Use the version-matched Orca worktree command with these semantics for every
-ticket (the exact executable and JSON shape come from the loaded guide):
+ticket (the exact executable and JSON shape come from the loaded guide). Prefer
+the inert form without `--agent` so creating the checkout cannot start a worker
+before the whole wave is verified:
 
 ```bash
 <ORCA> worktree create \
@@ -188,16 +257,20 @@ ticket (the exact executable and JSON shape come from the loaded guide):
   --name feature/ticket-<N> \
   --no-parent \
   --base-branch main \
-  --agent codex \
   --setup run \
   --json
 ```
 
-Use the full worktree id returned by Orca, never only the repository id. Read
-the agent handle from `agentTerminalHandle`, falling back to
-`startupTerminal.handle` only when the guide documents that compatibility
-field. Before dispatching the outer Task, verify from the returned absolute
-worktree path:
+Only use agent-first `--agent codex` creation when the version-matched guide
+requires it or the user explicitly requests it. In that case the terminal is
+still not dispatched: do not send a prompt, and do not assume the worktree is
+valid until all branch/base/cleanliness checks below pass.
+
+Use the full worktree id returned by Orca, never only the repository id. If an
+agent-first create was required, read the agent handle from
+`agentTerminalHandle`, falling back to `startupTerminal.handle` only when the
+guide documents that compatibility field. Before dispatching the outer Task,
+verify from the returned absolute worktree path:
 
 ```bash
 git -C <worktree-path> branch --show-current
@@ -210,16 +283,25 @@ must match. Orca may normalize a slash in `--name feature/ticket-<N>` to a
 hyphenated Git branch such as `feature-ticket-<N>` while retaining the requested
 display name, so never infer the branch from the create response alone. If Orca
 created a different branch in a completely fresh, unmodified checkout, rename
-that checked-out branch to the required exact name and verify again. If the
-checkout is dirty, the required branch already exists elsewhere, or the base
-does not match, do not dispatch into it; report the worktree-specific blocker
-and leave the other approved workers running.
+that checked-out branch to the required exact name and verify again. This is
+the only automatic branch rename permitted. If the checkout is dirty, the
+required branch already exists elsewhere, the base does not match, or the
+create response is ambiguous, do not dispatch into it; report the
+worktree-specific blocker and leave the checkout untouched.
 
-Wait for each agent terminal to reach `tui-idle` with the documented timeout,
-then attach the outer Task using the version-matched injected dispatch. Use
-the low-level `dispatch --inject` path here because branch/base verification
-must happen between worktree creation and dispatch. Do not send an ordinary
-prompt in place of an injected supervised dispatch.
+Create and verify every approved worktree before creating any worker terminal
+or dispatch. If creation of ticket A succeeds and creation of ticket B fails,
+do not dispatch A and do not retry A's create command. Preserve A's verified
+checkout, record the partial wave, and resume only through the reconciliation
+rules in section 0 after the user or a later invocation supplies direction.
+
+After all worktrees are verified, create exactly one Codex terminal per
+worktree if the inert creation path was used. Wait for each terminal to reach
+`tui-idle` with the documented timeout, then attach the outer Task using the
+version-matched injected dispatch. Use the low-level `dispatch --inject` path
+here because branch/base verification must happen between worktree creation
+and dispatch. Do not send an ordinary prompt in place of an injected
+supervised dispatch.
 
 ## 5. Supervise the wave
 
@@ -252,7 +334,7 @@ the inner workflow made ticket-owned changes. If the inner workflow left
 commits or partial work, do not automatically retry in the same branch; report
 the evidence and ask for a recovery decision.
 
-## 6. Finish
+## 6. Finish and optional GitHub PRs
 
 For each selected ticket, report:
 
@@ -267,3 +349,26 @@ Also report any candidate tickets deliberately left for the next wave and the
 original invoking worktree's status. Leave all feature worktrees available for
 review. The v2 run is complete only when every approved outer Task has reported
 and every worktree outcome has been recorded.
+
+If the user explicitly requested PR creation (for example, “create the PR
+towards main with gh”), do this only after that ticket's inner workflow has
+reported an approved outcome and the outer report includes its commits,
+validation, Standards verdict, Spec verdict, and repair count:
+
+1. From the ticket's verified worktree, confirm the exact branch, clean status,
+   base SHA, and that the branch contains ticket-owned commits. Never create a
+   PR for a blocked, rejected, partial, dirty, or ambiguous outcome.
+2. Check for an existing PR for the exact head branch with `gh pr view` or the
+   guide's equivalent. If none exists, create it with the GitHub CLI using the
+   exact head branch and `--base main`, a ticket-specific title, and a body
+   containing the ticket path, implementation commits, validation commands and
+   results, Standards/Spec verdicts, and repair count. Preserve literal shell
+   arguments safely; do not use an interpolated shell string that can expand
+   skill tokens or credentials.
+3. Read back the created PR with `gh pr view --json number,url,state,baseRefName,headRefName`
+   and report its URL/number. Do not merge, close, rebase, delete the worktree,
+   or alter `main` unless the user separately asks for that follow-up.
+
+If PR creation fails after the implementation is approved, classify it as an
+operational handoff failure, preserve the branch/worktree, report the exact
+`gh` error, and do not retry destructively or mark the ticket blocked.
