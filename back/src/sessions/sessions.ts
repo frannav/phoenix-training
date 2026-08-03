@@ -1,20 +1,56 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import type { AppDatabase } from "../db/open-database";
-import { exercise, trainingSession, trainingSessionExercise, type RecordingMode } from "../db/schema";
+import {
+  exercise,
+  trainingSession,
+  trainingSessionExercise,
+  trainingSessionSeries,
+  type RecordingMode,
+} from "../db/schema";
 
 /**
- * Fila persistida de una Sesión y de cada aparición de Ejercicio, junto con
- * el Ejercicio resuelto para presentarla sin consultas adicionales.
+ * Fila persistida de una Sesión, de cada aparición de Ejercicio y de cada
+ * Serie, junto con el Ejercicio resuelto para presentarla sin consultas
+ * adicionales.
  */
 export type SessionRow = typeof trainingSession.$inferSelect;
 export type SessionExerciseRow = typeof trainingSessionExercise.$inferSelect;
+export type SessionSeriesRow = typeof trainingSessionSeries.$inferSelect;
 
-type EnrichedOccurrence = SessionExerciseRow & { exercise: typeof exercise.$inferSelect };
+type EnrichedOccurrence = SessionExerciseRow & {
+  exercise: typeof exercise.$inferSelect;
+  series: SessionSeriesRow[];
+};
 
 export type SessionAggregate = {
   session: SessionRow;
   exercises: EnrichedOccurrence[];
+};
+
+export type SeriesStatus = "pendiente" | "completada" | "omitida";
+
+/** Magnitudes de una Serie: los tres campos de objetivo y resultado por Forma de registro. */
+export type SeriesMagnitudes = {
+  carga: number | null;
+  repeticiones: number | null;
+  duracion: number | null;
+};
+
+export type SeriesInput = {
+  id?: string;
+  status: SeriesStatus;
+  goal: {
+    carga?: number | null;
+    repeticiones?: number | null;
+    duracion?: number | null;
+  } | null;
+  result: {
+    carga?: number | null;
+    repeticiones?: number | null;
+    duracion?: number | null;
+  } | null;
+  rpe?: number | null;
 };
 
 /**
@@ -34,6 +70,16 @@ export type SessionDocument = {
   updatedAt: string;
 };
 
+export type SessionSeriesDocument = {
+  id: string;
+  order: number;
+  status: SeriesStatus;
+  added: boolean;
+  goal: SeriesMagnitudes;
+  result: SeriesMagnitudes;
+  rpe: number | null;
+};
+
 export type SessionExerciseDocument = {
   id: string;
   exerciseId: string;
@@ -44,11 +90,13 @@ export type SessionExerciseDocument = {
     recordingMode: RecordingMode;
     provenance: "catalogo" | "personalizado";
   };
+  series: SessionSeriesDocument[];
 };
 
 export type SessionExerciseInput = {
   id?: string;
   exerciseId: string;
+  series: SeriesInput[];
 };
 
 export type StartSessionOutcome =
@@ -59,8 +107,14 @@ export type ReplaceSessionOutcome =
   | { ok: true; session: SessionDocument }
   | {
       ok: false;
-      reason: "not-found" | "revision-conflict" | "invalid-exercises" | "unknown-child";
+      reason:
+        | "not-found"
+        | "revision-conflict"
+        | "invalid-exercises"
+        | "unknown-child"
+        | "validation";
       message?: string;
+      fields?: Record<string, string[]>;
     };
 
 export function createOpaqueSessionId(): string {
@@ -93,6 +147,23 @@ function toSessionDocument(aggregate: SessionAggregate): SessionDocument {
         recordingMode: occurrence.exercise.recordingMode as RecordingMode,
         provenance: occurrence.exercise.accountId === null ? "catalogo" : "personalizado",
       },
+      series: occurrence.series.map((seriesRow) => ({
+        id: seriesRow.id,
+        order: seriesRow.position,
+        status: seriesRow.status as SeriesStatus,
+        added: seriesRow.added,
+        goal: {
+          carga: seriesRow.goalCarga,
+          repeticiones: seriesRow.goalRepeticiones,
+          duracion: seriesRow.goalDuracion,
+        },
+        result: {
+          carga: seriesRow.carga,
+          repeticiones: seriesRow.repeticiones,
+          duracion: seriesRow.duracion,
+        },
+        rpe: seriesRow.rpe,
+      })),
     })),
     startedAt: aggregate.session.startedAt.toISOString(),
     updatedAt: aggregate.session.updatedAt.toISOString(),
@@ -120,11 +191,29 @@ async function loadSessionAggregate(
     .orderBy(asc(trainingSessionExercise.sortOrder), asc(trainingSessionExercise.id))
     .all();
 
+  const occurrenceIds = rows.map(({ occurrence }) => occurrence.id);
+  const seriesRows =
+    occurrenceIds.length === 0
+      ? []
+      : await database
+          .select()
+          .from(trainingSessionSeries)
+          .where(inArray(trainingSessionSeries.sessionExerciseId, occurrenceIds))
+          .orderBy(asc(trainingSessionSeries.position), asc(trainingSessionSeries.id))
+          .all();
+  const seriesByOccurrenceId = new Map<string, SessionSeriesRow[]>();
+  for (const seriesRow of seriesRows) {
+    const existing = seriesByOccurrenceId.get(seriesRow.sessionExerciseId) ?? [];
+    existing.push(seriesRow);
+    seriesByOccurrenceId.set(seriesRow.sessionExerciseId, existing);
+  }
+
   return {
     session: sessionRow,
     exercises: rows.map(({ occurrence, exercise: exerciseRow }) => ({
       ...occurrence,
       exercise: exerciseRow,
+      series: seriesByOccurrenceId.get(occurrence.id) ?? [],
     })),
   };
 }
@@ -234,11 +323,177 @@ export async function getSessionForAccount(
 }
 
 /**
+ * Campos de objetivo y de resultado admitidos por cada Forma de registro
+ * (spec «Series y Formas de registro»): los mismos campos que una Serie
+ * completada exige y que una Serie pendiente u omitida conserva como
+ * objetivos opcionales.
+ */
+const seriesFieldsPerMode: Record<RecordingMode, Array<"carga" | "repeticiones" | "duracion">> = {
+  fuerza_con_carga: ["carga", "repeticiones"],
+  repeticiones_sin_carga: ["repeticiones"],
+  tiempo_por_serie: ["duracion"],
+  cardio_continuo: ["duracion"],
+};
+
+const seriesMagnitudeNames = ["carga", "repeticiones", "duracion"] as const;
+
+/**
+ * Clave de campo con rutas de hijo legibles (`exercises[0].series[1].carga`):
+ * el contrato que el servidor devuelve en `fields` y que el cliente usa para
+ * mostrar los errores junto al campo afectado.
+ */
+export function sessionFieldKey(...segments: Array<string | number>): string {
+  let key = "";
+  for (const segment of segments) {
+    if (typeof segment === "number" || /^\d+$/.test(segment)) {
+      key += `[${segment}]`;
+    } else {
+      key += key.length === 0 ? segment : `.${segment}`;
+    }
+  }
+  return key;
+}
+
+/**
+ * Límites de dominio de cada magnitud (spec «Series y Formas de registro»):
+ * la carga admite de 0 a 9999,99 kg con dos decimales como máximo; las
+ * repeticiones, enteros de 1 a 9999; la duración, enteros de 1 a 359999
+ * segundos. Devuelve el mensaje cuando el valor no cumple su límite.
+ */
+function seriesLimitMessage(target: "carga" | "repeticiones" | "duracion", value: number): string | null {
+  switch (target) {
+    case "carga":
+      if (!Number.isFinite(value)) {
+        return "La carga debe ser un número.";
+      }
+      if (value < 0 || value > 9999.99) {
+        return "La carga admite de 0 a 9999,99 kg.";
+      }
+      if (Number(value.toFixed(2)) !== value) {
+        return "La carga admite como máximo dos decimales.";
+      }
+      return null;
+    case "repeticiones":
+      if (!Number.isInteger(value) || value < 1 || value > 9999) {
+        return "Las repeticiones admiten enteros de 1 a 9999.";
+      }
+      return null;
+    case "duracion":
+      if (!Number.isInteger(value) || value < 1 || value > 359999) {
+        return "La duración admite enteros de 1 a 359999 segundos.";
+      }
+      return null;
+  }
+}
+
+/** Mensaje del campo obligatorio al completar la Serie según su Forma de registro. */
+const requiredResultMessages: Record<"carga" | "repeticiones" | "duracion", string> = {
+  carga: "La carga es obligatoria para completar la Serie.",
+  repeticiones: "Las repeticiones son obligatorias para completar la Serie.",
+  duracion: "La duración es obligatoria para completar la Serie.",
+};
+
+/**
+ * Límites del RPE opcional de una Serie completada: de 1 a 10 en pasos de
+ * 0,5. Los valores inválidos se rechazan sin redondear ni corregir.
+ */
+function rpeLimitMessage(value: number): string | null {
+  if (!Number.isFinite(value)) {
+    return "El RPE debe ser un número.";
+  }
+  if (value < 1 || value > 10) {
+    return "El RPE admite de 1 a 10.";
+  }
+  if (!Number.isInteger(value * 2)) {
+    return "El RPE admite pasos de 0,5.";
+  }
+  return null;
+}
+
+/**
+ * Valida una Serie contra su Forma de registro y su estado: una Serie
+ * completada exige atómicamente todos los valores de su Forma y puede tener
+ * RPE; una pendiente u omitida no admite resultado ni RPE; los objetivos son
+ * opcionales e independientes y respetan los mismos límites.
+ */
+function validateSeriesInput(
+  addError: (key: string, message: string) => void,
+  baseKey: string,
+  mode: RecordingMode,
+  series: SeriesInput,
+): void {
+  const allowed = seriesFieldsPerMode[mode];
+
+  if (series.status === "completada") {
+    for (const field of allowed) {
+      const value = series.result?.[field];
+      if (value === null || value === undefined) {
+        addError(`${baseKey}.${field}`, requiredResultMessages[field]);
+        continue;
+      }
+      const limitMessage = seriesLimitMessage(field, value);
+      if (limitMessage) {
+        addError(`${baseKey}.${field}`, limitMessage);
+      }
+    }
+    for (const field of seriesMagnitudeNames) {
+      if (!allowed.includes(field) && series.result?.[field] !== null && series.result?.[field] !== undefined) {
+        addError(
+          `${baseKey}.${field}`,
+          "Magnitud no admitida por la Forma de registro del Ejercicio.",
+        );
+      }
+    }
+    if (series.rpe !== null && series.rpe !== undefined) {
+      const rpeMessage = rpeLimitMessage(series.rpe);
+      if (rpeMessage) {
+        addError(`${baseKey}.rpe`, rpeMessage);
+      }
+    }
+  } else {
+    for (const field of seriesMagnitudeNames) {
+      if (series.result?.[field] !== null && series.result?.[field] !== undefined) {
+        addError(
+          `${baseKey}.${field}`,
+          "Una Serie pendiente u omitida no admite Resultado de serie.",
+        );
+      }
+    }
+    if (series.rpe !== null && series.rpe !== undefined) {
+      addError(`${baseKey}.rpe`, "El RPE solo existe en una Serie completada.");
+    }
+  }
+
+  for (const field of seriesMagnitudeNames) {
+    const value = series.goal?.[field];
+    if (value === null || value === undefined) {
+      continue;
+    }
+    if (!allowed.includes(field)) {
+      addError(
+        `${baseKey}.${field}`,
+        "Objetivo no admitido por la Forma de registro del Ejercicio.",
+      );
+      continue;
+    }
+    const limitMessage = seriesLimitMessage(field, value);
+    if (limitMessage) {
+      addError(`${baseKey}.${field}`, limitMessage);
+    }
+  }
+}
+
+/**
  * Sustituye el agregado completo de una Sesión activa propia en una sola
- * transacción: conserva los identificadores de las apariciones existentes,
- * asigna identificadores opacos a las nuevas y registra como último Ejercicio
- * confirmado el de la última aparición. Una revisión obsoleta produce un
- * conflicto recuperable sin mezclar ni duplicar cambios.
+ * transacción: conserva los identificadores de las apariciones y de las
+ * Series existentes, asigna identificadores opacos a los nuevos y registra
+ * como último Ejercicio confirmado el de la última aparición. Una revisión
+ * obsoleta produce un conflicto recuperable sin mezclar ni duplicar hijos.
+ *
+ * La transición es una transacción síncrona y atómica: valida primero el
+ * agregado entero (Forma de registro, límites, estados y cardinalidad de
+ * cardio continuo) y solo después escribe, de modo que ninguna entrada
+ * inválida persiste ni incrementa la revisión.
  */
 export async function replaceSession(
   database: AppDatabase,
@@ -256,47 +511,93 @@ export async function replaceSession(
     now: Date;
   },
 ): Promise<ReplaceSessionOutcome> {
-  return database.transaction(async (tx) => {
-    const sessionRow = await tx
+  let outcome: ReplaceSessionOutcome = { ok: false, reason: "not-found" };
+  let succeeded = false;
+
+  await database.transaction((tx) => {
+    const sessionRow = tx
       .select()
       .from(trainingSession)
-      .where(
-        and(eq(trainingSession.id, sessionId), eq(trainingSession.accountId, accountId)),
-      )
+      .where(and(eq(trainingSession.id, sessionId), eq(trainingSession.accountId, accountId)))
       .get();
     if (!sessionRow) {
-      return { ok: false, reason: "not-found" } as const;
+      outcome = { ok: false, reason: "not-found" };
+      return;
     }
     if (sessionRow.revision !== expectedRevision) {
-      return { ok: false, reason: "revision-conflict" } as const;
+      outcome = { ok: false, reason: "revision-conflict" };
+      return;
     }
 
-    const current = await tx
+    const currentOccurrences = tx
       .select()
       .from(trainingSessionExercise)
       .where(eq(trainingSessionExercise.sessionId, sessionId))
       .all();
-    const currentById = new Map(current.map((occurrence) => [occurrence.id, occurrence]));
+    const currentOccurrenceById = new Map(currentOccurrences.map((entry) => [entry.id, entry]));
+    const currentSeries =
+      currentOccurrences.length === 0
+        ? []
+        : tx
+            .select()
+            .from(trainingSessionSeries)
+            .where(
+              inArray(
+                trainingSessionSeries.sessionExerciseId,
+                currentOccurrences.map((entry) => entry.id),
+              ),
+            )
+            .all();
+    const seriesByOccurrenceId = new Map<string, Map<string, SessionSeriesRow>>();
+    for (const seriesRow of currentSeries) {
+      const existing = seriesByOccurrenceId.get(seriesRow.sessionExerciseId) ?? new Map();
+      existing.set(seriesRow.id, seriesRow);
+      seriesByOccurrenceId.set(seriesRow.sessionExerciseId, existing);
+    }
 
-    const seenIds = new Set<string>();
-    const newExerciseIds = new Set<string>();
-    const next: {
-      id: string;
-      sessionId: string;
-      exerciseId: string;
-      sortOrder: number;
-      createdAt: Date;
-    }[] = [];
+    // Resuelve el Ejercicio de cada aparición —las existentes conservan el
+    // suyo aunque ya no esté disponible— para validar la Forma de registro.
+    const allExerciseIds = [
+      ...new Set([
+        ...currentOccurrences.map((entry) => entry.exerciseId),
+        ...exercises.filter((entry) => entry.id === undefined).map((entry) => entry.exerciseId),
+      ]),
+    ];
+    const exerciseRowsById = new Map<string, typeof exercise.$inferSelect>();
+    if (allExerciseIds.length > 0) {
+      for (const row of tx.select().from(exercise).where(inArray(exercise.id, allExerciseIds)).all()) {
+        exerciseRowsById.set(row.id, row);
+      }
+    }
 
-    for (let index = 0; index < exercises.length; index += 1) {
+    const fields: Record<string, string[]> = {};
+    const addError = (key: string, message: string) => {
+      const existing = fields[key] ?? [];
+      existing.push(message);
+      fields[key] = existing;
+    };
+
+    const usedOccurrenceIds = new Set<string>();
+    const nextOccurrences: (typeof trainingSessionExercise.$inferInsert)[] = [];
+    const nextSeries: (typeof trainingSessionSeries.$inferInsert)[] = [];
+
+    let failed: ReplaceSessionOutcome | null = null;
+
+    outer: for (let index = 0; index < exercises.length; index += 1) {
       const input = exercises[index]!;
+      let occurrenceId: string;
+      let mode: RecordingMode;
+
       if (input.id !== undefined) {
-        const existing = currentById.get(input.id);
-        if (!existing || seenIds.has(input.id)) {
-          return { ok: false, reason: "unknown-child" } as const;
+        const existing = currentOccurrenceById.get(input.id);
+        if (!existing || usedOccurrenceIds.has(input.id)) {
+          failed = { ok: false, reason: "unknown-child" };
+          break;
         }
-        seenIds.add(input.id);
-        next.push({
+        usedOccurrenceIds.add(input.id);
+        occurrenceId = existing.id;
+        mode = (exerciseRowsById.get(existing.exerciseId)?.recordingMode ?? "fuerza_con_carga") as RecordingMode;
+        nextOccurrences.push({
           id: existing.id,
           sessionId,
           exerciseId: existing.exerciseId,
@@ -304,58 +605,124 @@ export async function replaceSession(
           createdAt: existing.createdAt,
         });
       } else {
-        newExerciseIds.add(input.exerciseId);
-        next.push({
-          id: createOpaqueSessionId(),
+        const row = exerciseRowsById.get(input.exerciseId);
+        const visible =
+          row !== undefined &&
+          row.available &&
+          (row.accountId === null || row.accountId === accountId);
+        if (!visible) {
+          addError(
+            sessionFieldKey("exercises", index, "exerciseId"),
+            "El Ejercicio no está disponible para tu Cuenta.",
+          );
+          continue;
+        }
+        occurrenceId = createOpaqueSessionId();
+        mode = row!.recordingMode as RecordingMode;
+        nextOccurrences.push({
+          id: occurrenceId,
           sessionId,
           exerciseId: input.exerciseId,
           sortOrder: index,
           createdAt: now,
         });
       }
-    }
 
-    // Los usos nuevos solo admiten Ejercicios disponibles para la Cuenta: el
-    // catálogo compartido o un personalizado propio. Un Ejercicio ajeno se
-    // comporta como no disponible, sin inferir su existencia.
-    if (newExerciseIds.size > 0) {
-      const resolved = await tx
-        .select({ id: exercise.id })
-        .from(exercise)
-        .where(
-          and(
-            eq(exercise.available, true),
-            or(isNull(exercise.accountId), eq(exercise.accountId, accountId)),
-            inArray(exercise.id, [...newExerciseIds]),
-          ),
-        )
-        .all();
-      const resolvedIds = new Set(resolved.map((entry) => entry.id));
-      for (const exerciseId of newExerciseIds) {
-        if (!resolvedIds.has(exerciseId)) {
-          return {
-            ok: false,
-            reason: "invalid-exercises",
-            message: "Uno de los Ejercicios no está disponible para tu Cuenta.",
-          } as const;
+      if (mode === "cardio_continuo" && input.series.length !== 1) {
+        addError(
+          sessionFieldKey("exercises", index, "series"),
+          "El cardio continuo admite exactamente una Serie por aparición del Ejercicio.",
+        );
+      }
+
+      const existingSeries = seriesByOccurrenceId.get(occurrenceId) ?? new Map<string, SessionSeriesRow>();
+      const usedSeriesIds = new Set<string>();
+
+      for (let seriesIndex = 0; seriesIndex < input.series.length; seriesIndex += 1) {
+        const seriesInput = input.series[seriesIndex]!;
+        const baseKey = sessionFieldKey("exercises", index, "series", seriesIndex);
+        validateSeriesInput(addError, baseKey, mode, seriesInput);
+
+        let seriesId: string;
+        let added: boolean;
+        let createdAt: Date;
+        if (seriesInput.id !== undefined) {
+          const existing = existingSeries.get(seriesInput.id);
+          if (!existing || usedSeriesIds.has(seriesInput.id)) {
+            failed = { ok: false, reason: "unknown-child" };
+            break outer;
+          }
+          usedSeriesIds.add(seriesInput.id);
+          seriesId = existing.id;
+          added = existing.added;
+          createdAt = existing.createdAt;
+        } else {
+          seriesId = createOpaqueSessionId();
+          added = true;
+          createdAt = now;
         }
+
+        nextSeries.push({
+          id: seriesId,
+          sessionExerciseId: occurrenceId,
+          status: seriesInput.status,
+          position: seriesIndex,
+          added,
+          goalCarga: seriesInput.goal?.carga ?? null,
+          goalRepeticiones: seriesInput.goal?.repeticiones ?? null,
+          goalDuracion: seriesInput.goal?.duracion ?? null,
+          carga: seriesInput.result?.carga ?? null,
+          repeticiones: seriesInput.result?.repeticiones ?? null,
+          duracion: seriesInput.result?.duracion ?? null,
+          rpe: seriesInput.rpe ?? null,
+          createdAt,
+          updatedAt: now,
+        });
       }
     }
 
-    await tx
-      .delete(trainingSessionExercise)
-      .where(eq(trainingSessionExercise.sessionId, sessionId));
-    if (next.length > 0) {
-      await tx.insert(trainingSessionExercise).values(next);
+    if (failed) {
+      outcome = failed;
+      return;
+    }
+    if (Object.keys(fields).length > 0) {
+      outcome = { ok: false, reason: "validation", fields };
+      return;
     }
 
-    const lastExerciseId = next.length > 0 ? next[next.length - 1]!.exerciseId : null;
-    await tx
+    // CAS de la cabecera dentro de la transacción: la actualización exige la
+    // revisión esperada y no solo el identificador. Si otra escritura ganó
+    // entre la lectura y esta actualización, no coincide y la sustitución se
+    // abandona antes de tocar los hijos: no hay nada que deshacer.
+    const lastExerciseId = nextOccurrences.length > 0 ? nextOccurrences[nextOccurrences.length - 1]!.exerciseId : null;
+    const updated = tx
       .update(trainingSession)
       .set({ revision: sessionRow.revision + 1, lastExerciseId, updatedAt: now })
-      .where(eq(trainingSession.id, sessionId));
+      .where(and(eq(trainingSession.id, sessionId), eq(trainingSession.revision, expectedRevision)))
+      .returning()
+      .get();
+    if (!updated) {
+      outcome = { ok: false, reason: "revision-conflict" };
+      return;
+    }
 
-    const aggregate = await loadSessionAggregate(tx, { sessionId });
-    return { ok: true, session: toSessionDocument(aggregate!) };
+    // La sustitución reemplaza el agregado completo: se borran los hijos
+    // (las Series se eliminan en cascada) y se reinsertan con las
+    // identidades conservadas de los existentes y las nuevas asignadas.
+    tx.delete(trainingSessionExercise).where(eq(trainingSessionExercise.sessionId, sessionId)).run();
+    if (nextOccurrences.length > 0) {
+      tx.insert(trainingSessionExercise).values(nextOccurrences).run();
+    }
+    if (nextSeries.length > 0) {
+      tx.insert(trainingSessionSeries).values(nextSeries).run();
+    }
+
+    succeeded = true;
   });
+
+  if (!succeeded) {
+    return outcome;
+  }
+  const aggregate = await loadSessionAggregate(database, { sessionId });
+  return { ok: true, session: toSessionDocument(aggregate!) };
 }

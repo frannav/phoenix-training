@@ -6,7 +6,9 @@ import {
   getActiveSession,
   getSessionForAccount,
   replaceSession,
+  sessionFieldKey,
   startFreeSession,
+  type SessionExerciseInput,
 } from "./sessions";
 
 export type SessionsRouterDependencies = {
@@ -25,19 +27,44 @@ const startSessionSchema = z
   })
   .strict();
 
+const seriesMagnitudesSchema = z
+  .object({
+    carga: z.number().nullable().optional(),
+    repeticiones: z.number().nullable().optional(),
+    duracion: z.number().nullable().optional(),
+  })
+  .strict();
+
+const seriesInputSchema = z
+  .object({
+    id: z.string().max(200).optional(),
+    status: z.enum(["pendiente", "completada", "omitida"], {
+      message: "El estado de la Serie no es válido.",
+    }),
+    goal: seriesMagnitudesSchema.nullable().optional(),
+    result: seriesMagnitudesSchema.nullable().optional(),
+    rpe: z.number().nullable().optional(),
+  })
+  .strict();
+
+const sessionExerciseSchema = z
+  .object({
+    id: z.string().max(200).optional(),
+    exerciseId: z
+      .string()
+      .min(1, "Indica el Ejercicio que se añade a la Sesión.")
+      .max(200, "El identificador del Ejercicio no es válido."),
+    series: z
+      .array(seriesInputSchema)
+      .max(200, "Una aparición no puede contener más de 200 Series."),
+  })
+  .strict();
+
 const replaceSessionSchema = z
   .object({
     revision: z.number().int().min(1, "Indica la revisión leída de la Sesión."),
     exercises: z
-      .array(
-        z.object({
-          id: z.string().optional(),
-          exerciseId: z
-            .string()
-            .min(1, "Indica el Ejercicio que se añade a la Sesión.")
-            .max(200, "El identificador del Ejercicio no es válido."),
-        }),
-      )
+      .array(sessionExerciseSchema)
       .max(100, "Una Sesión no puede contener más de 100 Ejercicios."),
   })
   .strict();
@@ -49,13 +76,12 @@ const revisionConflictMessage =
   "La Sesión ha cambiado desde tu última lectura. Recarga la versión vigente antes de continuar.";
 
 function validationError(error: z.ZodError): ReturnType<typeof apiError> {
-  const flattened = z.flattenError(error);
-  const fieldErrors = flattened.fieldErrors as Record<string, string[] | undefined>;
   const fields: Record<string, string[]> = {};
-  for (const [key, messages] of Object.entries(fieldErrors)) {
-    if (messages && messages.length > 0) {
-      fields[key] = messages;
-    }
+  for (const issue of error.issues) {
+    const key = sessionFieldKey(...issue.path.map((segment) => String(segment)));
+    const existing = fields[key] ?? [];
+    existing.push(issue.message);
+    fields[key] = existing;
   }
   return apiError("VALIDATION_ERROR", "La petición no es válida.", fields);
 }
@@ -140,13 +166,18 @@ export function createSessionsRouter({
       accountId: context.get("accountId"),
       sessionId: context.req.param("sessionId") ?? "",
       expectedRevision: parsed.data.revision,
-      exercises: parsed.data.exercises,
+      exercises: parsed.data.exercises as unknown as SessionExerciseInput[],
       now: now(),
     });
     if (!outcome.ok) {
       switch (outcome.reason) {
         case "revision-conflict":
           return context.json(apiError("REVISION_CONFLICT", revisionConflictMessage), 409);
+        case "validation":
+          return context.json(
+            apiError("VALIDATION_ERROR", "La petición no es válida.", outcome.fields),
+            400,
+          );
         case "invalid-exercises":
           return context.json(
             apiError("VALIDATION_ERROR", "La petición no es válida.", {

@@ -403,8 +403,8 @@ export const trainingSession = sqliteTable(
 
 /**
  * Aparición de un Ejercicio dentro de una Sesión. Cada aparición conserva la
- * identidad del Ejercicio añadido; las Series (tickets siguientes) colgarán
- * de la aparición. Una Sesión libre comienza sin apariciones.
+ * identidad del Ejercicio añadido y sus Series. Una Sesión libre comienza sin
+ * apariciones.
  */
 export const trainingSessionExercise = sqliteTable(
   "training_session_exercise",
@@ -423,6 +423,47 @@ export const trainingSessionExercise = sqliteTable(
     index("training_session_exercise_session_order_idx").on(
       table.sessionId,
       table.sortOrder,
+    ),
+  ],
+);
+
+/**
+ * Serie de una aparición de Ejercicio dentro de una Sesión. Cada Serie tiene
+ * exactamente uno de tres estados — pendiente, completada u omitida — y solo
+ * conserva los datos permitidos por su estado:
+ *
+ * - Pendiente y Omitida pueden tener Objetivos de serie, pero nunca Resultado
+ *   de serie ni RPE.
+ * - Completada tiene todos los resultados exigidos por la Forma de registro
+ *   y puede tener RPE.
+ *
+ * `added` distingue la Serie añadida sobre la marcha (eliminable) de la Serie
+ * prevista conservada de la intención original del origen de la Sesión.
+ */
+export const trainingSessionSeries = sqliteTable(
+  "training_session_series",
+  {
+    id: text("id").primaryKey(),
+    sessionExerciseId: text("session_exercise_id")
+      .notNull()
+      .references(() => trainingSessionExercise.id, { onDelete: "cascade" }),
+    status: text("status").notNull(),
+    position: integer("position").notNull(),
+    added: integer("added", { mode: "boolean" }).notNull().default(false),
+    goalCarga: real("goal_carga"),
+    goalRepeticiones: integer("goal_repeticiones"),
+    goalDuracion: integer("goal_duracion"),
+    carga: real("carga"),
+    repeticiones: integer("repeticiones"),
+    duracion: integer("duracion"),
+    rpe: real("rpe"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("training_session_series_exercise_position_idx").on(
+      table.sessionExerciseId,
+      table.position,
     ),
   ],
 );

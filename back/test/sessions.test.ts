@@ -83,6 +83,16 @@ async function loadRealCatalog(context: TestContext): Promise<void> {
   expect(result.added).toBeGreaterThan(0);
 }
 
+export type SeriesDocument = {
+  id: string;
+  order: number;
+  status: "pendiente" | "completada" | "omitida";
+  added: boolean;
+  goal: { carga: number | null; repeticiones: number | null; duracion: number | null };
+  result: { carga: number | null; repeticiones: number | null; duracion: number | null };
+  rpe: number | null;
+};
+
 export type SessionExerciseDocument = {
   id: string;
   exerciseId: string;
@@ -93,6 +103,7 @@ export type SessionExerciseDocument = {
     recordingMode: string;
     provenance: "catalogo" | "personalizado";
   };
+  series: SeriesDocument[];
 };
 
 export type SessionDocument = {
@@ -154,7 +165,14 @@ async function replaceSession(
   context: TestContext,
   cookie: string,
   id: string,
-  body: { revision: number; exercises: { id?: string; exerciseId: string }[] },
+  body: {
+    revision: number;
+    exercises: {
+      id?: string;
+      exerciseId: string;
+      series?: unknown[];
+    }[];
+  },
 ): Promise<{ status: number; body: unknown }> {
   const response = await context.app.request(`/api/sessions/${id}`, {
     method: "PUT",
@@ -165,12 +183,18 @@ async function replaceSession(
 }
 
 async function catalogExerciseId(context: TestContext, cookie: string): Promise<string> {
-  const response = await context.app.request("/api/exercises?limit=1", {
+  const response = await context.app.request("/api/exercises?limit=50", {
     headers: { Cookie: cookie, Origin: origin },
   });
   expect(response.status).toBe(200);
-  const body = (await response.json()) as { items: { id: string; provenance: string }[] };
-  const item = body.items.find((entry) => entry.provenance === "catalogo");
+  const body = (await response.json()) as {
+    items: { id: string; provenance: string; recordingMode: string }[];
+  };
+  // Una aparición de cardio continuo exige exactamente una Serie, así que el
+  // helper elige un Ejercicio del catálogo de otra Forma de registro.
+  const item = body.items.find(
+    (entry) => entry.provenance === "catalogo" && entry.recordingMode !== "cardio_continuo",
+  );
   expect(item).toBeDefined();
   return item!.id;
 }
@@ -288,7 +312,7 @@ describe("reanudar la Sesión activa", () => {
 
     const { status, body } = await replaceSession(context!, cookie, session.id, {
       revision: session.revision,
-      exercises: [{ exerciseId }],
+      exercises: [{ exerciseId, series: [] }],
     });
     expect(status).toBe(200);
 
@@ -309,7 +333,7 @@ describe("reanudar la Sesión activa", () => {
     const exerciseId = await catalogExerciseId(context!, cookie);
     await replaceSession(context!, cookie, session.id, {
       revision: session.revision,
-      exercises: [{ exerciseId }],
+      exercises: [{ exerciseId, series: [] }],
     });
 
     // nueva lectura sin estado previo: la API es la única fuente
@@ -332,14 +356,17 @@ describe("reanudar la Sesión activa", () => {
 
     const added = await replaceSession(context!, cookie, session.id, {
       revision: session.revision,
-      exercises: [{ exerciseId }],
+      exercises: [{ exerciseId, series: [] }],
     });
     const first = (added.body as { session: SessionDocument }).session;
     const occurrenceId = first.exercises[0]!.id;
 
     const second = await replaceSession(context!, cookie, session.id, {
       revision: first.revision,
-      exercises: [{ id: occurrenceId, exerciseId }, { exerciseId }],
+      exercises: [
+        { id: occurrenceId, exerciseId, series: [] },
+        { exerciseId, series: [] },
+      ],
     });
     const updated = (second.body as { session: SessionDocument }).session;
     expect(updated.revision).toBe(3);
@@ -355,14 +382,14 @@ describe("reanudar la Sesión activa", () => {
 
     const unknown = await replaceSession(context!, cookie, session.id, {
       revision: session.revision,
-      exercises: [{ exerciseId: "ffffffffffffffffffffffffffffffff" }],
+      exercises: [{ exerciseId: "ffffffffffffffffffffffffffffffff", series: [] }],
     });
     expect(unknown.status).toBe(400);
     const error = (unknown.body as {
       error: { code: string; fields?: Record<string, string[]> };
     }).error;
     expect(error.code).toBe("VALIDATION_ERROR");
-    expect(error.fields?.exercises).toBeDefined();
+    expect(error.fields?.["exercises[0].exerciseId"]).toBeDefined();
   });
 });
 
@@ -388,14 +415,17 @@ describe("conflicto recuperable entre escrituras", () => {
 
     const first = await replaceSession(context!, cookie, session.id, {
       revision: session.revision,
-      exercises: [{ exerciseId }],
+      exercises: [{ exerciseId, series: [] }],
     });
     expect(first.status).toBe(200);
 
     // repetición de la escritura con la revisión anterior: conflicto recuperable
     const stale = await replaceSession(context!, cookie, session.id, {
       revision: session.revision,
-      exercises: [{ exerciseId }, { exerciseId }],
+      exercises: [
+        { exerciseId, series: [] },
+        { exerciseId, series: [] },
+      ],
     });
     expect(stale.status).toBe(409);
     expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
@@ -409,7 +439,10 @@ describe("conflicto recuperable entre escrituras", () => {
     // reintentar con la revisión vigente funciona
     const retried = await replaceSession(context!, cookie, session.id, {
       revision: after.revision,
-      exercises: [{ id: after.exercises[0]!.id, exerciseId }, { exerciseId }],
+      exercises: [
+        { id: after.exercises[0]!.id, exerciseId, series: [] },
+        { exerciseId, series: [] },
+      ],
     });
     expect(retried.status).toBe(200);
     expect((retried.body as { session: SessionDocument }).session.exercises).toHaveLength(2);
@@ -477,5 +510,703 @@ describe("aislamiento entre dos Cuentas", () => {
     expect(thirdA.status).toBe(409);
     const thirdB = await startFreeSession(context!, cookieB);
     expect(thirdB.status).toBe(409);
+  });
+});
+
+const seriesCustomInput = {
+  name: "Fondos en paralelas",
+  instructions: "Baja el cuerpo hasta que los hombros queden a la altura de los codos.",
+  recordingMode: "fuerza_con_carga",
+  category: "Pecho",
+  bodyPart: "Pecho",
+  equipment: "Paralelas",
+} as const;
+
+async function createCustomExercise(
+  context: TestContext,
+  cookie: string,
+  overrides: Record<string, unknown> = {},
+): Promise<string> {
+  const response = await context.app.request("/api/exercises", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+    body: JSON.stringify({ ...seriesCustomInput, ...overrides }),
+  });
+  expect(response.status).toBe(201);
+  return ((await response.json()) as { exercise: { id: string } }).exercise.id;
+}
+
+type SeriesInput = {
+  id?: string;
+  status: "pendiente" | "completada" | "omitida";
+  goal?: { carga?: number | null; repeticiones?: number | null; duracion?: number | null } | null;
+  result?: { carga?: number | null; repeticiones?: number | null; duracion?: number | null } | null;
+  rpe?: number | null;
+};
+
+async function sessionWithExercise(
+  context: TestContext,
+  cookie: string,
+  exerciseId: string,
+  series: SeriesInput[] = [],
+): Promise<SessionDocument> {
+  const started = await startFreeSession(context, cookie);
+  const session = (started.body as { session: SessionDocument }).session;
+  const { status, body } = await replaceSession(context, cookie, session.id, {
+    revision: session.revision,
+    exercises: [{ exerciseId, series }],
+  });
+  expect(status).toBe(200);
+  return (body as { session: SessionDocument }).session;
+}
+
+/**
+ * Sustituye la única Serie de la única aparición de la Sesión. Lee primero el
+ * estado vigente (como hace la interfaz) para escribir siempre con la última
+ * revisión; un 400 o 409 no cambia el documento y el siguiente intento parte
+ * del mismo estado.
+ */
+async function replaceSingleSeries(
+  context: TestContext,
+  cookie: string,
+  session: SessionDocument,
+  seriesInput: SeriesInput,
+): Promise<{ status: number; body: unknown }> {
+  const active = await getActiveSession(context, cookie);
+  const current = (active.body as { session: SessionDocument }).session;
+  const occurrence = current.exercises[0]!;
+  return replaceSession(context, cookie, current.id, {
+    revision: current.revision,
+    exercises: [
+      { id: occurrence.id, exerciseId: occurrence.exerciseId, series: [seriesInput] },
+    ],
+  });
+}
+
+/** Construye la entrada canónica de una Serie tal como la devuelve el documento. */
+function echoSeriesInput(series: SeriesDocument): SeriesInput {
+  return {
+    id: series.id,
+    status: series.status,
+    goal: series.goal,
+    result: series.result,
+    rpe: series.rpe,
+  };
+}
+
+/** Construye la entrada canónica de una aparición tal como la devuelve el documento. */
+function echoExerciseInput(entry: SessionExerciseDocument): {
+  id: string;
+  exerciseId: string;
+  series: SeriesInput[];
+} {
+  return {
+    id: entry.id,
+    exerciseId: entry.exerciseId,
+    series: entry.series.map(echoSeriesInput),
+  };
+}
+
+describe("registrar resultados por Serie", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  test("una Serie añadida a un Ejercicio se conserva con identidad propia y estado pendiente", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null, rpe: null },
+    ]);
+
+    const occurrence = session.exercises[0]!;
+    expect(occurrence.series).toHaveLength(1);
+    const series = occurrence.series[0]!;
+    expect(series.id).toMatch(/^[0-9a-f]{32}$/);
+    expect(series.order).toBe(0);
+    expect(series.status).toBe("pendiente");
+    expect(series.added).toBe(true);
+    expect(series.goal).toEqual({ carga: null, repeticiones: null, duracion: null });
+    expect(series.result).toEqual({ carga: null, repeticiones: null, duracion: null });
+    expect(series.rpe).toBeNull();
+  });
+
+  test("completar una Serie de fuerza con carga exige carga y repeticiones y conserva el RPE", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    const { status, body } = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "completada",
+      goal: null,
+      result: { carga: 100, repeticiones: 5 },
+      rpe: 8.5,
+    });
+    expect(status).toBe(200);
+
+    const series = (body as { session: SessionDocument }).session.exercises[0]!.series[0]!;
+    expect(series.status).toBe("completada");
+    expect(series.result).toEqual({ carga: 100, repeticiones: 5, duracion: null });
+    expect(series.rpe).toBe(8.5);
+    expect(series.added).toBe(true);
+  });
+
+  test("una entrada parcial no completa la Serie y responde el error junto al campo", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    const partial = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "completada",
+      goal: null,
+      result: { carga: 100, repeticiones: null },
+    });
+    expect(partial.status).toBe(400);
+    const error = (partial.body as { error: { code: string; fields?: Record<string, string[]> } }).error;
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.fields?.["exercises[0].series[0].repeticiones"]).toBeDefined();
+
+    // la entrada parcial no se persiste: la Serie sigue pendiente sin resultado
+    const current = await getActiveSession(context!, cookie);
+    const series = (current.body as { session: SessionDocument }).session.exercises[0]!.series[0]!;
+    expect(series.status).toBe("pendiente");
+    expect(series.result).toEqual({ carga: null, repeticiones: null, duracion: null });
+  });
+
+  test("repeticiones sin carga exige solo repeticiones al completar", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    const ok = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "completada",
+      goal: null,
+      result: { repeticiones: 12 },
+    });
+    expect(ok.status).toBe(200);
+    const series = (ok.body as { session: SessionDocument }).session.exercises[0]!.series[0]!;
+    expect(series.result).toEqual({ carga: null, repeticiones: 12, duracion: null });
+
+    const missing = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "completada",
+      goal: null,
+      result: { repeticiones: null },
+    });
+    expect(missing.status).toBe(400);
+    expect(
+      ((missing.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "exercises[0].series[0].repeticiones"
+      ]),
+    ).toBeDefined();
+  });
+
+  test("tiempo por serie y cardio continuo exigen duración al completar", async () => {
+    const tiempoId = await createCustomExercise(context!, cookie, { recordingMode: "tiempo_por_serie" });
+    const cardioId = await createCustomExercise(context!, cookie, { recordingMode: "cardio_continuo" });
+    const started = await startFreeSession(context!, cookie);
+    const session = (started.body as { session: SessionDocument }).session;
+    const { status, body } = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        { exerciseId: tiempoId, series: [{ status: "pendiente", goal: null, result: null }] },
+        { exerciseId: cardioId, series: [{ status: "pendiente", goal: null, result: null }] },
+      ],
+    });
+    expect(status).toBe(200);
+    let current = (body as { session: SessionDocument }).session;
+
+    for (const index of [0, 1]) {
+      const seriesId = current.exercises[index]!.series[0]!.id;
+      const ok = await replaceSession(context!, cookie, current.id, {
+        revision: current.revision,
+        exercises: current.exercises.map((entry, entryIndex) =>
+          entryIndex === index
+            ? {
+                id: entry.id,
+                exerciseId: entry.exerciseId,
+                series: [{ id: seriesId, status: "completada", goal: null, result: { duracion: 300 } }],
+              }
+            : echoExerciseInput(entry),
+        ),
+      });
+      expect(ok.status).toBe(200);
+      current = (ok.body as { session: SessionDocument }).session;
+      expect(current.exercises[index]!.series[0]!.result).toEqual({
+        carga: null,
+        repeticiones: null,
+        duracion: 300,
+      });
+
+      const missing = await replaceSession(context!, cookie, current.id, {
+        revision: current.revision,
+        exercises: current.exercises.map((entry, entryIndex) =>
+          entryIndex === index
+            ? {
+                id: entry.id,
+                exerciseId: entry.exerciseId,
+                series: [{ id: seriesId, status: "completada", goal: null, result: { duracion: null } }],
+              }
+            : echoExerciseInput(entry),
+        ),
+      });
+      expect(missing.status).toBe(400);
+      expect(
+        ((missing.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+          `exercises[${index}].series[0].duracion`
+        ]),
+      ).toBeDefined();
+    }
+  });
+
+  test("los límites de dominio se validan sin corrección silenciosa", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    const expectRejected = async (result: SeriesInput["result"]) => {
+      const { status } = await replaceSingleSeries(context!, cookie, session, {
+        id: seriesId,
+        status: "completada",
+        goal: null,
+        result,
+      });
+      expect(status).toBe(400);
+    };
+    const expectAccepted = async (result: SeriesInput["result"]) => {
+      const { status } = await replaceSingleSeries(context!, cookie, session, {
+        id: seriesId,
+        status: "completada",
+        goal: null,
+        result,
+      });
+      expect(status).toBe(200);
+    };
+
+    await expectRejected({ carga: -1, repeticiones: 5 });
+    await expectRejected({ carga: 9999.991, repeticiones: 5 });
+    await expectRejected({ carga: 10000, repeticiones: 5 });
+    await expectRejected({ carga: 100, repeticiones: 0 });
+    await expectRejected({ carga: 100, repeticiones: 10000 });
+    await expectAccepted({ carga: 0, repeticiones: 1 });
+    await expectAccepted({ carga: 9999.99, repeticiones: 9999 });
+    await expectAccepted({ carga: 123.45, repeticiones: 2 });
+
+    // duración: enteros de 1 a 359999 — segunda aparición en la misma Sesión
+    const tiempoId = await createCustomExercise(context!, cookie, { recordingMode: "tiempo_por_serie" });
+    const active = await getActiveSession(context!, cookie);
+    let current = (active.body as { session: SessionDocument }).session;
+    const withTiempo = await replaceSession(context!, cookie, current.id, {
+      revision: current.revision,
+      exercises: [
+        ...current.exercises.map(echoExerciseInput),
+        { exerciseId: tiempoId, series: [{ status: "pendiente", goal: null, result: null }] },
+      ],
+    });
+    expect(withTiempo.status).toBe(200);
+    current = (withTiempo.body as { session: SessionDocument }).session;
+    const tiempoSeriesId = current.exercises[1]!.series[0]!.id;
+
+    const tiempoPut = async (result: SeriesInput["result"]) => {
+      const fresh = await getActiveSession(context!, cookie);
+      const latest = (fresh.body as { session: SessionDocument }).session;
+      current = latest;
+      return replaceSession(context!, cookie, latest.id, {
+        revision: latest.revision,
+        exercises: latest.exercises.map((entry, index) =>
+          index === 1
+            ? {
+                id: entry.id,
+                exerciseId: entry.exerciseId,
+                series: [{ id: tiempoSeriesId, status: "completada", goal: null, result }],
+              }
+            : echoExerciseInput(entry),
+        ),
+      });
+    };
+
+    expect((await tiempoPut({ duracion: 0 })).status).toBe(400);
+    expect((await tiempoPut({ duracion: 360000 })).status).toBe(400);
+    expect((await tiempoPut({ duracion: 1 })).status).toBe(200);
+    expect((await tiempoPut({ duracion: 359999 })).status).toBe(200);
+  });
+
+  test("el RPE solo existe en Series completadas y admite pasos de 0,5", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    // RPE en una Serie pendiente: rechazado
+    const pendingWithRpe = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "pendiente",
+      goal: null,
+      result: null,
+      rpe: 7,
+    });
+    expect(pendingWithRpe.status).toBe(400);
+    expect(
+      ((pendingWithRpe.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "exercises[0].series[0].rpe"
+      ]),
+    ).toBeDefined();
+
+    for (const invalid of [0.5, 7.3, 10.5]) {
+      const rejected = await replaceSingleSeries(context!, cookie, session, {
+        id: seriesId,
+        status: "completada",
+        goal: null,
+        result: { repeticiones: 10 },
+        rpe: invalid,
+      });
+      expect(rejected.status).toBe(400);
+    }
+
+    for (const valid of [1, 5.5, 10]) {
+      const accepted = await replaceSingleSeries(context!, cookie, session, {
+        id: seriesId,
+        status: "completada",
+        goal: null,
+        result: { repeticiones: 10 },
+        rpe: valid,
+      });
+      expect(accepted.status).toBe(200);
+    }
+  });
+
+  test("un resultado no admite magnitudes ajenas a la Forma de registro", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    const rejected = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "completada",
+      goal: null,
+      result: { repeticiones: 10, duracion: 60 },
+    });
+    expect(rejected.status).toBe(400);
+    expect(
+      ((rejected.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "exercises[0].series[0].duracion"
+      ]),
+    ).toBeDefined();
+  });
+
+  test("los Objetivos de serie inicializan los campos sin completar la Serie", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: { carga: 80, repeticiones: 10 }, result: null },
+    ]);
+
+    // la Serie permanece pendiente con sus objetivos, sin resultado ni RPE
+    const series = session.exercises[0]!.series[0]!;
+    expect(series.status).toBe("pendiente");
+    expect(series.goal).toEqual({ carga: 80, repeticiones: 10, duracion: null });
+    expect(series.result).toEqual({ carga: null, repeticiones: null, duracion: null });
+    expect(series.rpe).toBeNull();
+
+    // los objetivos conservan los límites de dominio
+    const invalidGoal = await replaceSingleSeries(context!, cookie, session, {
+      id: series.id,
+      status: "pendiente",
+      goal: { carga: 80, repeticiones: 0 },
+      result: null,
+    });
+    expect(invalidGoal.status).toBe(400);
+    expect(
+      ((invalidGoal.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "exercises[0].series[0].repeticiones"
+      ]),
+    ).toBeDefined();
+
+    // un objetivo ajeno a la Forma se rechaza: cardio añadido a la misma Sesión
+    const cardioId = await createCustomExercise(context!, cookie, { recordingMode: "cardio_continuo" });
+    const active = await getActiveSession(context!, cookie);
+    let current = (active.body as { session: SessionDocument }).session;
+    const withCardio = await replaceSession(context!, cookie, current.id, {
+      revision: current.revision,
+      exercises: [
+        ...current.exercises.map(echoExerciseInput),
+        { exerciseId: cardioId, series: [{ status: "pendiente", goal: { duracion: 600 }, result: null }] },
+      ],
+    });
+    expect(withCardio.status).toBe(200);
+    current = (withCardio.body as { session: SessionDocument }).session;
+    expect(current.exercises[1]!.series[0]!.goal).toEqual({
+      carga: null,
+      repeticiones: null,
+      duracion: 600,
+    });
+
+    const wrongGoal = await replaceSession(context!, cookie, current.id, {
+      revision: current.revision,
+      exercises: current.exercises.map((entry, index) =>
+        index === 1
+          ? {
+              id: entry.id,
+              exerciseId: entry.exerciseId,
+              series: [
+                { id: current.exercises[1]!.series[0]!.id, status: "pendiente", goal: { carga: 80 }, result: null },
+              ],
+            }
+          : echoExerciseInput(entry),
+      ),
+    });
+    expect(wrongGoal.status).toBe(400);
+    expect(
+      ((wrongGoal.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "exercises[1].series[0].carga"
+      ]),
+    ).toBeDefined();
+  });
+
+  test("omitir y restaurar una Serie conservan los objetivos sin resultado", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: { carga: 60, repeticiones: 8 }, result: null },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    const omitted = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "omitida",
+      goal: { carga: 60, repeticiones: 8 },
+      result: null,
+    });
+    expect(omitted.status).toBe(200);
+    let series = (omitted.body as { session: SessionDocument }).session.exercises[0]!.series[0]!;
+    expect(series.status).toBe("omitida");
+    expect(series.goal).toEqual({ carga: 60, repeticiones: 8, duracion: null });
+    expect(series.result).toEqual({ carga: null, repeticiones: null, duracion: null });
+
+    const restored = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "pendiente",
+      goal: { carga: 60, repeticiones: 8 },
+      result: null,
+    });
+    expect(restored.status).toBe(200);
+    series = (restored.body as { session: SessionDocument }).session.exercises[0]!.series[0]!;
+    expect(series.status).toBe("pendiente");
+
+    // restaurar como completada exige un resultado completo
+    const restoredCompleted = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "completada",
+      goal: { carga: 60, repeticiones: 8 },
+      result: { carga: 62.5, repeticiones: 8 },
+      rpe: 7,
+    });
+    expect(restoredCompleted.status).toBe(200);
+    series = (restoredCompleted.body as { session: SessionDocument }).session.exercises[0]!.series[0]!;
+    expect(series.status).toBe("completada");
+    expect(series.result).toEqual({ carga: 62.5, repeticiones: 8, duracion: null });
+  });
+
+  test("cardio continuo admite exactamente una Serie por aparición del Ejercicio", async () => {
+    const cardioId = await createCustomExercise(context!, cookie, { recordingMode: "cardio_continuo" });
+    const session = await sessionWithExercise(context!, cookie, cardioId, [
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const occurrenceId = session.exercises[0]!.id;
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    // añadir una segunda Serie a la misma aparición: rechazado
+    const twoSeries = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrenceId,
+          exerciseId: cardioId,
+          series: [
+            { id: seriesId, status: "pendiente", goal: null, result: null },
+            { status: "pendiente", goal: null, result: null },
+          ],
+        },
+      ],
+    });
+    expect(twoSeries.status).toBe(400);
+    expect(
+      ((twoSeries.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "exercises[0].series"
+      ]),
+    ).toBeDefined();
+
+    // un segundo esfuerzo se registra añadiendo de nuevo el Ejercicio
+    const secondAppearance = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrenceId,
+          exerciseId: cardioId,
+          series: [{ id: seriesId, status: "pendiente", goal: null, result: null }],
+        },
+        { exerciseId: cardioId, series: [{ status: "pendiente", goal: null, result: null }] },
+      ],
+    });
+    expect(secondAppearance.status).toBe(200);
+    const next = (secondAppearance.body as { session: SessionDocument }).session;
+    expect(next.exercises).toHaveLength(2);
+    expect(next.exercises[1]!.series).toHaveLength(1);
+  });
+
+  test("repetir una escritura con revisión anterior no duplica Series", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const seriesId = session.exercises[0]!.series[0]!.id;
+
+    const first = await replaceSingleSeries(context!, cookie, session, {
+      id: seriesId,
+      status: "completada",
+      goal: null,
+      result: { repeticiones: 10 },
+    });
+    expect(first.status).toBe(200);
+    const afterFirst = (first.body as { session: SessionDocument }).session;
+
+    // repetición de la escritura con la revisión anterior: conflicto sin duplicar
+    const stale = await replaceSession(context!, cookie, afterFirst.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: afterFirst.exercises[0]!.id,
+          exerciseId,
+          series: [
+            { id: seriesId, status: "completada", goal: null, result: { repeticiones: 10 } },
+            { status: "completada", goal: null, result: { repeticiones: 12 } },
+          ],
+        },
+      ],
+    });
+    expect(stale.status).toBe(409);
+    expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
+
+    const current = await getActiveSession(context!, cookie);
+    const afterStale = (current.body as { session: SessionDocument }).session;
+    expect(afterStale.revision).toBe(afterFirst.revision);
+    expect(afterStale.exercises[0]!.series).toHaveLength(1);
+
+    // reintentar con la revisión vigente añade la Serie sin duplicar la primera
+    const retried = await replaceSession(context!, cookie, afterFirst.id, {
+      revision: afterStale.revision,
+      exercises: [
+        {
+          id: afterStale.exercises[0]!.id,
+          exerciseId,
+          series: [
+            { id: seriesId, status: "completada", goal: null, result: { repeticiones: 10 } },
+            { status: "completada", goal: null, result: { repeticiones: 12 } },
+          ],
+        },
+      ],
+    });
+    expect(retried.status).toBe(200);
+    const series = (retried.body as { session: SessionDocument }).session.exercises[0]!.series!;
+    expect(series).toHaveLength(2);
+    expect(series[0]!.id).toBe(seriesId);
+    expect(series[1]!.id).not.toBe(seriesId);
+  });
+
+  test("una Serie ajena o de otra aparición es un hijo desconocido", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "pendiente", goal: null, result: null },
+      { status: "pendiente", goal: null, result: null },
+    ]);
+    const occurrenceId = session.exercises[0]!.id;
+    const firstSeriesId = session.exercises[0]!.series[0]!.id;
+    const secondSeriesId = session.exercises[0]!.series[1]!.id;
+
+    // un identificador de Serie inexistente es rechazado
+    const unknown = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrenceId,
+          exerciseId,
+          series: [{ id: "ffffffffffffffffffffffffffffffff", status: "pendiente", goal: null, result: null }],
+        },
+      ],
+    });
+    expect(unknown.status).toBe(400);
+    expect(
+      ((unknown.body as { error: { fields?: Record<string, string[]> } }).error.fields?.["exercises"]),
+    ).toBeDefined();
+
+    // el mismo identificador repetido dos veces es rechazado
+    const duplicated = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrenceId,
+          exerciseId,
+          series: [
+            { id: firstSeriesId, status: "pendiente", goal: null, result: null },
+            { id: firstSeriesId, status: "pendiente", goal: null, result: null },
+          ],
+        },
+      ],
+    });
+    expect(duplicated.status).toBe(400);
+
+    // una Serie de otra aparición es un hijo desconocido: primero se añade la
+    // segunda aparición y después se intenta colocar bajo ella una Serie de la
+    // primera
+    const withSecond = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrenceId,
+          exerciseId,
+          series: [
+            { id: firstSeriesId, status: "pendiente", goal: null, result: null },
+            { id: secondSeriesId, status: "pendiente", goal: null, result: null },
+          ],
+        },
+        { exerciseId, series: [] },
+      ],
+    });
+    expect(withSecond.status).toBe(200);
+    const afterSecond = (withSecond.body as { session: SessionDocument }).session;
+
+    const misplaced = await replaceSession(context!, cookie, afterSecond.id, {
+      revision: afterSecond.revision,
+      exercises: [
+        echoExerciseInput(afterSecond.exercises[0]!),
+        {
+          id: afterSecond.exercises[1]!.id,
+          exerciseId,
+          series: [{ id: secondSeriesId, status: "pendiente", goal: null, result: null }],
+        },
+      ],
+    });
+    expect(misplaced.status).toBe(400);
   });
 });
