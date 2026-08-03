@@ -1,10 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { loadCatalog, readCatalogAssets } from "../src/catalog/load-catalog";
 import { migrateDatabase } from "../src/db/migrate";
 import { openDatabase, type DatabaseConnection } from "../src/db/open-database";
-import { plan as planTable, planTraining } from "../src/db/schema";
 import type { MailAdapter } from "../src/mail/mail-adapter";
 
 const baseUrl = "http://127.0.0.1:3000";
@@ -288,8 +286,9 @@ async function deletePlan(
   context: TestContext,
   id: string,
   cookie: string,
+  revision: number,
 ): Promise<{ status: number; body: unknown }> {
-  const response = await context.app.request(`/api/plans/${id}`, {
+  const response = await context.app.request(`/api/plans/${id}?revision=${revision}`, {
     method: "DELETE",
     headers: { Cookie: cookie, Origin: origin },
   });
@@ -1256,14 +1255,14 @@ describe("eliminar borradores", () => {
         },
       ]),
     );
-    const planId = (created.body as { plan: PlanDocument }).plan.id;
+    const plan = (created.body as { plan: PlanDocument }).plan;
 
-    const deleted = await deletePlan(context!, planId, cookieA);
+    const deleted = await deletePlan(context!, plan.id, cookieA, plan.revision);
     expect(deleted.status).toBe(200);
     expect(deleted.body).toEqual({ deleted: true });
 
     // el Plan desaparece
-    const afterDelete = await getPlan(context!, planId, cookieA);
+    const afterDelete = await getPlan(context!, plan.id, cookieA);
     expect(afterDelete.status).toBe(404);
 
     // la Rutina y el Ejercicio siguen existiendo
@@ -1277,8 +1276,68 @@ describe("eliminar borradores", () => {
     expect(exerciseAfter.status).toBe(200);
 
     // eliminar de nuevo responde inexistente
-    const again = await deletePlan(context!, planId, cookieA);
+    const again = await deletePlan(context!, plan.id, cookieA, plan.revision);
     expect(again.status).toBe(404);
+  });
+
+  test("eliminar con una revisión obsoleta devuelve conflicto y no elimina el Plan", async () => {
+    const created = await createPlan(
+      context!,
+      cookieA,
+      planPayload([{ trainings: [{ day: 0, source: "especifico", specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }] }] }]),
+    );
+    const plan = (created.body as { plan: PlanDocument }).plan;
+
+    // la sustitución incrementa la revisión sin salir del borrador
+    const renamed = await replacePlan(context!, plan.id, cookieA, {
+      revision: plan.revision,
+      name: "Renombrado",
+      weeks: (toInput(plan) as { weeks: unknown }).weeks,
+    });
+    expect(renamed.status).toBe(200);
+    expect((renamed.body as { plan: PlanDocument }).plan.revision).toBe(2);
+
+    const stale = await deletePlan(context!, plan.id, cookieA, plan.revision);
+    expect(stale.status).toBe(409);
+    expect(stale.body).toEqual({
+      error: {
+        code: "STALE_REVISION",
+        message: "El Plan fue modificado por otra sesión. Carga la versión actual antes de guardar.",
+      },
+    });
+
+    // sin cambios parciales: el Plan sigue existiendo con su revisión vigente
+    const after = (await getPlan(context!, plan.id, cookieA)).body as { plan: PlanDocument };
+    expect(after.plan.revision).toBe(2);
+    expect(after.plan.name).toBe("Renombrado");
+
+    // la revisión vigente sí elimina
+    const deleted = await deletePlan(context!, plan.id, cookieA, 2);
+    expect(deleted.status).toBe(200);
+    expect((await getPlan(context!, plan.id, cookieA)).status).toBe(404);
+  });
+
+  test("eliminar exige la revisión del Plan", async () => {
+    const created = await createPlan(
+      context!,
+      cookieA,
+      planPayload([{ trainings: [{ day: 0, source: "especifico", specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }] }] }]),
+    );
+    const plan = (created.body as { plan: PlanDocument }).plan;
+
+    const response = await context!.app.request(`/api/plans/${plan.id}`, {
+      method: "DELETE",
+      headers: { Cookie: cookieA, Origin: origin },
+    });
+    expect(response.status).toBe(400);
+    expect(
+      ((await response.json()) as { error: { fields?: Record<string, string[]> } }).error.fields
+        ?.revision,
+    ).toBeDefined();
+
+    // sin cambios parciales: el borrador sigue existiendo
+    const after = (await getPlan(context!, plan.id, cookieA)).body as { plan: PlanDocument };
+    expect(after.plan.status).toBe("borrador");
   });
 
   test("un Plan que ya no es borrador no puede eliminarse", async () => {
@@ -1287,17 +1346,16 @@ describe("eliminar borradores", () => {
       cookieA,
       planPayload([{ trainings: [{ day: 0, source: "especifico", specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }] }] }]),
     );
-    const planId = (created.body as { plan: PlanDocument }).plan.id;
+    const plan = (created.body as { plan: PlanDocument }).plan;
 
-    // Preparación de estado: la activación (ticket 23) todavía no existe por
-    // la API, así que el test pone el Plan en «activo» directamente para
-    // comprobar la guarda de la transición imposible por la operación pública.
-    await context!.connection.db
-      .update(planTable)
-      .set({ status: "activo" })
-      .where(eq(planTable.id, planId));
+    // la activación saca al Plan del borrador por la operación pública
+    const activated = await activatePlan(context!, plan.id, cookieA, plan.revision, {
+      startDate: "2025-08-04",
+    });
+    expect(activated.status).toBe(200);
+    const active = (activated.body as { plan: PlanDocument }).plan;
 
-    const deleted = await deletePlan(context!, planId, cookieA);
+    const deleted = await deletePlan(context!, plan.id, cookieA, active.revision);
     expect(deleted.status).toBe(409);
     expect(deleted.body).toEqual({
       error: {
@@ -1313,11 +1371,11 @@ describe("eliminar borradores", () => {
       cookieA,
       planPayload([{ trainings: [{ day: 0, source: "especifico", specific: [{ exerciseId: press.id, series: [{ repeticiones: 10 }] }] }] }]),
     );
-    const id = (created.body as { plan: PlanDocument }).plan.id;
+    const plan = (created.body as { plan: PlanDocument }).plan;
 
-    const foreign = await deletePlan(context!, id, cookieB);
+    const foreign = await deletePlan(context!, plan.id, cookieB, plan.revision);
     expect(foreign.status).toBe(404);
-    const unknown = await deletePlan(context!, "ffffffffffffffffffffffffffffffff", cookieA);
+    const unknown = await deletePlan(context!, "ffffffffffffffffffffffffffffffff", cookieA, 1);
     expect(unknown.status).toBe(404);
   });
 });
@@ -1727,13 +1785,13 @@ describe("editar un Plan activo", () => {
     const routineTraining = plan.weeks[0]!.trainings[0]!;
     const specificTraining = plan.weeks[0]!.trainings[1]!;
 
-    // el día 3 queda omitido: un día que ya no está pendiente no cambia
-    await context!.connection.db
-      .update(planTraining)
-      .set({ status: "omitido" })
-      .where(eq(planTraining.id, specificTraining.id));
+    // el día 3 queda omitido por la acción pública: un día que ya no está
+    // pendiente no cambia en la sustitución posterior
+    const omitted = await omitTraining(context!, plan.id, specificTraining.id, cookie, plan.revision);
+    expect(omitted.status).toBe(200);
+    const current = (omitted.body as { plan: PlanDocument }).plan;
 
-    const weeks = (toInput(plan) as { weeks: Array<Record<string, unknown>> }).weeks;
+    const weeks = (toInput(current) as { weeks: Array<Record<string, unknown>> }).weeks;
     const weekZero = weeks[0] as { trainings: Array<Record<string, unknown>> };
     const weekOne = weeks[1] as { trainings: Array<Record<string, unknown>> };
     const movedRoutine = {
@@ -1742,16 +1800,16 @@ describe("editar un Plan activo", () => {
     };
 
     const { status, body } = await replacePlan(context!, plan.id, cookie, {
-      revision: plan.revision,
+      revision: current.revision,
       name: "Ciclo activo v2",
       weeks: [
         {
-          id: plan.weeks[0]!.id,
+          id: current.weeks[0]!.id,
           // el día omitido viaja intacto; el pendiente se mueve de día
           trainings: [movedRoutine, weekZero.trainings[1]],
         },
         {
-          id: plan.weeks[1]!.id,
+          id: current.weeks[1]!.id,
           trainings: [...weekOne.trainings, { day: 4, source: "especifico", specific: [{ exerciseId: dominada.id, series: [{ repeticiones: 6 }] }] }],
         },
       ],
@@ -1759,7 +1817,7 @@ describe("editar un Plan activo", () => {
     expect(status).toBe(200);
     const updated = (body as { plan: PlanDocument }).plan;
     expect(updated.name).toBe("Ciclo activo v2");
-    expect(updated.revision).toBe(plan.revision + 1);
+    expect(updated.revision).toBe(current.revision + 1);
 
     // el Entrenamiento pendiente movido de día recalcula su Fecha prevista
     const moved = updated.weeks[0]!.trainings[0]!;
@@ -1785,18 +1843,18 @@ describe("editar un Plan activo", () => {
   test("una edición que modifica un día que ya no está pendiente devuelve conflicto sin cambios parciales", async () => {
     const plan = await activePlanFixture();
     const specificTraining = plan.weeks[0]!.trainings[1]!;
-    await context!.connection.db
-      .update(planTraining)
-      .set({ status: "omitido" })
-      .where(eq(planTraining.id, specificTraining.id));
+    // el día 3 queda omitido por la acción pública
+    const omitted = await omitTraining(context!, plan.id, specificTraining.id, cookie, plan.revision);
+    expect(omitted.status).toBe(200);
+    const current = (omitted.body as { plan: PlanDocument }).plan;
 
-    const input = toInput(plan) as { weeks: Array<Record<string, unknown>> };
+    const input = toInput(current) as { weeks: Array<Record<string, unknown>> };
     const week = input.weeks[0] as { trainings: Array<Record<string, unknown>> };
     const training = week.trainings[1] as { specific: Array<Record<string, unknown>> };
     training.specific = [{ exerciseId: dominada.id, series: [{ repeticiones: 5 }] }];
 
     const { status, body } = await replacePlan(context!, plan.id, cookie, {
-      revision: plan.revision,
+      revision: current.revision,
       name: "Edición prohibida",
       weeks: input.weeks,
     });
@@ -1808,9 +1866,9 @@ describe("editar un Plan activo", () => {
       },
     });
 
-    const current = (await getPlan(context!, plan.id, cookie)).body as { plan: PlanDocument };
-    expect(current.plan.revision).toBe(plan.revision);
-    expect(current.plan.name).toBe(plan.name);
+    const after = (await getPlan(context!, plan.id, cookie)).body as { plan: PlanDocument };
+    expect(after.plan.revision).toBe(current.revision);
+    expect(after.plan.name).toBe(current.name);
   });
 
   test("el calendario de un Plan activo no reorganiza semanas", async () => {
@@ -1834,15 +1892,15 @@ describe("editar un Plan activo", () => {
 
   test("un Plan completado no puede editarse", async () => {
     const plan = await activePlanFixture();
-    await context!.connection.db
-      .update(planTable)
-      .set({ status: "completado" })
-      .where(eq(planTable.id, plan.id));
+    // completar es la operación pública que cierra el Plan
+    const completed = await completePlan(context!, plan.id, cookie, plan.revision);
+    expect(completed.status).toBe(200);
+    const completedPlan = (completed.body as { plan: PlanDocument }).plan;
 
     const { status, body } = await replacePlan(context!, plan.id, cookie, {
-      revision: plan.revision,
+      revision: completedPlan.revision,
       name: "Renombrado imposible",
-      weeks: toInput(plan).weeks as Array<Record<string, unknown>>,
+      weeks: toInput(completedPlan).weeks as Array<Record<string, unknown>>,
     });
     expect(status).toBe(409);
     expect(body).toEqual({
@@ -1913,12 +1971,11 @@ async function duplicatePlan(
   planId: string,
   cookie: string,
   revision: number,
-  body: Record<string, unknown> = {},
 ): Promise<{ status: number; body: unknown }> {
   const response = await context.app.request(`/api/plans/${planId}/duplicate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
-    body: JSON.stringify({ revision, ...body }),
+    body: JSON.stringify({ revision }),
   });
   return { status: response.status, body: (await response.json()) as unknown };
 }
@@ -2232,11 +2289,6 @@ describe("duplicar Planes", () => {
     expect(first.series[1]).toMatchObject({ order: 1, repeticiones: 6 });
     expect(first.series[0]!.id).not.toBe(originalEntries[0]!.series[0]!.id);
     expect(first.series[1]!.id).not.toBe(originalEntries[0]!.series[1]!.id);
-
-    // el nombre se puede decidir al duplicar
-    const named = await duplicatePlan(context!, plan.id, cookieA, plan.revision, { name: "Ciclo nuevo" });
-    expect(named.status).toBe(201);
-    expect((named.body as { plan: PlanDocument }).plan.name).toBe("Ciclo nuevo");
   });
 
   test("duplicar un Plan activo o completado pierde fechas, estados y Sesiones", async () => {
@@ -2671,5 +2723,297 @@ describe("editar un Plan con una Rutina archivada", () => {
       id: routine.id,
       archived: true,
     });
+  });
+});
+
+describe("editar un Plan con un Ejercicio archivado", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+  let press: ExerciseItem;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+    press = await exerciseOfMode(context, cookie, "fuerza_con_carga");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function customExerciseFixture(): Promise<ExerciseItem> {
+    const created = await context!.app.request("/api/exercises", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({
+        name: "Peso muerto con barra",
+        instructions: "Levanta la barra desde el suelo hasta la cadera.",
+        recordingMode: "fuerza_con_carga",
+        category: "Espalda",
+      }),
+    });
+    expect(created.status).toBe(201);
+    return ((await created.json()) as { exercise: ExerciseItem }).exercise;
+  }
+
+  async function archiveExercise(exerciseId: string): Promise<void> {
+    const archived = await context!.app.request(`/api/exercises/${exerciseId}/archive`, {
+      method: "POST",
+      headers: { Cookie: cookie, Origin: origin },
+    });
+    expect(archived.status).toBe(200);
+  }
+
+  async function singleDayFixture(): Promise<PlanDocument> {
+    const custom = await customExerciseFixture();
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            {
+              day: 0,
+              source: "especifico",
+              specific: [{ exerciseId: custom.id, series: [{ repeticiones: 5 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const draft = (created.body as { plan: PlanDocument }).plan;
+    const activated = await activatePlan(context!, draft.id, cookie, draft.revision, {
+      startDate: "2025-08-04",
+    });
+    expect(activated.status).toBe(200);
+    const plan = (activated.body as { plan: PlanDocument }).plan;
+
+    await archiveExercise(custom.id);
+    // el documento vigente se lee después de archivar: la referencia viva
+    // sigue resolviendo el Ejercicio con `available: false`
+    const current = (await getPlan(context!, plan.id, cookie)).body as {
+      plan: PlanDocument;
+    };
+    return current.plan;
+  }
+
+  test("un Plan conserva un Ejercicio archivado ya establecido al renombrar y al editar otro día pendiente", async () => {
+    const plan = await singleDayFixture();
+    const archivedEntry = plan.weeks[0]!.trainings[0]!.content[0]!;
+    expect(archivedEntry.exercise.available).toBe(false);
+
+    // renombrar sigue permitido: la referencia archivada ya establecida no bloquea la edición
+    const renamed = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: "Ciclo con ejercicio archivado",
+      weeks: (toInput(plan) as { weeks: unknown }).weeks,
+    });
+    expect(renamed.status).toBe(200);
+    const renamedPlan = (renamed.body as { plan: PlanDocument }).plan;
+    expect(renamedPlan.name).toBe("Ciclo con ejercicio archivado");
+    expect(renamedPlan.revision).toBe(plan.revision + 1);
+
+    // la referencia viva sigue resolviendo el Ejercicio archivado
+    const keptEntry = renamedPlan.weeks[0]!.trainings[0]!.content[0]!;
+    expect(keptEntry).toMatchObject({
+      id: archivedEntry.id,
+      exerciseId: archivedEntry.exerciseId,
+      exercise: { id: archivedEntry.exerciseId, available: false },
+    });
+    expect(keptEntry.series[0]).toMatchObject({ repeticiones: 5 });
+
+    // editar otro día pendiente (añadir un Entrenamiento con un Ejercicio disponible) sigue permitido
+    const added = await replacePlan(context!, plan.id, cookie, {
+      revision: renamedPlan.revision,
+      name: "Ciclo con ejercicio archivado",
+      weeks: [
+        {
+          id: renamedPlan.weeks[0]!.id,
+          trainings: [
+            ...(toInput(renamedPlan) as { weeks: WeekInput[] }).weeks[0]!.trainings,
+            {
+              day: 1,
+              source: "especifico",
+              specific: [{ exerciseId: press.id, series: [{ repeticiones: 8 }] }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(added.status).toBe(200);
+    const addedPlan = (added.body as { plan: PlanDocument }).plan;
+    expect(addedPlan.weeks[0]!.trainings).toHaveLength(2);
+    expect(addedPlan.weeks[0]!.trainings[1]!).toMatchObject({
+      day: 1,
+      plannedDate: "2025-08-05",
+      status: "pendiente",
+    });
+  });
+
+  test("una referencia nueva a un Ejercicio archivado se rechaza al editar un Plan", async () => {
+    const plan = await singleDayFixture();
+    const alreadyReferencedId = plan.weeks[0]!.trainings[0]!.content[0]!.exerciseId;
+
+    // otro Ejercicio archivado que el Plan todavía no referencia
+    const other = await customExerciseFixture();
+    await archiveExercise(other.id);
+
+    // añadir un Entrenamiento nuevo que usa el Ejercicio archivado es un uso nuevo
+    const input = toInput(plan) as { weeks: WeekInput[] };
+    const rejected = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: plan.name,
+      weeks: [
+        {
+          id: plan.weeks[0]!.id,
+          trainings: [
+            ...input.weeks[0]!.trainings,
+            {
+              day: 1,
+              source: "especifico",
+              specific: [{ exerciseId: other.id, series: [{ repeticiones: 4 }] }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(rejected.status).toBe(400);
+    expect(
+      (rejected.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "weeks[0].trainings[1].specific[0].exerciseId"
+      ],
+    ).toBeDefined();
+
+    // cambiar la referencia de una entrada existente al Ejercicio archivado también se rechaza
+    const existingEntry = input.weeks[0]!.trainings[0]!;
+    expect(existingEntry.specific).toBeDefined();
+    const changedEntry: Record<string, unknown> = {
+      ...existingEntry.specific![0],
+      exerciseId: other.id,
+    };
+    expect((changedEntry as { id?: unknown }).id).toBeDefined();
+    const changedReference = await replacePlan(context!, plan.id, cookie, {
+      revision: plan.revision,
+      name: plan.name,
+      weeks: [
+        {
+          id: plan.weeks[0]!.id,
+          trainings: [
+            {
+              id: plan.weeks[0]!.trainings[0]!.id,
+              day: 0,
+              source: "especifico",
+              specific: [changedEntry],
+            },
+          ],
+        },
+      ],
+    });
+    expect(changedReference.status).toBe(400);
+    expect(
+      (changedReference.body as { error: { fields?: Record<string, string[]> } }).error.fields?.[
+        "weeks[0].trainings[0].specific[0].exerciseId"
+      ],
+    ).toBeDefined();
+
+    // sin cambios parciales: el Plan conserva su estado y revisión
+    const after = (await getPlan(context!, plan.id, cookie)).body as { plan: PlanDocument };
+    expect(after.plan.revision).toBe(plan.revision);
+    expect(after.plan.name).toBe(plan.name);
+    expect(after.plan.weeks[0]!.trainings).toHaveLength(1);
+    expect(after.plan.weeks[0]!.trainings[0]!.content[0]!.exerciseId).toBe(
+      alreadyReferencedId,
+    );
+  });
+
+  test("un borrador conserva un Ejercicio archivado al editarse", async () => {
+    const custom = await customExerciseFixture();
+    const created = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            {
+              day: 0,
+              source: "especifico",
+              specific: [{ exerciseId: custom.id, series: [{ repeticiones: 6 }] }],
+            },
+          ],
+        },
+      ]),
+    );
+    const draft = (created.body as { plan: PlanDocument }).plan;
+
+    await archiveExercise(custom.id);
+
+    // renombrar el borrador conserva la referencia ya establecida
+    const renamed = await replacePlan(context!, draft.id, cookie, {
+      revision: draft.revision,
+      name: "Borrador con ejercicio archivado",
+      weeks: (toInput(draft) as { weeks: unknown }).weeks,
+    });
+    expect(renamed.status).toBe(200);
+    const updated = (renamed.body as { plan: PlanDocument }).plan;
+    expect(updated.name).toBe("Borrador con ejercicio archivado");
+    expect(updated.weeks[0]!.trainings[0]!.content[0]).toMatchObject({
+      exerciseId: custom.id,
+      exercise: { id: custom.id, available: false },
+    });
+  });
+});
+
+describe("validación de parámetros de ruta", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  test("un identificador de Plan o Entrenamiento mal formado responde 400 con la forma común", async () => {
+    const activate = await context!.app.request("/api/plans/no-es-un-id/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({ revision: 1, startDate: "2025-08-04" }),
+    });
+    expect(activate.status).toBe(400);
+    const activateBody = (await activate.json()) as {
+      error: { code: string; message: string; fields?: Record<string, string[]> };
+    };
+    expect(activateBody.error.code).toBe("VALIDATION_ERROR");
+    expect(activateBody.error.fields?.planId).toBeDefined();
+
+    const omit = await context!.app.request(
+      "/api/plans/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/trainings/mal-formado/omit",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+        body: JSON.stringify({ revision: 1 }),
+      },
+    );
+    expect(omit.status).toBe(400);
+    const omitBody = (await omit.json()) as { error: { fields?: Record<string, string[]> } };
+    expect(omitBody.error.fields?.trainingId).toBeDefined();
+
+    // un identificador bien formado que no existe sigue respondiendo inexistente
+    const unknown = await context!.app.request(
+      "/api/plans/ffffffffffffffffffffffffffffffff/activate",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+        body: JSON.stringify({ revision: 1, startDate: "2025-08-04" }),
+      },
+    );
+    expect(unknown.status).toBe(404);
   });
 });

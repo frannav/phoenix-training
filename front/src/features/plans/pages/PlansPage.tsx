@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ApiRequestError } from "../../../shared/http/api-client";
+import { ConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { PageIntro } from "../../../shared/ui/PageIntro";
 import {
   deletePlan,
@@ -31,7 +33,7 @@ export function PlansPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deletePlan,
+    mutationFn: ({ id, revision }: { id: string; revision: number }) => deletePlan(id, revision),
     onSuccess: () => {
       setDeleteTarget(null);
       void queryClient.invalidateQueries({ queryKey: ["plans"] });
@@ -47,6 +49,7 @@ export function PlansPage() {
   });
 
   const plans = plansQuery.data?.items ?? [];
+  const mutationError = deleteMutation.error ?? duplicateMutation.error;
 
   return (
     <>
@@ -62,41 +65,27 @@ export function PlansPage() {
         </Link>
 
         {deleteTarget && (
-          <div
-            className={styles.dialogBackdrop}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirmar-eliminar-plan-titulo"
-            aria-describedby="confirmar-eliminar-plan-descripcion"
-          >
-            <div className={styles.dialog}>
-              <h2 id="confirmar-eliminar-plan-titulo">Eliminar «{deleteTarget.name}»</h2>
-              <p id="confirmar-eliminar-plan-descripcion">
-                El borrador se eliminará por completo. Las Rutinas y Ejercicios que
-                referencia no se borran.
-              </p>
-              <div className={styles.dialogActions}>
-                <button
-                  className={styles.dialogDanger}
-                  type="button"
-                  onClick={() => deleteMutation.mutate(deleteTarget.id)}
-                  disabled={deleteMutation.isPending}
-                >
-                  {deleteMutation.isPending ? "Eliminando…" : "Eliminar"}
-                </button>
-                <button
-                  className={styles.dialogCancel}
-                  type="button"
-                  onClick={() => setDeleteTarget(null)}
-                  disabled={deleteMutation.isPending}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
+          <ConfirmDialog
+            title={`Eliminar «${deleteTarget.name}»`}
+            description="El borrador se eliminará por completo. Las Rutinas y Ejercicios que referencia no se borran."
+            confirmLabel="Eliminar"
+            pendingLabel="Eliminando…"
+            pending={deleteMutation.isPending}
+            onConfirm={() =>
+              deleteMutation.mutate({ id: deleteTarget.id, revision: deleteTarget.revision })
+            }
+            onCancel={() => setDeleteTarget(null)}
+          />
         )}
       </section>
+
+      {mutationError && (
+        <p className={styles.error} role="alert">
+          {mutationError instanceof ApiRequestError
+            ? mutationError.message
+            : "No se pudo completar la acción. Inténtalo de nuevo."}
+        </p>
+      )}
 
       <section className={styles.results} aria-labelledby="planes-titulo" aria-busy={plansQuery.isPending}>
         <h2 id="planes-titulo" className={styles.sectionHeading}>

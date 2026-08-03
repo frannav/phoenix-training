@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiRequestError } from "../../../shared/http/api-client";
+import { ConfirmDialog } from "../../../shared/ui/ConfirmDialog";
 import { PageIntro } from "../../../shared/ui/PageIntro";
 import {
   activatePlan,
@@ -256,58 +257,32 @@ export function PlanDetailPage() {
       )}
 
       {confirmTarget && (
-        <div
-          className={styles.dialogBackdrop}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirmar-accion-titulo"
-          aria-describedby="confirmar-accion-descripcion"
-        >
-          <div className={styles.dialog}>
-            <h2 id="confirmar-accion-titulo">
-              {confirmTarget.type === "complete"
-                ? `Completar «${plan.name}»`
-                : "Omitir este Entrenamiento"}
-            </h2>
-            <p id="confirmar-accion-descripcion">
-              {confirmTarget.type === "complete"
-                ? "Los días pendientes pasarán a omitidos y el Plan cerrará su calendario. Esta acción no se puede deshacer."
-                : `El ${dayLabels[confirmTarget.training.day]}${
-                    confirmTarget.training.plannedDate !== null
-                      ? ` del ${formatDomainDate(confirmTarget.training.plannedDate)}`
-                      : ""
-                  } quedará omitido y no podrá iniciar una Sesión hasta devolverlo a pendiente.`}
-            </p>
-            <div className={styles.dialogActions}>
-              <button
-                className={styles.dialogDanger}
-                type="button"
-                disabled={isActing}
-                onClick={() => {
-                  if (confirmTarget.type === "complete") {
-                    void runAction(() => completePlan(plan.id, plan.revision));
-                  } else {
-                    void runAction(() => omitTraining(plan.id, confirmTarget.training.id, plan.revision));
-                  }
-                }}
-              >
-                {isActing
-                  ? "Guardando…"
-                  : confirmTarget.type === "complete"
-                    ? "Completar"
-                    : "Omitir"}
-              </button>
-              <button
-                className={styles.dialogCancel}
-                type="button"
-                disabled={isActing}
-                onClick={() => setConfirmTarget(null)}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={
+            confirmTarget.type === "complete"
+              ? `Completar «${plan.name}»`
+              : "Omitir este Entrenamiento"
+          }
+          description={
+            confirmTarget.type === "complete"
+              ? "Los días pendientes pasarán a omitidos y el Plan cerrará su calendario. Esta acción no se puede deshacer."
+              : `El ${dayLabels[confirmTarget.training.day]}${
+                  confirmTarget.training.plannedDate !== null
+                    ? ` del ${formatDomainDate(confirmTarget.training.plannedDate)}`
+                    : ""
+                } quedará omitido y no podrá iniciar una Sesión hasta devolverlo a pendiente.`
+          }
+          confirmLabel={confirmTarget.type === "complete" ? "Completar" : "Omitir"}
+          pending={isActing}
+          onConfirm={() => {
+            if (confirmTarget.type === "complete") {
+              void runAction(() => completePlan(plan.id, plan.revision));
+            } else {
+              void runAction(() => omitTraining(plan.id, confirmTarget.training.id, plan.revision));
+            }
+          }}
+          onCancel={() => setConfirmTarget(null)}
+        />
       )}
     </>
   );

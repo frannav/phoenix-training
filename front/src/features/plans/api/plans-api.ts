@@ -141,8 +141,8 @@ export async function replacePlan(
   });
 }
 
-export async function deletePlan(id: string): Promise<{ deleted: true }> {
-  return apiDelete<{ deleted: true }>(`/api/plans/${id}`);
+export async function deletePlan(id: string, revision: number): Promise<{ deleted: true }> {
+  return apiDelete<{ deleted: true }>(`/api/plans/${id}?revision=${revision}`);
 }
 
 /**
@@ -191,12 +191,8 @@ export async function restoreTraining(
 export async function duplicatePlan(
   id: string,
   revision: number,
-  name?: string,
 ): Promise<{ plan: PlanItem }> {
-  return apiPost<{ plan: PlanItem }>(
-    `/api/plans/${id}/duplicate`,
-    name ? { revision, name } : { revision },
-  );
+  return apiPost<{ plan: PlanItem }>(`/api/plans/${id}/duplicate`, { revision });
 }
 
 /**

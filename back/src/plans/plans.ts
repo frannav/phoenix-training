@@ -113,7 +113,8 @@ export type PlanReplaceOutcome =
 export type PlanDeleteOutcome =
   | { ok: true }
   | { ok: false; reason: "not-found" }
-  | { ok: false; reason: "not-draft" };
+  | { ok: false; reason: "not-draft" }
+  | { ok: false; reason: "stale-revision" };
 
 /** Fila persistida de los hijos de un Plan. */
 export type PlanWeekRow = typeof planWeek.$inferSelect;
@@ -184,6 +185,50 @@ export async function validatePlanInput(
       if (row.routineId) {
         unchangedRoutineReferences.add(`${row.id}:${row.routineId}`);
       }
+    }
+  }
+
+  // Referencias específicas ya establecidas del Plan existente: se conservan
+  // aunque el Ejercicio esté retirado o archivado, porque la referencia viva
+  // sobrevive a su retirada (spec «Catálogo y Ejercicios personalizados»). La
+  // clave es `planTrainingId:planTrainingExerciseId:exerciseId` y solo
+  // coincide cuando el Entrenamiento conserva su identidad, la entrada
+  // conserva la suya y el Ejercicio es exactamente el mismo: cualquier uso
+  // nuevo — Entrenamiento nuevo, entrada nueva o cambio de Ejercicio — sigue
+  // rechazándose.
+  const unchangedSpecificReferences = new Set<string>();
+  if (existingPlanId) {
+    const existingSpecificTrainings = await database
+      .select({ id: planTraining.id })
+      .from(planTraining)
+      .where(
+        and(
+          eq(planTraining.planId, existingPlanId),
+          eq(planTraining.source, "especifico"),
+        ),
+      )
+      .all();
+    const existingSpecificEntries =
+      existingSpecificTrainings.length === 0
+        ? []
+        : await database
+            .select({
+              planTrainingId: planTrainingExercise.planTrainingId,
+              id: planTrainingExercise.id,
+              exerciseId: planTrainingExercise.exerciseId,
+            })
+            .from(planTrainingExercise)
+            .where(
+              inArray(
+                planTrainingExercise.planTrainingId,
+                existingSpecificTrainings.map((row) => row.id),
+              ),
+            )
+            .all();
+    for (const entry of existingSpecificEntries) {
+      unchangedSpecificReferences.add(
+        `${entry.planTrainingId}:${entry.id}:${entry.exerciseId}`,
+      );
     }
   }
 
@@ -263,20 +308,38 @@ export async function validatePlanInput(
       if (training.specific.length === 0) {
         addError(key("specific"), "Un Entrenamiento específico necesita al menos un Ejercicio.");
       }
-      validateSpecificContent(exerciseById, accountId, training.specific, key, addError);
+      validateSpecificContent({
+        exerciseById,
+        accountId,
+        trainingId: training.id,
+        unchangedSpecificReferences,
+        entries: training.specific,
+        key,
+        addError,
+      });
     });
   });
 
   return Object.keys(fields).length > 0 ? { ok: false, fields } : { ok: true };
 }
 
-function validateSpecificContent(
-  exerciseById: Map<string, typeof exercise.$inferSelect>,
-  accountId: string,
-  entries: PlanSpecificExerciseInput[],
-  key: (...segments: Array<string | number>) => string,
-  addError: (key: string, message: string) => void,
-): void {
+function validateSpecificContent({
+  exerciseById,
+  accountId,
+  trainingId,
+  unchangedSpecificReferences,
+  entries,
+  key,
+  addError,
+}: {
+  exerciseById: Map<string, typeof exercise.$inferSelect>;
+  accountId: string;
+  trainingId: string | undefined;
+  unchangedSpecificReferences: Set<string>;
+  entries: PlanSpecificExerciseInput[];
+  key: (...segments: Array<string | number>) => string;
+  addError: (key: string, message: string) => void;
+}): void {
   entries.forEach((entry, index) => {
     const row = exerciseById.get(entry.exerciseId);
     const visible = row !== undefined && (row.accountId === null || row.accountId === accountId);
@@ -289,11 +352,22 @@ function validateSpecificContent(
     }
     const exerciseRow = row!;
     if (!exerciseRow.available) {
-      addError(
-        key("specific", index, "exerciseId"),
-        "El Ejercicio no está disponible para usos nuevos.",
-      );
-      return;
+      // Una referencia específica ya establecida sobrevive a la retirada o el
+      // archivo del Ejercicio: solo los usos nuevos de un Ejercicio no
+      // disponible se rechazan (spec «Catálogo y Ejercicios personalizados»).
+      const unchanged =
+        trainingId !== undefined &&
+        entry.id !== undefined &&
+        unchangedSpecificReferences.has(
+          `${trainingId}:${entry.id}:${entry.exerciseId}`,
+        );
+      if (!unchanged) {
+        addError(
+          key("specific", index, "exerciseId"),
+          "El Ejercicio no está disponible para usos nuevos.",
+        );
+        return;
+      }
     }
 
     const mode = exerciseRow.recordingMode as RecordingMode;
@@ -1021,30 +1095,44 @@ export async function replacePlan(
 }
 
 /**
- * Elimina por completo un Plan propio. Solo un borrador puede eliminarse en
- * el MVP: los Planes activos y completados conservan su estructura y
- * calendario. Eliminar el Plan no elimina las Rutinas ni Ejercicios que
- * referencia: las claves foráneas no propagan borrados a otras Cuentas.
+ * Elimina por completo un Plan propio dentro de una única transacción. Solo
+ * un borrador puede eliminarse en el MVP: los Planes activos y completados
+ * conservan su estructura y calendario. La acción respeta la revisión leída:
+ * una revisión obsoleta devuelve conflicto sin eliminar nada. Eliminar el
+ * Plan no elimina las Rutinas ni Ejercicios que referencia: las claves
+ * foráneas no propagan borrados a otras Cuentas.
  */
 export async function deletePlan(
   database: AppDatabase,
-  { accountId, planId }: { accountId: string; planId: string },
+  {
+    accountId,
+    planId,
+    revision,
+  }: { accountId: string; planId: string; revision: number },
 ): Promise<PlanDeleteOutcome> {
-  const current = await database
-    .select({ id: plan.id, status: plan.status })
-    .from(plan)
-    .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)))
-    .get();
-  if (!current) {
-    return { ok: false, reason: "not-found" };
-  }
-  if (current.status !== "borrador") {
-    return { ok: false, reason: "not-draft" };
-  }
-  await database
-    .delete(plan)
-    .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)));
-  return { ok: true };
+  let outcome: PlanDeleteOutcome = { ok: false, reason: "not-found" };
+  await database.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(plan)
+      .where(and(eq(plan.id, planId), eq(plan.accountId, accountId)))
+      .get();
+    if (!current) {
+      outcome = { ok: false, reason: "not-found" };
+      return;
+    }
+    if (current.status !== "borrador") {
+      outcome = { ok: false, reason: "not-draft" };
+      return;
+    }
+    if (current.revision !== revision) {
+      outcome = { ok: false, reason: "stale-revision" };
+      return;
+    }
+    tx.delete(plan).where(eq(plan.id, planId)).run();
+    outcome = { ok: true };
+  });
+  return outcome;
 }
 
 export type PlanTrainingTransitionOutcome =

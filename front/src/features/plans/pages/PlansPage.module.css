@@ -146,59 +146,6 @@
   color: var(--color-ink-muted);
 }
 
-.dialogBackdrop {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgb(25 32 24 / 45%);
-  padding: 1rem;
-  z-index: 20;
-}
-
-.dialog {
-  max-width: 26rem;
-  width: 100%;
-  border-radius: 1rem;
-  padding: 1.25rem;
-  background: var(--color-surface);
-  display: grid;
-  gap: 0.75rem;
-}
-
-.dialog h2 {
-  margin: 0;
-  font-size: 1.05rem;
-}
-
-.dialog p {
-  margin: 0;
-  color: var(--color-ink-muted);
-}
-
-.dialogActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.6rem;
-  margin-top: 0.4rem;
-}
-
-.dialogDanger {
-  border: 0;
-  border-radius: 0.6rem;
-  padding: 0.55rem 0.9rem;
-  font-weight: 700;
-  color: var(--color-on-accent);
-  background: var(--color-danger);
-}
-
-.dialogCancel {
-  border: 1px solid var(--color-border);
-  border-radius: 0.6rem;
-  padding: 0.55rem 0.9rem;
-  background: var(--color-surface);
-}
-
 @media (min-width: 40rem) {
   .list {
     grid-template-columns: repeat(2, minmax(0, 1fr));

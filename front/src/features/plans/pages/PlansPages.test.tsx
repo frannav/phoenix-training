@@ -96,7 +96,7 @@ type PlansHandlers = {
   get?: (id: string) => PlanItem;
   create?: (body: unknown) => PlanItem;
   replace?: (id: string, body: unknown) => { status: number; body: unknown };
-  delete?: (id: string) => void;
+  delete?: (id: string, revision: number) => void;
   activate?: (id: string, body: { revision: number; startDate: string }) => PlanItem;
   complete?: (id: string, body: { revision: number }) => PlanItem;
   omit?: (id: string, trainingId: string, body: { revision: number }) => PlanItem;
@@ -126,7 +126,7 @@ function stubPlans(handlers: PlansHandlers) {
       return handlers.replace!(detailMatch[1]!, body);
     }
     if (detailMatch && method === "DELETE") {
-      handlers.delete!(detailMatch[1]!);
+      handlers.delete!(detailMatch[1]!, Number(parsed.searchParams.get("revision")));
       return { status: 200, body: { deleted: true } };
     }
     const activateMatch = parsed.pathname.match(/^\/api\/plans\/([0-9a-f]+)\/activate$/);
@@ -241,7 +241,8 @@ describe("listado de Planes", () => {
     const items = [planFixture()];
     stubPlans({
       list: () => items,
-      delete: (id) => {
+      delete: (id, revision) => {
+        expect(revision).toBe(1);
         items.splice(
           items.findIndex((item) => item.id === id),
           1,
@@ -640,7 +641,7 @@ describe("activar un Plan borrador", () => {
     vi.unstubAllGlobals();
   });
 
-  test("pide el lunes de la primera semana y activa con la Fecha prevista calculada", async () => {
+  test("envía la fecha elegida y refleja la Fecha prevista calculada", async () => {
     const user = userEvent.setup();
     const plan = planFixture();
     const requests: Array<{ id: string; body: { revision: number; startDate: string } }> = [];
@@ -672,14 +673,9 @@ describe("activar un Plan borrador", () => {
     const activateButton = screen.getByRole("button", { name: "Activar Plan" });
     expect(activateButton).toBeDisabled();
 
-    // un martes no activa: la primera semana empieza en lunes
-    fireEvent.change(dateInput, { target: { value: "2025-08-05" } });
-    expect(screen.getByRole("alert")).toHaveTextContent(/empieza en lunes/);
-    expect(activateButton).toBeDisabled();
-
-    // el lunes habilita la activación
+    // La validación de que la fecha sea lunes pertenece al servidor; aquí se
+    // comprueba que el editor envía la fecha elegida junto a la revisión.
     fireEvent.change(dateInput, { target: { value: "2025-08-04" } });
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(activateButton).toBeEnabled();
 
     await user.click(activateButton);
