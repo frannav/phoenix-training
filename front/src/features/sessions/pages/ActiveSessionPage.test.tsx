@@ -712,10 +712,11 @@ describe("registrar resultados por Serie en la interfaz", () => {
     expect(putCalls).toBe(0);
   });
 
-  test("añadir una Serie crea una Serie pendiente nueva", async () => {
+  test("añadir una Serie propone como borrador los valores de la anterior", async () => {
     const occurrence = occurrenceDoc(benchPress, [
       seriesDoc({ id: "serie-1", status: "completada", result: { carga: 80, repeticiones: 10, duracion: null } }),
     ]);
+    const proposedGoal = { carga: 80, repeticiones: 10, duracion: null };
     const putBodies: unknown[] = [];
     stubFetch((url, init) => {
       if (url === "/api/sessions/sesion-activa" && (init.method ?? "GET") === "PUT") {
@@ -725,8 +726,8 @@ describe("registrar resultados por Serie en la interfaz", () => {
           body: {
             session: sessionWithOccurrence(
               occurrenceDoc(benchPress, [
-                seriesDoc({ id: "serie-1", status: "completada", result: { carga: 80, repeticiones: 10, duracion: null } }),
-                seriesDoc({ id: "serie-2", order: 1 }),
+                seriesDoc({ id: "serie-1", status: "completada", result: proposedGoal }),
+                seriesDoc({ id: "serie-2", order: 1, goal: proposedGoal }),
               ]),
             ),
           },
@@ -745,10 +746,60 @@ describe("registrar resultados por Serie en la interfaz", () => {
     );
     await user.click(screen.getByRole("button", { name: "Añadir serie" }));
 
-    expect(await screen.findByRole("group", { name: "Serie 2" })).toBeInTheDocument();
     const payload = (putBodies[0] as { exercises: { series: unknown[] }[] }).exercises[0]!;
     expect(payload.series).toHaveLength(2);
-    expect(payload.series[1]).toEqual({ status: "pendiente", goal: null, result: null });
+    // la Serie nueva nace pendiente con los valores de la anterior como
+    // Objetivos, que inicializan los campos del formulario sin completarla.
+    expect(payload.series[1]).toEqual({ status: "pendiente", goal: proposedGoal, result: null });
+
+    const row = await screen.findByRole("group", { name: "Serie 2" });
+    expect(within(row).getByText("Pendiente")).toBeInTheDocument();
+    expect((within(row).getByLabelText("Carga (kg)") as HTMLInputElement).value).toBe("80");
+    expect((within(row).getByLabelText("Repeticiones") as HTMLInputElement).value).toBe("10");
+  });
+
+  test("añadir una Serie copia los Objetivos de una anterior pendiente", async () => {
+    const occurrence = occurrenceDoc(benchPress, [
+      seriesDoc({ id: "serie-1", goal: { carga: 60, repeticiones: 8, duracion: null } }),
+    ]);
+    const putBodies: unknown[] = [];
+    stubFetch((url, init) => {
+      if (url === "/api/sessions/sesion-activa" && (init.method ?? "GET") === "PUT") {
+        putBodies.push(JSON.parse(String(init.body)));
+        return {
+          status: 200,
+          body: {
+            session: sessionWithOccurrence(
+              occurrenceDoc(benchPress, [
+                seriesDoc({ id: "serie-1", goal: { carga: 60, repeticiones: 8, duracion: null } }),
+                seriesDoc({ id: "serie-2", order: 1, goal: { carga: 60, repeticiones: 8, duracion: null } }),
+              ]),
+            ),
+          },
+        };
+      }
+      if (url === "/api/sessions/sesion-activa") {
+        return { status: 200, body: { session: sessionWithOccurrence(occurrence) } };
+      }
+      return { status: 404, body: { error: { code: "NOT_FOUND", message: "no" } } };
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: /Press de banca con barra/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Añadir serie" }));
+
+    const payload = (putBodies[0] as { exercises: { series: unknown[] }[] }).exercises[0]!;
+    expect(payload.series[1]).toEqual({
+      status: "pendiente",
+      goal: { carga: 60, repeticiones: 8, duracion: null },
+      result: null,
+    });
+    const row = await screen.findByRole("group", { name: "Serie 2" });
+    expect((within(row).getByLabelText("Carga (kg)") as HTMLInputElement).value).toBe("60");
+    expect((within(row).getByLabelText("Repeticiones") as HTMLInputElement).value).toBe("8");
   });
 
   test("añadir un Ejercicio de cardio continuo desde el selector crea su única Serie pendiente", async () => {

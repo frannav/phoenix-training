@@ -281,11 +281,26 @@ export function ActiveSessionPage() {
     if (!session) {
       return;
     }
+    // «Añadir una Serie propone como borrador los valores de la Serie
+    // anterior»: la Serie nueva nace pendiente con esos valores como
+    // Objetivos, y los Objetivos inicializan los campos del formulario sin
+    // completarla. De una Serie completada se proponen los valores realmente
+    // realizados (Resultado); de una pendiente u omitida, sus Objetivos.
+    const previous = occurrence.series[occurrence.series.length - 1];
+    const proposedGoal =
+      previous === undefined
+        ? null
+        : previous.status === "completada"
+          ? previous.result
+          : previous.goal;
     const exercises = toAggregateInput(session).map((entry) =>
       entry.id === occurrence.id
         ? {
             ...entry,
-            series: [...entry.series, { status: "pendiente" as const, goal: null, result: null }],
+            series: [
+              ...entry.series,
+              { status: "pendiente" as const, goal: proposedGoal, result: null },
+            ],
           }
         : entry,
     );
