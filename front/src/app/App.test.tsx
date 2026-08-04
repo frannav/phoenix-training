@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { emptyDashboard } from "../test/dashboard-fixtures";
 import { App } from "./App";
 
 const verifiedSession = {
@@ -52,6 +53,11 @@ describe("application navigation", () => {
         
         if (url === "/api/auth/get-session") {
           return Response.json(verifiedSession);
+        }
+        if (url.startsWith("/api/dashboard")) {
+          // Inicio consume el contrato del dashboard; sin datos basta para
+          // la navegación, que es lo que se comprueba aquí.
+          return Response.json(emptyDashboard);
         }
         if (url === "/api/sessions/active") {
           return Response.json({ session: null });
