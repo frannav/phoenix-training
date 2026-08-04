@@ -226,6 +226,8 @@ export function AccountPage() {
             setError(null);
             setDeletePasswordError(null);
             setDeleteError(null);
+            setDeletePassword("");
+            setDeleteConfirmed(false);
             setConfirmingDelete(true);
           }}
         >
@@ -279,7 +281,13 @@ export function AccountPage() {
                 className={styles.signOut}
                 type="button"
                 disabled={deletingAccount}
-                onClick={() => setConfirmingDelete(false)}
+                onClick={() => {
+                  setDeletePassword("");
+                  setDeleteConfirmed(false);
+                  setDeletePasswordError(null);
+                  setDeleteError(null);
+                  setConfirmingDelete(false);
+                }}
               >
                 Cancelar
               </button>

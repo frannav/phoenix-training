@@ -123,6 +123,34 @@ describe("pantalla de Cuenta", () => {
     expect(confirmButton).toBeEnabled();
   });
 
+  test("al cancelar y reabrir, la eliminación exige volver a introducir la contraseña y confirmar", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Eliminar mi cuenta" }));
+    await user.type(
+      screen.getByLabelText("Contraseña para eliminar la Cuenta"),
+      "contraseña-segura",
+    );
+    await user.click(screen.getByRole("checkbox"));
+    expect(
+      screen.getByRole("button", { name: "Eliminar mi cuenta definitivamente" }),
+    ).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Eliminar mi cuenta" }));
+
+    expect(
+      screen.getByLabelText("Contraseña para eliminar la Cuenta"),
+    ).toHaveValue("");
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(
+      screen.getByRole("button", { name: "Eliminar mi cuenta definitivamente" }),
+    ).toBeDisabled();
+  });
+
   test("elimina la Cuenta con la contraseña y la confirmación y devuelve a la entrada", async () => {
     const user = userEvent.setup();
     let deleteBody: unknown = null;
