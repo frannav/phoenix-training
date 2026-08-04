@@ -1,37 +1,49 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ApiRequestError } from "../../../shared/http/api-client";
 import { PageIntro } from "../../../shared/ui/PageIntro";
 import {
   activeSessionQueryKey,
   getActiveSession,
-  sessionProgressLabel,
-  sessionTitle,
-  startFreeSession,
+  startSession,
 } from "../../sessions/api/sessions-api";
-import { getSystemHealth } from "../api/get-system-health";
+import { dashboardQueryKeyFor, getDashboard } from "../api/dashboard-api";
+import { ActivePlanBlock } from "../components/ActivePlanBlock";
+import { EvolutionBlock } from "../components/EvolutionBlock";
+import { RecentMaxesBlock } from "../components/RecentMaxesBlock";
+import { TrainingBlock } from "../components/TrainingBlock";
+import { WeeklyVolumeBlock } from "../components/WeeklyVolumeBlock";
 import styles from "./HomePage.module.css";
 
+/**
+ * Inicio: el recorrido vertical de los cinco bloques acordados (spec
+ * «Inicio, navegación y presentación adaptable») consumiendo el contrato de
+ * `GET /api/dashboard` (ticket 33). La página es la única dueña de la lectura
+ * única y de las acciones de iniciar Sesión; los bloques presentan datos ya
+ * agregados por la API sin recalcular reglas de dominio.
+ */
 export function HomePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
 
-  const health = useQuery({
-    queryKey: ["system", "health"],
-    queryFn: getSystemHealth,
+  const dashboard = useQuery({
+    // El Ejercicio elegido del bloque «Evolución» viaja en la consulta de la
+    // lectura única; mientras se refresca se conserva la lectura anterior.
+    queryKey: dashboardQueryKeyFor(selectedExerciseId),
+    queryFn: () => getDashboard(selectedExerciseId ?? undefined),
     retry: false,
-  });
-
-  const activeSession = useQuery({
-    queryKey: activeSessionQueryKey,
-    queryFn: getActiveSession,
-    retry: false,
+    placeholderData: (previousData) => previousData,
   });
 
   const startMutation = useMutation({
-    mutationFn: startFreeSession,
+    mutationFn: startSession,
     onSuccess: ({ session }) => {
       void queryClient.setQueryData(activeSessionQueryKey, { session });
+      // La nueva Sesión activa cambia la lectura de Inicio (spec «API y
+      // concurrencia»: las mutaciones invalidan ampliamente Inicio).
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       navigate(`/sesion/${session.id}`);
     },
     onError: async (error) => {
@@ -46,13 +58,11 @@ export function HomePage() {
             navigate(`/sesion/${current.session.id}`);
           }
         } catch {
-          // sin conexión: el mensaje de error de abajo queda visible
+          // sin conexión: el mensaje de error de la acción queda visible
         }
       }
     },
   });
-
-  const session = activeSession.data?.session ?? null;
 
   return (
     <>
@@ -62,55 +72,48 @@ export function HomePage() {
         description="Todo preparado para decidir qué entrenar hoy."
       />
 
-      <section className={styles.trainingBlock} aria-labelledby="entrenamiento-actual">
-        <h2 className={styles.trainingTitle} id="entrenamiento-actual">
-          Entrenamiento actual
-        </h2>
+      <div className={styles.blocks}>
+        {dashboard.isPending && <p className={styles.status}>Cargando tu Inicio…</p>}
 
-        {activeSession.isPending && (
-          <p className={styles.trainingStatus}>Comprobando tu entrenamiento…</p>
-        )}
-
-        {!activeSession.isPending && session && (
-          <div className={styles.activeSessionCard}>
-            <span className={styles.activeSessionName}>{sessionTitle(session)}</span>
-            <span className={styles.activeSessionProgress}>
-              {sessionProgressLabel(session)}
-            </span>
-            <Link className={styles.continueButton} to={`/sesion/${session.id}`}>
-              Continuar
-            </Link>
-          </div>
-        )}
-
-        {!activeSession.isPending && !session && (
-          <div className={styles.freeSessionCard}>
-            <p className={styles.freeSessionTitle}>Sesión libre</p>
-            <p className={styles.freeSessionText}>
-              Empieza a registrar sin Rutina ni Plan previo.
-            </p>
-            <button
-              className={styles.startButton}
-              type="button"
-              onClick={() => startMutation.mutate()}
-              disabled={startMutation.isPending}
-            >
-              {startMutation.isPending ? "Iniciando…" : "Iniciar Sesión libre"}
+        {dashboard.isError && (
+          <p className={styles.error} role="alert">
+            No se pudo cargar tu Inicio. Inténtalo de nuevo.
+            <button type="button" onClick={() => void dashboard.refetch()}>
+              Reintentar
             </button>
-            {startMutation.isError && (
-              <p className={styles.startError} role="alert">
-                No se pudo iniciar la Sesión. Inténtalo de nuevo.
-              </p>
-            )}
-          </div>
+          </p>
         )}
-      </section>
 
-      <p className={styles.status} role="status">
-        {health.isPending && "Conectando con el servidor…"}
-        {health.isSuccess && "Aplicación conectada"}
-        {health.isError && "No se pudo conectar con el servidor"}
-      </p>
+        {dashboard.isSuccess && (
+          <>
+            {/* En escritorio entrenamiento y Plan comparten la primera fila;
+                volumen y RM recientes la segunda; la evolución ocupa el
+                ancho inferior (ticket 07). En móvil todas son filas de una
+                sola columna en el mismo orden. */}
+            <section className={styles.topRow} aria-label="Entrenamiento y Plan">
+              <TrainingBlock
+                training={dashboard.data.training}
+                isStarting={startMutation.isPending}
+                startError={startMutation.isError}
+                onStartFree={() => startMutation.mutate({ origin: "libre" })}
+                onStartPlan={(planId, trainingId) =>
+                  startMutation.mutate({ origin: "plan", planId, trainingId })
+                }
+              />
+              <ActivePlanBlock plan={dashboard.data.activePlan} />
+            </section>
+            <section className={styles.analyticsRow} aria-label="Volumen y RM recientes">
+              <WeeklyVolumeBlock volume={dashboard.data.weeklyVolume} />
+              <RecentMaxesBlock recordedMaxes={dashboard.data.recentRecordedMaxes} />
+            </section>
+            <EvolutionBlock
+              options={dashboard.data.evolution.options}
+              current={dashboard.data.evolution.current}
+              onSelectExercise={setSelectedExerciseId}
+            />
+          </>
+        )}
+      </div>
     </>
   );
 }

@@ -1,99 +1,46 @@
-.status {
-  width: fit-content;
-  border-radius: 999px;
-  margin: 1.5rem 0 0;
-  padding: 0.55rem 0.8rem;
-  background: var(--color-success-soft);
-  color: var(--color-success-dark);
-  font-size: 0.875rem;
-  font-weight: 700;
-}
-
-.trainingBlock {
+.blocks {
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
   margin-top: 2rem;
 }
 
-.trainingTitle {
-  margin: 0;
-  font-size: 1.05rem;
-}
-
-.trainingStatus {
-  margin: 0;
-  color: var(--color-ink-muted);
-  font-weight: 700;
-}
-
-.activeSessionCard {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: 1.25rem;
-  padding: 1.1rem 1.25rem;
-  background: var(--color-surface-muted);
-}
-
-.activeSessionName {
-  font-weight: 800;
-}
-
-.activeSessionProgress {
-  margin-left: auto;
-  color: var(--color-ink-muted);
-  font-size: 0.875rem;
-  font-weight: 700;
-}
-
-.continueButton {
-  border-radius: 0.8rem;
-  padding: 0.65rem 1rem;
-  background: var(--color-success);
-  color: var(--color-surface);
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.freeSessionCard {
+.topRow,
+.analyticsRow {
   display: grid;
-  gap: 0.4rem;
-  border: 1px solid var(--color-border);
-  border-radius: 1.25rem;
-  padding: 1.25rem;
-  background: var(--color-surface-muted);
+  gap: 1rem;
 }
 
-.freeSessionTitle {
-  margin: 0;
-  font-weight: 800;
+@media (min-width: 48rem) {
+  /* Escritorio: entrenamiento y Plan comparten la primera fila; volumen y
+     RM recientes la segunda. La evolución conserva el ancho completo. */
+  .topRow {
+    grid-template-columns: 1.1fr 1fr;
+  }
+
+  .analyticsRow {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
-.freeSessionText {
+.status {
   margin: 0;
   color: var(--color-ink-muted);
-  font-size: 0.9rem;
-}
-
-.startButton {
-  width: fit-content;
-  margin-top: 0.5rem;
-  border: 0;
-  border-radius: 0.8rem;
-  padding: 0.7rem 1.1rem;
-  background: var(--color-ink);
-  color: var(--color-surface);
-  font-weight: 800;
-}
-
-.startButton:disabled {
-  opacity: 0.6;
-}
-
-.startError {
-  margin: 0;
-  color: var(--color-danger-dark, #b42318);
   font-weight: 700;
-  font-size: 0.875rem;
+}
+
+.error {
+  display: grid;
+  justify-items: start;
+  gap: 0.7rem;
+  margin: 0;
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.error button {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  font-weight: 700;
+  background: var(--color-surface);
 }

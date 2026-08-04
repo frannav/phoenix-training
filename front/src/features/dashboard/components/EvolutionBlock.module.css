@@ -1,0 +1,107 @@
+.card {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.pickerLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pickerText {
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.picker {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--color-surface);
+  font-weight: 700;
+}
+
+.evolutionCard,
+.absentCard,
+.emptyCard {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 1.25rem;
+  padding: 1.25rem;
+  background: var(--color-surface-muted);
+}
+
+.metricLine {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.metricLabel {
+  font-weight: 800;
+}
+
+.metricUnit {
+  color: var(--color-ink-muted);
+  font-weight: 700;
+}
+
+.chartFigure {
+  margin: 0.4rem 0 0;
+}
+
+.chart {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.summary {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+}
+
+.summary strong {
+  color: var(--color-ink);
+}
+
+.absentTitle {
+  margin: 0;
+  font-weight: 800;
+}
+
+.absentText,
+.emptyText,
+.absentCard p {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+}
+
+.emptyAction {
+  justify-self: start;
+  margin-top: 0.3rem;
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+}

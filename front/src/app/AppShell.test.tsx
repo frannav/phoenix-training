@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { stubFetch } from "../test/mock-fetch";
+import { emptyDashboard } from "../test/dashboard-fixtures";
 import type { SessionDocument } from "../features/sessions/api/sessions-api";
 import { App } from "./App";
 
@@ -61,6 +62,11 @@ function stubApp(session: SessionDocument | null) {
   stubFetch((url) => {
     if (url === "/api/auth/get-session") {
       return { status: 200, body: verifiedSession };
+    }
+    if (url.startsWith("/api/dashboard")) {
+      // Inicio consume el contrato del dashboard: sin datos basta para el
+      // acceso persistente; el estado vacío de Inicio no participa aquí.
+      return { status: 200, body: emptyDashboard };
     }
     if (url === "/api/sessions/active") {
       return { status: 200, body: { session } };

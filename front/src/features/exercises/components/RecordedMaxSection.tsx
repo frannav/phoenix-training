@@ -9,21 +9,11 @@ import {
   type RecordedMax,
   type RecordedMaxFormValues,
 } from "../api/exercises-api";
+import { formatDomainDate, formatLoad } from "../../../shared/format";
 import { RecordedMaxForm, type ExerciseOption } from "./RecordedMaxForm";
 import styles from "./RecordedMaxSection.module.css";
 
 type FormState = { mode: "create" } | { mode: "edit"; rm: RecordedMax } | null;
-
-/** La carga se presenta en español: coma decimal y unidades en kilogramos. */
-function formatLoad(load: number): string {
-  return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(load);
-}
-
-/** La fecha de dominio YYYY-MM-DD se presenta como DD/MM/AAAA. */
-function formatDomainDate(date: string): string {
-  const [year, month, day] = date.split("-");
-  return `${day}/${month}/${year}`;
-}
 
 function sortByExerciseName(options: ExerciseOption[]): ExerciseOption[] {
   return [...options].sort((a, b) => a.name.localeCompare(b.name, "es"));
