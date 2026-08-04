@@ -54,6 +54,15 @@ describe("pantalla de entrada", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/Sesión cerrada/i);
   });
 
+  test("muestra confirmación tras eliminar la Cuenta definitivamente", () => {
+    renderPage(["/entrar?estado=cuenta-eliminada"]);
+
+    expect(screen.getByRole("status")).toHaveTextContent(/eliminado definitivamente/i);
+    expect(
+      screen.getByRole("link", { name: "Crear cuenta" }),
+    ).toHaveAttribute("href", "/registro");
+  });
+
   test("muestra errores junto a los campos sin enviar la petición", async () => {
     const user = userEvent.setup();
     const fetchSpy = vi.fn();

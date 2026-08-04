@@ -82,6 +82,20 @@
   margin: 0;
 }
 
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 36rem;
+  color: var(--color-ink);
+  line-height: 1.5;
+}
+
+.checkbox input {
+  margin-top: 0.2rem;
+  accent-color: var(--color-danger);
+}
+
 .confirmationActions {
   display: flex;
   flex-wrap: wrap;

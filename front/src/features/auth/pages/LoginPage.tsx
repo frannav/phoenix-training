@@ -89,6 +89,17 @@ export function LoginPage() {
             <p>Sesión cerrada correctamente.</p>
           </div>
         )}
+        {searchParams.get("estado") === "cuenta-eliminada" && (
+          <div className={styles.result} role="status">
+            <span className={styles.resultIcon} aria-hidden="true">
+              ✓
+            </span>
+            <p>
+              Tu Cuenta y todos sus datos se han eliminado definitivamente. Crea
+              una Cuenta nueva para volver a entrenar.
+            </p>
+          </div>
+        )}
         {pendingVerification && (
           <div className={styles.alert} role="alert">
             <span aria-hidden="true">✉</span>
