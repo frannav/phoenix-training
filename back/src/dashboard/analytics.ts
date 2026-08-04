@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import type { AppDatabase } from "../db/open-database";
 import {
   exercise,
@@ -101,6 +101,10 @@ export async function weeklyVolume(
   if (previousWeekStart === null) {
     throw new Error("No se puede calcular la semana anterior.");
   }
+  const currentSunday = addDomainDays(currentWeekStart, 6);
+  if (currentSunday === null) {
+    throw new Error("No se puede calcular el domingo de la semana actual.");
+  }
   const rangeStart = addDomainDays(currentWeekStart, -7 * (weeklyVolumeWeeks - 1));
   if (rangeStart === null) {
     throw new Error("No se puede calcular el rango de las seis semanas.");
@@ -128,6 +132,9 @@ export async function weeklyVolume(
         eq(trainingSessionSeries.status, "completada"),
         eq(exercise.recordingMode, "fuerza_con_carga"),
         gte(trainingSession.datePerformed, rangeStart),
+        // Las barras son exactamente las últimas seis semanas: una Sesión
+        // con Fecha realizada posterior al domingo actual queda fuera.
+        lte(trainingSession.datePerformed, currentSunday),
       ),
     )
     .groupBy(trainingSession.datePerformed)
@@ -142,7 +149,12 @@ export async function weeklyVolume(
   }
   for (const row of rows) {
     const weekStart = mondayOf(row.datePerformed);
-    totalsByWeek.set(weekStart, (totalsByWeek.get(weekStart) ?? 0) + row.volume);
+    if (!totalsByWeek.has(weekStart)) {
+      // Defensa en profundidad: una semana fuera del mapa inicializado (p.
+      // ej. futura respecto al domingo actual) no crea una barra adicional.
+      continue;
+    }
+    totalsByWeek.set(weekStart, totalsByWeek.get(weekStart)! + row.volume);
   }
 
   const weeks: WeeklyVolumeWeek[] = [...totalsByWeek.entries()].map(
@@ -221,7 +233,9 @@ export type EvolutionPoint = {
   /**
    * Intensidad relativa máxima de la Sesión (solo fuerza con carga): la
    * mayor proporción `carga de la Serie / RM vigente de una repetición × 100`,
-   * redondeada a un decimal. Puede superar el 100 %. Nula sin RM vigente.
+   * redondeada a un decimal. Puede superar el 100 %. Nula sin RM vigente o
+   * cuando el RM vigente tiene carga cero: un denominador cero no expresa
+   * una proporción con un decimal, y nunca se estima un 1RM.
    */
   intensidadRelativaMax: number | null;
 };
@@ -366,7 +380,9 @@ export async function exerciseEvolution(
     let intensidadRelativaMax: number | null = null;
     if (metric === "carga_maxima") {
       const oneRepLoad = oneRepMaxByDate.get(entry.date);
-      if (oneRepLoad !== undefined) {
+      // Carga cero no es un denominador utilizable: la intensidad se omite
+      // como sin RM vigente, sin estimar nunca un 1RM.
+      if (oneRepLoad !== undefined && oneRepLoad > 0) {
         for (const series of entry.series) {
           if (series.carga === null) {
             continue;

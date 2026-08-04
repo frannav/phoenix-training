@@ -361,6 +361,27 @@ describe("volumen semanal", () => {
     ]);
   });
 
+  test("una Sesión con Fecha realizada posterior a la semana actual no crea una séptima barra", async () => {
+    await finalizedSessionWithSeries(context!, cookie, fuerzaId, [
+      { status: "completada", goal: null, result: { carga: 100, repeticiones: 10 }, rpe: null },
+    ], "2025-03-12");
+    // El lunes siguiente a la semana actual (10–16 de marzo de 2025): la
+    // Sesión es futura respecto al domingo actual y no puede ocupar una
+    // séptima barra fuera de las últimas seis semanas.
+    await finalizedSessionWithSeries(context!, cookie, fuerzaId, [
+      { status: "completada", goal: null, result: { carga: 40, repeticiones: 5 }, rpe: null },
+    ], "2025-03-17");
+
+    const volume = await weeklyVolume(context!.connection.db, {
+      accountId: await accountIdFor(context!, "deportista@example.com"),
+      today: new Date("2025-03-10T12:00:00.000Z"),
+    });
+    expect(volume.weeks).toHaveLength(6);
+    expect(volume.weeks.at(-1)).toEqual({ weekStart: "2025-03-10", total: 1000 });
+    expect(volume.weeks.some((week) => week.total === 200)).toBe(false);
+    expect(volume.currentTotal).toBe(1000);
+  });
+
   test("excluye Series pendientes y omitidas, Sesiones activas y otras Formas de registro", async () => {
     // Una Serie completada y otras pendiente/omitida del mismo Ejercicio de fuerza.
     await finalizedSessionWithSeries(context!, cookie, fuerzaId, [
@@ -747,6 +768,23 @@ describe("evolución de un Ejercicio", () => {
     const after = await evolutionFor(fuerzaId);
     expect(after!.points).toHaveLength(2);
     expect(after!.points[1]!.intensidadRelativaMax).toBe(105);
+  });
+
+  test("un RM vigente de una repetición con carga cero omite la intensidad relativa", async () => {
+    const fuerzaId = (await createExercise(context!, cookie, { name: "Sentadilla", recordingMode: "fuerza_con_carga" })).id;
+    // El ticket 20 admite 0 kg como carga mínima de un RM: el registro es
+    // vigente, pero un denominador cero no permite expresar la proporción
+    // con un decimal; la intensidad se omite como sin RM utilizable.
+    await createRecordedMax(context!, cookie, { exerciseId: fuerzaId, load: 0, repetitions: 1, date: "2025-03-01" });
+    await finalizedSessionWithSeries(context!, cookie, fuerzaId, [
+      { status: "completada", goal: null, result: { carga: 100, repeticiones: 10 }, rpe: null },
+    ], "2025-03-12");
+
+    const evolution = await evolutionFor(fuerzaId);
+    expect(evolution!.points).toHaveLength(1);
+    expect(evolution!.points[0]!.intensidadRelativaMax).toBeNull();
+    // La métrica propia de la Forma de registro sigue calculándose.
+    expect(evolution!.points[0]!.value).toBe(100);
   });
 
   test("varias apariciones del mismo Ejercicio se agregan en un único punto", async () => {
