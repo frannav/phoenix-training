@@ -1,0 +1,7 @@
+interface:
+  display_name: "Orchestrate Tickets v3"
+  short_description: "Launch compact parallel ticket waves"
+  default_prompt: "Use $orchestrate-tickets-v3 to find, approve, and launch a compact safe wave of parallel ticket worktrees."
+
+policy:
+  allow_implicit_invocation: false
