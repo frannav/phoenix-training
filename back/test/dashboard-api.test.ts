@@ -967,6 +967,22 @@ describe("selector de evolución", () => {
     expect(foreign.evolution.options.map((option) => option.id)).toEqual([sentadillaId]);
   });
 
+  test("un Ejercicio propio sin Series completadas pedido por exerciseId es ausencia explícita", async () => {
+    await finalizedSessionWithSeries(context!, cookie, sentadillaId, [
+      { status: "completada", goal: null, result: { carga: 100, repeticiones: 10 }, rpe: null },
+    ], "2025-03-12");
+
+    // El Ejercicio sin analítica no es opción del selector: pedirlo
+    // expresamente no crea una gráfica vacía (spec «Inicio»).
+    const requested = await dashboardOf(context!, cookie, `?exerciseId=${dominadaId}`);
+    expect(requested.evolution.current).toBeNull();
+    expect(requested.evolution.options.map((option) => option.id)).toEqual([sentadillaId]);
+
+    // Sin exerciseId el bloque sigue mostrando la opción más reciente.
+    const defaultBody = await dashboardOf(context!, cookie);
+    expect(defaultBody.evolution.current).toMatchObject({ exerciseId: sentadillaId });
+  });
+
   test("cardio continuo aparece como opción sin analítica", async () => {
     await finalizedSessionWithSeries(context!, cookie, cintaId, [
       { status: "completada", goal: null, result: { duracion: 1800 }, rpe: null },

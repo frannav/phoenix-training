@@ -114,7 +114,14 @@ export function createDashboardRouter({
 
     const requestedId = query.data.exerciseId;
     const selectedId = requestedId ?? options[0]?.id ?? null;
-    const selected = selectedId
+    // El bloque solo lee la evolución de un Ejercicio que sea opción del
+    // selector: un Ejercicio propio sin Series completadas, ajeno o inexistente
+    // no es opción y su ausencia se expresa como `current: null`, sin gráficas
+    // vacías (spec «Inicio»). El cardio continuo conserva su opción y su modelo
+    // sin analítica.
+    const isSelectable =
+      selectedId !== null && options.some((option) => option.id === selectedId);
+    const selected = isSelectable
       ? await exerciseEvolution(database, { accountId, exerciseId: selectedId })
       : null;
 
