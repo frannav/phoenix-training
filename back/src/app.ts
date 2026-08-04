@@ -394,6 +394,7 @@ export function createApp({
       "/api",
       createSessionsRouter({
         database,
+        cursorKey,
         authenticatedUserId,
         now,
       }),

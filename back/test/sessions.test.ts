@@ -183,6 +183,7 @@ async function replaceSession(
   id: string,
   body: {
     revision: number;
+    datePerformed?: string;
     exercises: {
       id?: string;
       exerciseId: string;
@@ -2261,6 +2262,25 @@ async function finalizeSessionRequest(
   return { status: response.status, body: (await response.json()) as unknown };
 }
 
+/**
+ * Crea una Sesión libre con una Serie completada y una pendiente y la
+ * finaliza: el resultado es un registro del Historial con una Serie
+ * completada y otra omitida.
+ */
+async function finalizedFreeSession(
+  context: TestContext,
+  cookie: string,
+): Promise<SessionDocument> {
+  const exerciseId = await createCustomExercise(context, cookie, { recordingMode: "fuerza_con_carga" });
+  const session = await sessionWithExercise(context, cookie, exerciseId, [
+    { status: "completada", goal: null, result: { carga: 80, repeticiones: 10 }, rpe: 8 },
+    { status: "pendiente", goal: null, result: null },
+  ]);
+  const finalized = await finalizeSessionRequest(context, cookie, session.id, session.revision);
+  expect(finalized.status).toBe(200);
+  return (finalized.body as { session: SessionDocument }).session;
+}
+
 describe("finalizar una Sesión", () => {
   let context: TestContext | undefined;
   let cookie: string;
@@ -2474,7 +2494,7 @@ describe("eliminar una Sesión activa", () => {
     expect(ok.status).toBe(200);
   });
 
-  test("una Sesión ya finalizada no puede eliminarse por este canal", async () => {
+  test("una Sesión finalizada puede eliminarse por este canal: el Historial corrige y elimina registros (ticket 29)", async () => {
     const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
     const session = await sessionWithExercise(context!, cookie, exerciseId, [
       { status: "completada", goal: null, result: { repeticiones: 10 } },
@@ -2486,8 +2506,11 @@ describe("eliminar una Sesión activa", () => {
     const { status, body } = await deleteSessionRequest(
       context!, cookie, after.id, after.revision,
     );
-    expect(status).toBe(409);
-    expect((body as { error: { code: string } }).error.code).toBe("SESSION_NOT_ACTIVE");
+    expect(status).toBe(200);
+    expect(body).toEqual({ deleted: true });
+
+    const gone = await getSession(context!, cookie, after.id);
+    expect(gone.status).toBe(404);
   });
 
   test("eliminar una Sesión ajena o inexistente responde 404", async () => {
@@ -2659,5 +2682,804 @@ describe("eliminar y transicionar Series y Ejercicios añadidos", () => {
     expect(next.exercises[0]!.id).toBe(current.exercises[1]!.id);
     expect(next.exercises[0]!.series[0]!.status).toBe("completada");
     expect(next.lastExerciseId).toBe(ejercicioB);
+  });
+});
+
+export type SessionHistoryItem = {
+  id: string;
+  origin: SessionOrigin;
+  datePerformed: string;
+  plannedDate: string | null;
+  startedAt: string;
+  updatedAt: string;
+  exerciseCount: number;
+  completedSeries: number;
+  omittedSeries: number;
+};
+
+async function listSessions(
+  context: TestContext,
+  cookie: string,
+  query: Record<string, string | number> = {},
+): Promise<{ status: number; body: unknown }> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    params.set(key, String(value));
+  }
+  const qs = params.toString();
+  const response = await context.app.request(`/api/sessions${qs ? `?${qs}` : ""}`, {
+    headers: { Cookie: cookie, Origin: origin },
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+describe("corregir una Sesión finalizada", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function finalizedWithSeries(series: SeriesInput[]): Promise<SessionDocument> {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, series);
+    const finalized = await finalizeSessionRequest(context!, cookie, session.id, session.revision);
+    expect(finalized.status).toBe(200);
+    return (finalized.body as { session: SessionDocument }).session;
+  }
+
+  test("una corrección edita objetivos, resultados, RPE y Fecha realizada y devuelve la representación canónica", async () => {
+    const finalized = await finalizedWithSeries([
+      { status: "completada", goal: { carga: 80, repeticiones: 10 }, result: { carga: 82.5, repeticiones: 10 }, rpe: 8.5 },
+      { status: "pendiente", goal: { carga: 80, repeticiones: 10 }, result: null },
+    ]);
+    const occurrence = finalized.exercises[0]!;
+
+    const { status, body } = await replaceSession(context!, cookie, finalized.id, {
+      revision: finalized.revision,
+      datePerformed: "2025-03-08",
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [
+            { id: occurrence.series[0]!.id, status: "completada", goal: { carga: 85, repeticiones: 8 }, result: { carga: 85, repeticiones: 8 }, rpe: 9 },
+            { id: occurrence.series[1]!.id, status: "omitida", goal: { carga: 80, repeticiones: 10 }, result: null },
+          ],
+        },
+      ],
+    });
+    expect(status).toBe(200);
+
+    const corrected = (body as { session: SessionDocument }).session;
+    expect(corrected.status).toBe("finalizada");
+    expect(corrected.revision).toBe(finalized.revision + 1);
+    expect(corrected.datePerformed).toBe("2025-03-08");
+    expect(corrected.plannedDate).toBeNull();
+    expect(corrected.exercises).toHaveLength(1);
+    const series = corrected.exercises[0]!.series;
+    expect(series[0]!.status).toBe("completada");
+    expect(series[0]!.goal).toEqual({ carga: 85, repeticiones: 8, duracion: null });
+    expect(series[0]!.result).toEqual({ carga: 85, repeticiones: 8, duracion: null });
+    expect(series[0]!.rpe).toBe(9);
+    expect(series[1]!.status).toBe("omitida");
+    expect(series[1]!.goal).toEqual({ carga: 80, repeticiones: 10, duracion: null });
+    expect(series[1]!.result).toEqual({ carga: null, repeticiones: null, duracion: null });
+    expect(series[1]!.rpe).toBeNull();
+  });
+
+  test("corregir la Fecha realizada no mueve la Fecha prevista del Entrenamiento de origen", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const plan = await createPlan(context!, cookie, {
+      name: "Ciclo base",
+      weeks: [{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }],
+    });
+    const activated = await activatePlan(context!, cookie, plan.id, plan.revision, "2025-03-03");
+    const training = activated.weeks[0]!.trainings[0]!;
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: activated.id,
+      trainingId: training.id,
+    });
+    expect(started.status).toBe(201);
+    let session = (started.body as { session: SessionDocument }).session;
+    const occurrence = session.exercises[0]!;
+    const completed = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [
+            { id: occurrence.series[0]!.id, status: "completada", goal: { carga: 60, repeticiones: 10 }, result: { carga: 62.5, repeticiones: 10 }, rpe: 8 },
+          ],
+        },
+      ],
+    });
+    expect(completed.status).toBe(200);
+    session = (completed.body as { session: SessionDocument }).session;
+    const finalized = await finalizeSessionRequest(context!, cookie, session.id, session.revision);
+    expect(finalized.status).toBe(200);
+    const after = (finalized.body as { session: SessionDocument }).session;
+    expect(after.plannedDate).toBe(training.plannedDate);
+
+    const { status, body } = await replaceSession(context!, cookie, after.id, {
+      revision: after.revision,
+      datePerformed: "2025-03-12",
+      exercises: after.exercises.map(echoExerciseInput),
+    });
+    expect(status).toBe(200);
+    const corrected = (body as { session: SessionDocument }).session;
+    expect(corrected.datePerformed).toBe("2025-03-12");
+    expect(corrected.plannedDate).toBe(training.plannedDate);
+  });
+
+  test("cambia una Serie entre completada y omitida conservando los objetivos", async () => {
+    const finalized = await finalizedWithSeries([
+      { status: "completada", goal: { carga: 80, repeticiones: 10 }, result: { carga: 82.5, repeticiones: 10 }, rpe: 8.5 },
+      { status: "pendiente", goal: { carga: 80, repeticiones: 10 }, result: null },
+    ]);
+    const occurrence = finalized.exercises[0]!;
+    const firstId = occurrence.series[0]!.id;
+    const secondId = occurrence.series[1]!.id;
+
+    const { status, body } = await replaceSession(context!, cookie, finalized.id, {
+      revision: finalized.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [
+            { id: firstId, status: "omitida", goal: { carga: 80, repeticiones: 10 }, result: null },
+            { id: secondId, status: "completada", goal: { carga: 80, repeticiones: 10 }, result: { carga: 85, repeticiones: 10 }, rpe: 9 },
+          ],
+        },
+      ],
+    });
+    expect(status).toBe(200);
+
+    const series = (body as { session: SessionDocument }).session.exercises[0]!.series;
+    expect(series[0]!.status).toBe("omitida");
+    expect(series[0]!.result).toEqual({ carga: null, repeticiones: null, duracion: null });
+    expect(series[0]!.rpe).toBeNull();
+    expect(series[0]!.goal).toEqual({ carga: 80, repeticiones: 10, duracion: null });
+    expect(series[1]!.status).toBe("completada");
+    expect(series[1]!.result).toEqual({ carga: 85, repeticiones: 10, duracion: null });
+    expect(series[1]!.rpe).toBe(9);
+    expect(series[1]!.goal).toEqual({ carga: 80, repeticiones: 10, duracion: null });
+  });
+
+  test("añade una Serie con resultado completo a una Sesión finalizada", async () => {
+    const finalized = await finalizedWithSeries([
+      { status: "completada", goal: null, result: { carga: 80, repeticiones: 10 }, rpe: 8 },
+    ]);
+    const occurrence = finalized.exercises[0]!;
+
+    const { status, body } = await replaceSession(context!, cookie, finalized.id, {
+      revision: finalized.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [
+            echoSeriesInput(occurrence.series[0]!),
+            { status: "completada", goal: { carga: 80, repeticiones: 10 }, result: { carga: 85, repeticiones: 6 }, rpe: 9 },
+          ],
+        },
+      ],
+    });
+    expect(status).toBe(200);
+
+    const next = (body as { session: SessionDocument }).session;
+    expect(next.exercises[0]!.series).toHaveLength(2);
+    const added = next.exercises[0]!.series[1]!;
+    expect(added.added).toBe(true);
+    expect(added.status).toBe("completada");
+    expect(added.result).toEqual({ carga: 85, repeticiones: 6, duracion: null });
+    expect(added.rpe).toBe(9);
+    expect(next.revision).toBe(finalized.revision + 1);
+  });
+
+  test("una Sesión finalizada rechaza Series pendientes", async () => {
+    const finalized = await finalizedWithSeries([
+      { status: "completada", goal: null, result: { carga: 80, repeticiones: 10 } },
+    ]);
+    const occurrence = finalized.exercises[0]!;
+
+    const { status, body } = await replaceSession(context!, cookie, finalized.id, {
+      revision: finalized.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [{ id: occurrence.series[0]!.id, status: "pendiente", goal: null, result: null }],
+        },
+      ],
+    });
+    expect(status).toBe(400);
+    const error = (body as { error: { code: string; fields?: Record<string, string[]> } }).error;
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.fields?.["exercises[0].series[0].status"]).toBeDefined();
+
+    // nada cambió: sigue finalizada con su Serie completada y la misma revisión
+    const current = (await getSession(context!, cookie, finalized.id)).body as { session: SessionDocument };
+    expect(current.session.status).toBe("finalizada");
+    expect(current.session.revision).toBe(finalized.revision);
+    expect(current.session.exercises[0]!.series[0]!.status).toBe("completada");
+  });
+
+  test("una Sesión finalizada no puede quedar sin al menos una Serie completada", async () => {
+    const finalized = await finalizedWithSeries([
+      { status: "completada", goal: null, result: { carga: 80, repeticiones: 10 }, rpe: 8 },
+      { status: "completada", goal: null, result: { carga: 85, repeticiones: 8 }, rpe: 9 },
+    ]);
+    const occurrence = finalized.exercises[0]!;
+
+    const { status, body } = await replaceSession(context!, cookie, finalized.id, {
+      revision: finalized.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [
+            { id: occurrence.series[0]!.id, status: "omitida", goal: null, result: null },
+            { id: occurrence.series[1]!.id, status: "omitida", goal: null, result: null },
+          ],
+        },
+      ],
+    });
+    expect(status).toBe(400);
+    const error = (body as { error: { code: string; fields?: Record<string, string[]> } }).error;
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.fields?.["exercises"]).toBeDefined();
+  });
+
+  test("una Serie prevista no puede eliminarse de una Sesión finalizada", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de tracción",
+      exercises: [{ exerciseId: press, series: [{ carga: 60, repeticiones: 10 }, { carga: 60, repeticiones: 8 }] }],
+    });
+    const plan = await createPlan(context!, cookie, {
+      name: "Ciclo base",
+      weeks: [{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }],
+    });
+    const activated = await activatePlan(context!, cookie, plan.id, plan.revision, "2025-03-03");
+    const training = activated.weeks[0]!.trainings[0]!;
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: activated.id,
+      trainingId: training.id,
+    });
+    expect(started.status).toBe(201);
+    let session = (started.body as { session: SessionDocument }).session;
+    const occurrence = session.exercises[0]!;
+    const completed = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [
+            { id: occurrence.series[0]!.id, status: "completada", goal: { carga: 60, repeticiones: 10 }, result: { carga: 62.5, repeticiones: 10 }, rpe: 8 },
+            { id: occurrence.series[1]!.id, status: "completada", goal: { carga: 60, repeticiones: 8 }, result: { carga: 62.5, repeticiones: 8 }, rpe: 8 },
+          ],
+        },
+      ],
+    });
+    expect(completed.status).toBe(200);
+    session = (completed.body as { session: SessionDocument }).session;
+    const finalized = await finalizeSessionRequest(context!, cookie, session.id, session.revision);
+    expect(finalized.status).toBe(200);
+    const after = (finalized.body as { session: SessionDocument }).session;
+    const plannedOccurrence = after.exercises[0]!;
+    expect(plannedOccurrence.added).toBe(false);
+    expect(plannedOccurrence.series.every((entry) => !entry.added)).toBe(true);
+
+    // se intenta conservar solo la primera Serie prevista
+    const { status, body } = await replaceSession(context!, cookie, after.id, {
+      revision: after.revision,
+      exercises: [
+        {
+          id: plannedOccurrence.id,
+          exerciseId: plannedOccurrence.exerciseId,
+          series: [echoSeriesInput(plannedOccurrence.series[0]!)],
+        },
+      ],
+    });
+    expect(status).toBe(400);
+    const error = (body as { error: { code: string; fields?: Record<string, string[]> } }).error;
+    expect(error.fields?.["exercises[0].series"]).toContain(
+      "Las Series previstas no pueden eliminarse; omítelas en su lugar.",
+    );
+  });
+
+  test("una Serie añadida puede eliminarse de una Sesión finalizada", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "repeticiones_sin_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: null, result: { repeticiones: 10 }, rpe: 7 },
+      { status: "completada", goal: null, result: { repeticiones: 8 }, rpe: 6 },
+    ]);
+    const finalized = await finalizeSessionRequest(context!, cookie, session.id, session.revision);
+    expect(finalized.status).toBe(200);
+    const after = (finalized.body as { session: SessionDocument }).session;
+    const occurrence = after.exercises[0]!;
+    expect(occurrence.added).toBe(true);
+    const keptId = occurrence.series[0]!.id;
+    const removedId = occurrence.series[1]!.id;
+
+    const { status, body } = await replaceSession(context!, cookie, after.id, {
+      revision: after.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [echoSeriesInput(occurrence.series[0]!)],
+        },
+      ],
+    });
+    expect(status).toBe(200);
+
+    const next = (body as { session: SessionDocument }).session;
+    expect(next.exercises[0]!.series).toHaveLength(1);
+    expect(next.exercises[0]!.series[0]!.id).toBe(keptId);
+    expect(next.exercises[0]!.series[0]!.id).not.toBe(removedId);
+    expect(next.exercises[0]!.series[0]!.status).toBe("completada");
+  });
+
+  test("una revisión obsoleta responde 409 sin mezclar cambios y la versión vigente se conserva", async () => {
+    const finalized = await finalizedWithSeries([
+      { status: "completada", goal: null, result: { carga: 80, repeticiones: 10 } },
+    ]);
+    const occurrence = finalized.exercises[0]!;
+
+    const stale = await replaceSession(context!, cookie, finalized.id, {
+      revision: finalized.revision - 1,
+      datePerformed: "2025-03-08",
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [echoSeriesInput(occurrence.series[0]!)],
+        },
+      ],
+    });
+    expect(stale.status).toBe(409);
+    expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
+
+    const current = (await getSession(context!, cookie, finalized.id)).body as { session: SessionDocument };
+    expect(current.session.revision).toBe(finalized.revision);
+    expect(current.session.datePerformed).toBe(finalized.datePerformed);
+    expect(current.session.exercises[0]!.series[0]!.result).toEqual({ carga: 80, repeticiones: 10, duracion: null });
+
+    // con la revisión vigente la corrección sí se aplica
+    const ok = await replaceSession(context!, cookie, finalized.id, {
+      revision: current.session.revision,
+      datePerformed: "2025-03-08",
+      exercises: current.session.exercises.map(echoExerciseInput),
+    });
+    expect(ok.status).toBe(200);
+    expect((ok.body as { session: SessionDocument }).session.datePerformed).toBe("2025-03-08");
+  });
+
+  test("una Fecha realizada inválida responde 400", async () => {
+    const finalized = await finalizedWithSeries([
+      { status: "completada", goal: null, result: { carga: 80, repeticiones: 10 } },
+    ]);
+
+    const { status } = await replaceSession(context!, cookie, finalized.id, {
+      revision: finalized.revision,
+      datePerformed: "2025-02-30",
+      exercises: finalized.exercises.map(echoExerciseInput),
+    });
+    expect(status).toBe(400);
+  });
+
+  test("corregir una Sesión finalizada ajena se comporta como inexistente", async () => {
+    const cookieB = await registerVerified(context!, "b@example.com");
+    const finalized = await finalizedWithSeries([
+      { status: "completada", goal: null, result: { carga: 80, repeticiones: 10 } },
+    ]);
+
+    const { status } = await replaceSession(context!, cookieB, finalized.id, {
+      revision: finalized.revision,
+      datePerformed: "2025-03-08",
+      exercises: finalized.exercises.map(echoExerciseInput),
+    });
+    expect(status).toBe(404);
+
+    // la Sesión original queda intacta para su dueña
+    const own = (await getSession(context!, cookie, finalized.id)).body as { session: SessionDocument };
+    expect(own.session.datePerformed).toBe(finalized.datePerformed);
+  });
+});
+
+describe("Historial: listar Sesiones finalizadas", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function setPerformedDate(session: SessionDocument, date: string): Promise<SessionDocument> {
+    const { status, body } = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      datePerformed: date,
+      exercises: session.exercises.map(echoExerciseInput),
+    });
+    expect(status).toBe(200);
+    return (body as { session: SessionDocument }).session;
+  }
+
+  async function finalizedFromRoutine(): Promise<SessionDocument> {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "rutina",
+      routineId: routine.id,
+    });
+    expect(started.status).toBe(201);
+    let session = (started.body as { session: SessionDocument }).session;
+    const occurrence = session.exercises[0]!;
+    const completed = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [
+            { id: occurrence.series[0]!.id, status: "completada", goal: { carga: 60, repeticiones: 10 }, result: { carga: 62.5, repeticiones: 10 }, rpe: 8 },
+          ],
+        },
+      ],
+    });
+    expect(completed.status).toBe(200);
+    session = (completed.body as { session: SessionDocument }).session;
+    const finalized = await finalizeSessionRequest(context!, cookie, session.id, session.revision);
+    expect(finalized.status).toBe(200);
+    return (finalized.body as { session: SessionDocument }).session;
+  }
+
+  test("lista solo Sesiones finalizadas, de más reciente a más antigua, y permite abrir su detalle", async () => {
+    const a = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-01");
+    const b = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-10");
+    const c = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-20");
+    const active = await startFreeSession(context!, cookie);
+    expect(active.status).toBe(201);
+    const activeId = (active.body as { session: SessionDocument }).session.id;
+
+    const { status, body } = await listSessions(context!, cookie);
+    expect(status).toBe(200);
+    const page = body as { items: SessionHistoryItem[]; nextCursor: string | null };
+    expect(page.items.map((item) => item.id)).toEqual([c.id, b.id, a.id]);
+    expect(page.items.some((item) => item.id === activeId)).toBe(false);
+    expect(page.nextCursor).toBeNull();
+
+    const first = page.items[0]!;
+    expect(first.origin).toBe("libre");
+    expect(first.datePerformed).toBe("2025-03-20");
+    expect(first.plannedDate).toBeNull();
+    expect(first.exerciseCount).toBe(1);
+    expect(first.completedSeries).toBe(1);
+    expect(first.omittedSeries).toBe(1);
+
+    // el detalle conserva objetivos, resultados, RPE y procedencia de Series
+    const detail = (await getSession(context!, cookie, first.id)).body as { session: SessionDocument };
+    expect(detail.session.status).toBe("finalizada");
+    expect(detail.session.datePerformed).toBe("2025-03-20");
+    expect(detail.session.exercises[0]!.series[0]!.result).toEqual({ carga: 80, repeticiones: 10, duracion: null });
+    expect(detail.session.exercises[0]!.series[0]!.rpe).toBe(8);
+    expect(detail.session.exercises[0]!.series[1]!.status).toBe("omitida");
+    expect(detail.session.exercises[0]!.series[1]!.goal).toEqual({ carga: null, repeticiones: null, duracion: null });
+  });
+
+  test("aplica un límite y pagina con el cursor opaco sin repetir ni perder Sesiones", async () => {
+    const one = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-01");
+    const two = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-10");
+    const three = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-20");
+
+    const first = await listSessions(context!, cookie, { limit: 2 });
+    expect(first.status).toBe(200);
+    const page1 = first.body as { items: SessionHistoryItem[]; nextCursor: string | null };
+    expect(page1.items.map((item) => item.id)).toEqual([three.id, two.id]);
+    expect(page1.nextCursor).toBeTruthy();
+
+    const second = await listSessions(context!, cookie, { limit: 2, cursor: page1.nextCursor! });
+    expect(second.status).toBe(200);
+    const page2 = second.body as { items: SessionHistoryItem[]; nextCursor: string | null };
+    expect(page2.items.map((item) => item.id)).toEqual([one.id]);
+    expect(page2.nextCursor).toBeNull();
+  });
+
+  test("filtra por origen de Sesión", async () => {
+    const libre = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-10");
+    const rutina = await finalizedFromRoutine();
+    expect(rutina.origin).toBe("rutina");
+
+    const libreOnly = await listSessions(context!, cookie, { origin: "libre" });
+    expect(libreOnly.status).toBe(200);
+    expect((libreOnly.body as { items: SessionHistoryItem[] }).items.map((item) => item.id)).toEqual([libre.id]);
+
+    const rutinaOnly = await listSessions(context!, cookie, { origin: "rutina" });
+    expect(rutinaOnly.status).toBe(200);
+    expect((rutinaOnly.body as { items: SessionHistoryItem[] }).items.map((item) => item.id)).toEqual([rutina.id]);
+  });
+
+  test("filtra por rango de Fecha realizada", async () => {
+    const a = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-01");
+    const b = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-10");
+    const c = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-20");
+
+    const range = await listSessions(context!, cookie, { from: "2025-03-05", to: "2025-03-15" });
+    expect(range.status).toBe(200);
+    const page = range.body as { items: SessionHistoryItem[] };
+    expect(page.items.map((item) => item.id)).toEqual([b.id]);
+
+    const fromOnly = await listSessions(context!, cookie, { from: "2025-03-10" });
+    expect((fromOnly.body as { items: SessionHistoryItem[] }).items.map((item) => item.id)).toEqual([c.id, b.id]);
+
+    const toOnly = await listSessions(context!, cookie, { to: "2025-03-01" });
+    expect((toOnly.body as { items: SessionHistoryItem[] }).items.map((item) => item.id)).toEqual([a.id]);
+  });
+
+  test("un Historial vacío devuelve items vacíos sin cursor", async () => {
+    const { status, body } = await listSessions(context!, cookie);
+    expect(status).toBe(200);
+    expect(body).toEqual({ items: [], nextCursor: null });
+  });
+
+  test("un cursor manipulado, un límite superior a 50 y filtros inválidos responden 400", async () => {
+    await finalizedFreeSession(context!, cookie);
+
+    const badLimit = await listSessions(context!, cookie, { limit: 51 });
+    expect(badLimit.status).toBe(400);
+
+    const badDate = await listSessions(context!, cookie, { from: "2025-02-30" });
+    expect(badDate.status).toBe(400);
+
+    const badOrigin = await listSessions(context!, cookie, { origin: "otra-cosa" });
+    expect(badOrigin.status).toBe(400);
+
+    const tampered = await listSessions(context!, cookie, { cursor: "cursor-manipulado" });
+    expect(tampered.status).toBe(400);
+  });
+
+  test("el Historial de otra Cuenta se comporta como inexistente", async () => {
+    const cookieB = await registerVerified(context!, "b@example.com");
+    const mine = await setPerformedDate(await finalizedFreeSession(context!, cookie), "2025-03-10");
+
+    const exerciseB = await createCustomExercise(context!, cookieB, { recordingMode: "repeticiones_sin_carga" });
+    const sessionB = await sessionWithExercise(context!, cookieB, exerciseB, [
+      { status: "completada", goal: null, result: { repeticiones: 12 } },
+    ]);
+    const finalizedB = await finalizeSessionRequest(context!, cookieB, sessionB.id, sessionB.revision);
+    expect(finalizedB.status).toBe(200);
+
+    const mineList = await listSessions(context!, cookie);
+    expect((mineList.body as { items: SessionHistoryItem[] }).items.map((item) => item.id)).toEqual([mine.id]);
+
+    const bList = await listSessions(context!, cookieB);
+    const theirs = (finalizedB.body as { session: SessionDocument }).session;
+    expect((bList.body as { items: SessionHistoryItem[] }).items.map((item) => item.id)).toEqual([theirs.id]);
+    expect((bList.body as { items: SessionHistoryItem[] }).items.some((item) => item.id === mine.id)).toBe(false);
+  });
+});
+
+describe("eliminar una Sesión finalizada", () => {
+  let context: TestContext | undefined;
+  let cookie: string;
+
+  beforeEach(async () => {
+    context = createTestContext();
+    await migrateDatabase(context.connection.db);
+    await loadRealCatalog(context);
+    cookie = await registerVerified(context, "deportista@example.com");
+  });
+
+  afterEach(() => {
+    context?.connection.close();
+  });
+
+  async function finalizedFromActivePlan(): Promise<{
+    plan: PlanDocument;
+    training: PlanTrainingDocument;
+    session: SessionDocument;
+  }> {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const plan = await createPlan(context!, cookie, {
+      name: "Ciclo base",
+      weeks: [{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }],
+    });
+    const activated = await activatePlan(context!, cookie, plan.id, plan.revision, "2025-03-03");
+    const training = activated.weeks[0]!.trainings[0]!;
+    const started = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: activated.id,
+      trainingId: training.id,
+    });
+    expect(started.status).toBe(201);
+    let session = (started.body as { session: SessionDocument }).session;
+    const occurrence = session.exercises[0]!;
+    const completed = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [
+            { id: occurrence.series[0]!.id, status: "completada", goal: { carga: 60, repeticiones: 10 }, result: { carga: 62.5, repeticiones: 10 }, rpe: 8 },
+          ],
+        },
+      ],
+    });
+    expect(completed.status).toBe(200);
+    session = (completed.body as { session: SessionDocument }).session;
+    const finalized = await finalizeSessionRequest(context!, cookie, session.id, session.revision);
+    expect(finalized.status).toBe(200);
+    return {
+      plan: activated,
+      training,
+      session: (finalized.body as { session: SessionDocument }).session,
+    };
+  }
+
+  test("eliminar una Sesión finalizada de un Plan activo devuelve el Entrenamiento a pendiente y permite iniciar otra", async () => {
+    const { plan, training, session } = await finalizedFromActivePlan();
+    const before = (await getPlan(context!, cookie, plan.id)).body as { plan: PlanDocument };
+    expect(before.plan.weeks[0]!.trainings[0]!.status).toBe("realizado");
+
+    const { status, body } = await deleteSessionRequest(context!, cookie, session.id, session.revision);
+    expect(status).toBe(200);
+    expect(body).toEqual({ deleted: true });
+
+    const after = (await getPlan(context!, cookie, plan.id)).body as { plan: PlanDocument };
+    expect(after.plan.status).toBe("activo");
+    expect(after.plan.weeks[0]!.trainings[0]!.status).toBe("pendiente");
+    expect(after.plan.weeks[0]!.trainings[0]!.plannedDate).toBe(training.plannedDate);
+
+    // el día vuelve a poder iniciar una Sesión nueva
+    const again = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(again.status).toBe(201);
+
+    // el registro eliminado ya no está en el Historial ni se puede leer
+    const gone = await getSession(context!, cookie, session.id);
+    expect(gone.status).toBe(404);
+    const history = await listSessions(context!, cookie);
+    expect((history.body as { items: SessionHistoryItem[] }).items.some((item) => item.id === session.id)).toBe(false);
+  });
+
+  test("eliminar una Sesión finalizada de un Plan completado conserva el estado del Plan y no permite iniciar otra desde el día", async () => {
+    const { plan, training, session } = await finalizedFromActivePlan();
+
+    const completed = await completePlanRequest(context!, cookie, plan.id, plan.revision);
+    expect(completed.status).toBe(200);
+    const before = (await getPlan(context!, cookie, plan.id)).body as { plan: PlanDocument };
+    expect(before.plan.status).toBe("completado");
+    expect(before.plan.weeks[0]!.trainings[0]!.status).toBe("realizado");
+
+    const { status } = await deleteSessionRequest(context!, cookie, session.id, session.revision);
+    expect(status).toBe(200);
+
+    const after = (await getPlan(context!, cookie, plan.id)).body as { plan: PlanDocument };
+    expect(after.plan.status).toBe("completado");
+    expect(after.plan.weeks[0]!.trainings[0]!.status).toBe("pendiente");
+
+    // un Plan completado no se reactiva: el día no origina otra Sesión
+    const restart = await startSessionRequest(context!, cookie, {
+      origin: "plan",
+      planId: plan.id,
+      trainingId: training.id,
+    });
+    expect(restart.status).toBe(409);
+    expect((restart.body as { error: { code: string } }).error.code).toBe("TRANSITION_IMPOSSIBLE");
+  });
+
+  test("eliminar Sesiones finalizadas libres o iniciadas desde una Rutina no altera ningún Plan", async () => {
+    const press = await catalogExerciseId(context!, cookie);
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: press, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const plan = await createPlan(context!, cookie, {
+      name: "Ciclo base",
+      weeks: [{ trainings: [{ day: 0, source: "rutina", routineId: routine.id }] }],
+    });
+    const activated = await activatePlan(context!, cookie, plan.id, plan.revision, "2025-03-03");
+    const trainingId = activated.weeks[0]!.trainings[0]!.id;
+
+    // Sesión libre finalizada
+    const free = await finalizedFreeSession(context!, cookie);
+    // Sesión iniciada desde la Rutina y finalizada
+    const fromRoutine = await startSessionRequest(context!, cookie, { origin: "rutina", routineId: routine.id });
+    expect(fromRoutine.status).toBe(201);
+    let routineSession = (fromRoutine.body as { session: SessionDocument }).session;
+    const occurrence = routineSession.exercises[0]!;
+    const completed = await replaceSession(context!, cookie, routineSession.id, {
+      revision: routineSession.revision,
+      exercises: [
+        {
+          id: occurrence.id,
+          exerciseId: occurrence.exerciseId,
+          series: [
+            { id: occurrence.series[0]!.id, status: "completada", goal: { carga: 60, repeticiones: 10 }, result: { carga: 62.5, repeticiones: 10 } },
+          ],
+        },
+      ],
+    });
+    expect(completed.status).toBe(200);
+    routineSession = (completed.body as { session: SessionDocument }).session;
+    const routineFinalized = await finalizeSessionRequest(context!, cookie, routineSession.id, routineSession.revision);
+    expect(routineFinalized.status).toBe(200);
+    const routineAfter = (routineFinalized.body as { session: SessionDocument }).session;
+
+    const freeDeleted = await deleteSessionRequest(context!, cookie, free.id, free.revision);
+    expect(freeDeleted.status).toBe(200);
+    const routineDeleted = await deleteSessionRequest(context!, cookie, routineAfter.id, routineAfter.revision);
+    expect(routineDeleted.status).toBe(200);
+
+    // el Plan activo queda intacto: su Entrenamiento sigue pendiente
+    const after = (await getPlan(context!, cookie, plan.id)).body as { plan: PlanDocument };
+    expect(after.plan.status).toBe("activo");
+    expect(after.plan.weeks[0]!.trainings[0]!.status).toBe("pendiente");
+    expect(after.plan.weeks[0]!.trainings[0]!.id).toBe(trainingId);
+  });
+
+  test("una revisión obsoleta responde 409 y conserva la Sesión finalizada", async () => {
+    const { session } = await finalizedFromActivePlan();
+
+    const stale = await deleteSessionRequest(context!, cookie, session.id, session.revision - 1);
+    expect(stale.status).toBe(409);
+    expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
+
+    const current = (await getSession(context!, cookie, session.id)).body as { session: SessionDocument };
+    expect(current.session.status).toBe("finalizada");
+    expect(current.session.revision).toBe(session.revision);
+
+    // con la revisión vigente elimina
+    const ok = await deleteSessionRequest(context!, cookie, session.id, session.revision);
+    expect(ok.status).toBe(200);
+  });
+
+  test("eliminar una Sesión finalizada ajena se comporta como inexistente", async () => {
+    const cookieB = await registerVerified(context!, "b@example.com");
+    const { session } = await finalizedFromActivePlan();
+
+    const { status } = await deleteSessionRequest(context!, cookieB, session.id, session.revision);
+    expect(status).toBe(404);
+
+    // la Sesión de la dueña sigue en el Historial
+    const own = (await getSession(context!, cookie, session.id)).body as { session: SessionDocument };
+    expect(own.session.id).toBe(session.id);
   });
 });

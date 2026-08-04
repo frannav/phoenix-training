@@ -1,12 +1,15 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import type { AppDatabase } from "../db/open-database";
+import { parseDomainDate } from "../domain/domain-dates";
 import { apiError } from "../http/api-error";
+import { decodeOpaqueCursor, encodeOpaqueCursor } from "../http/opaque-cursor";
 import {
-  deleteActiveSession,
+  deleteSession,
   finalizeSession,
   getActiveSession,
   getSessionForAccount,
+  listSessionHistory,
   replaceSession,
   sessionFieldKey,
   startSession,
@@ -16,6 +19,7 @@ import {
 
 export type SessionsRouterDependencies = {
   database: AppDatabase;
+  cursorKey: Buffer;
   authenticatedUserId: (request: Request) => Promise<string | null>;
   now: () => Date;
 };
@@ -60,6 +64,29 @@ const seriesMagnitudesSchema = z
   })
   .strict();
 
+/** Fecha de dominio YYYY-MM-DD que además sea una fecha real (spec «API y concurrencia»). */
+const domainDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe usar el formato AAAA-MM-DD.")
+  .refine((value) => parseDomainDate(value) !== null, {
+    message: "La fecha indicada no es válida.",
+  });
+
+const historyDefaultLimit = 20;
+const historyMaxLimit = 50;
+
+const historyQuerySchema = z
+  .object({
+    cursor: z.string().max(200).optional(),
+    limit: z.coerce.number().int().min(1).max(historyMaxLimit).optional(),
+    origin: z.enum(["libre", "rutina", "plan"], {
+      message: "El origen del filtro no es válido.",
+    }).optional(),
+    from: domainDateSchema.optional(),
+    to: domainDateSchema.optional(),
+  })
+  .strict();
+
 const seriesInputSchema = z
   .object({
     id: z.string().max(200).optional(),
@@ -88,6 +115,7 @@ const sessionExerciseSchema = z
 const replaceSessionSchema = z
   .object({
     revision: z.number().int().min(1, "Indica la revisión leída de la Sesión."),
+    datePerformed: domainDateSchema.optional(),
     exercises: z
       .array(sessionExerciseSchema)
       .max(100, "Una Sesión no puede contener más de 100 Ejercicios."),
@@ -127,6 +155,7 @@ function validationError(error: z.ZodError): ReturnType<typeof apiError> {
 
 export function createSessionsRouter({
   database,
+  cursorKey,
   authenticatedUserId,
   now,
 }: SessionsRouterDependencies): Hono<SessionsRouterEnv> {
@@ -201,6 +230,39 @@ export function createSessionsRouter({
     return context.json({ session });
   });
 
+  router.get("/sessions", async (context) => {
+    const parsed = historyQuerySchema.safeParse(context.req.query());
+    if (!parsed.success) {
+      return context.json(validationError(parsed.error), 400);
+    }
+
+    const { origin, from, to, limit = historyDefaultLimit } = parsed.data;
+    const offset = decodeOpaqueCursor(parsed.data.cursor, cursorKey);
+    if (offset === null) {
+      return context.json(
+        apiError("VALIDATION_ERROR", "La petición no es válida.", {
+          cursor: ["El cursor del Historial no es válido."],
+        }),
+        400,
+      );
+    }
+
+    // El límite máximo de 50 lo fija el esquema; se lee uno más para saber si
+    // hay una página siguiente y el cursor opaco codifica el desplazamiento.
+    const items = await listSessionHistory(database, {
+      accountId: context.get("accountId"),
+      filters: { origin, from, to },
+      limit: limit + 1,
+      offset,
+    });
+    const hasMore = items.length > limit;
+    const page = items.slice(0, limit);
+    return context.json({
+      items: page,
+      nextCursor: hasMore ? encodeOpaqueCursor(offset + limit, cursorKey) : null,
+    });
+  });
+
   router.get("/sessions/:sessionId", async (context) => {
     const session = await getSessionForAccount(database, {
       accountId: context.get("accountId"),
@@ -223,6 +285,7 @@ export function createSessionsRouter({
       accountId: context.get("accountId"),
       sessionId: context.req.param("sessionId") ?? "",
       expectedRevision: parsed.data.revision,
+      datePerformed: parsed.data.datePerformed,
       exercises: parsed.data.exercises as unknown as SessionExerciseInput[],
       now: now(),
     });
@@ -290,7 +353,7 @@ export function createSessionsRouter({
       return context.json(validationError(parsed.error), 400);
     }
 
-    const outcome = await deleteActiveSession(database, {
+    const outcome = await deleteSession(database, {
       accountId: context.get("accountId"),
       sessionId: context.req.param("sessionId") ?? "",
       expectedRevision: parsed.data.revision,
@@ -299,8 +362,6 @@ export function createSessionsRouter({
       switch (outcome.reason) {
         case "revision-conflict":
           return context.json(apiError("REVISION_CONFLICT", revisionConflictMessage), 409);
-        case "not-active":
-          return context.json(apiError("SESSION_NOT_ACTIVE", notActiveMessage), 409);
         default:
           return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
       }

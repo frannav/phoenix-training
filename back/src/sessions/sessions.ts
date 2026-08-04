@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { AppDatabase } from "../db/open-database";
 import {
   exercise,
@@ -158,7 +158,32 @@ export type FinalizeSessionOutcome =
 
 export type DeleteSessionOutcome =
   | { ok: true }
-  | { ok: false; reason: "not-found" | "revision-conflict" | "not-active" };
+  | { ok: false; reason: "not-found" | "revision-conflict" };
+
+/** Filtros explícitos del Historial (spec «API y concurrencia»): origen y rango de Fecha realizada. */
+export type SessionHistoryFilters = {
+  origin?: string;
+  from?: string;
+  to?: string;
+};
+
+/**
+ * Resumen de una Sesión finalizada para el listado del Historial: la Fecha
+ * realizada, el Origen de sesión, la Fecha prevista cuando existe y los
+ * recuentos que presentan el resumen sin abrir el detalle. El detalle se
+ * consulta por identificador y conserva el documento canónico completo.
+ */
+export type SessionHistoryItem = {
+  id: string;
+  origin: SessionOrigin;
+  datePerformed: string;
+  plannedDate: string | null;
+  startedAt: string;
+  updatedAt: string;
+  exerciseCount: number;
+  completedSeries: number;
+  omittedSeries: number;
+};
 
 export function createOpaqueSessionId(): string {
   return randomBytes(16).toString("hex");
@@ -512,6 +537,95 @@ export async function getSessionForAccount(
 }
 
 /**
+ * Lista el Historial de la Cuenta autenticada: solo Sesiones finalizadas,
+ * ordenadas de la Fecha realizada más reciente a la más antigua (empate por
+ * inicio e identificador para que el desplazamiento del cursor sea estable).
+ * Aplica los filtros explícitos —origen y rango de Fecha realizada— y el
+ * desplazamiento del cursor opaco; el límite máximo lo fija el límite HTTP
+ * (50). El resumen de cada Sesión cuenta sus apariciones y Series sin abrir
+ * el detalle, que se consulta por identificador.
+ */
+export async function listSessionHistory(
+  database: AppDatabase,
+  {
+    accountId,
+    filters,
+    limit,
+    offset,
+  }: {
+    accountId: string;
+    filters: SessionHistoryFilters;
+    limit: number;
+    offset: number;
+  },
+): Promise<SessionHistoryItem[]> {
+  const conditions = [
+    eq(trainingSession.accountId, accountId),
+    eq(trainingSession.status, "finalizada"),
+  ];
+  if (filters.origin !== undefined) {
+    conditions.push(eq(trainingSession.origin, filters.origin));
+  }
+  if (filters.from !== undefined) {
+    // Las fechas de dominio YYYY-MM-DD se comparan lexicográficamente.
+    conditions.push(gte(trainingSession.datePerformed, filters.from));
+  }
+  if (filters.to !== undefined) {
+    conditions.push(lte(trainingSession.datePerformed, filters.to));
+  }
+
+  const rows = await database
+    .select()
+    .from(trainingSession)
+    .where(and(...conditions))
+    .orderBy(
+      desc(trainingSession.datePerformed),
+      desc(trainingSession.startedAt),
+      desc(trainingSession.id),
+    )
+    .limit(limit)
+    .offset(offset)
+    .all();
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const sessionIds = rows.map((row) => row.id);
+  const stats = await database
+    .select({
+      sessionId: trainingSessionExercise.sessionId,
+      exerciseCount: sql<number>`COUNT(DISTINCT ${trainingSessionExercise.id})`,
+      completedSeries: sql<number>`COALESCE(SUM(CASE WHEN ${trainingSessionSeries.status} = 'completada' THEN 1 ELSE 0 END), 0)`,
+      omittedSeries: sql<number>`COALESCE(SUM(CASE WHEN ${trainingSessionSeries.status} = 'omitida' THEN 1 ELSE 0 END), 0)`,
+    })
+    .from(trainingSessionExercise)
+    .leftJoin(
+      trainingSessionSeries,
+      eq(trainingSessionSeries.sessionExerciseId, trainingSessionExercise.id),
+    )
+    .where(inArray(trainingSessionExercise.sessionId, sessionIds))
+    .groupBy(trainingSessionExercise.sessionId)
+    .all();
+  const statsBySessionId = new Map(stats.map((entry) => [entry.sessionId, entry]));
+
+  return rows.map((row) => {
+    const stat = statsBySessionId.get(row.id);
+    return {
+      id: row.id,
+      origin: row.origin as SessionOrigin,
+      datePerformed: row.datePerformed,
+      plannedDate: row.plannedDate,
+      startedAt: row.startedAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      exerciseCount: stat?.exerciseCount ?? 0,
+      completedSeries: stat?.completedSeries ?? 0,
+      omittedSeries: stat?.omittedSeries ?? 0,
+    };
+  });
+}
+
+/**
  * Campos de objetivo y de resultado admitidos por cada Forma de registro
  * (spec «Series y Formas de registro»): los mismos campos que una Serie
  * completada exige y que una Serie pendiente u omitida conserva como
@@ -690,12 +804,15 @@ export async function replaceSession(
     accountId,
     sessionId,
     expectedRevision,
+    datePerformed,
     exercises,
     now,
   }: {
     accountId: string;
     sessionId: string;
     expectedRevision: number;
+    /** Fecha realizada corregida (YYYY-MM-DD); sin valor conserva la vigente. */
+    datePerformed?: string;
     exercises: SessionExerciseInput[];
     now: Date;
   },
@@ -717,6 +834,10 @@ export async function replaceSession(
       outcome = { ok: false, reason: "revision-conflict" };
       return;
     }
+    // Una Sesión finalizada se corrige con las invariantes del Historial: sin
+    // Series pendientes y con al menos una Serie completada (spec «Sesiones
+    // de entrenamiento»). La sustitución nunca cambia el estado ni el Origen.
+    const finalized = sessionRow.status === "finalizada";
 
     const currentOccurrences = tx
       .select()
@@ -835,6 +956,14 @@ export async function replaceSession(
         const seriesInput = input.series[seriesIndex]!;
         const baseKey = sessionFieldKey("exercises", index, "series", seriesIndex);
         validateSeriesInput(addError, baseKey, mode, seriesInput);
+        // Invariante del Historial: una Sesión finalizada nunca admite Series
+        // pendientes; una Serie solo se corrige entre completada y omitida.
+        if (finalized && seriesInput.status === "pendiente") {
+          addError(
+            sessionFieldKey("exercises", index, "series", seriesIndex, "status"),
+            "Una Sesión finalizada no admite Series pendientes.",
+          );
+        }
 
         let seriesId: string;
         let added: boolean;
@@ -908,6 +1037,15 @@ export async function replaceSession(
       }
     }
 
+    // Invariante del Historial: una Sesión finalizada no puede quedar sin al
+    // menos una Serie completada (spec «Sesiones de entrenamiento»).
+    if (!failed && finalized) {
+      const hasCompleted = nextSeries.some((series) => series.status === "completada");
+      if (!hasCompleted) {
+        addError("exercises", "Una Sesión finalizada necesita al menos una Serie completada.");
+      }
+    }
+
     if (failed) {
       outcome = failed;
       return;
@@ -924,7 +1062,12 @@ export async function replaceSession(
     const lastExerciseId = nextOccurrences.length > 0 ? nextOccurrences[nextOccurrences.length - 1]!.exerciseId : null;
     const updated = tx
       .update(trainingSession)
-      .set({ revision: sessionRow.revision + 1, lastExerciseId, updatedAt: now })
+      .set({
+        revision: sessionRow.revision + 1,
+        lastExerciseId,
+        updatedAt: now,
+        ...(datePerformed === undefined ? {} : { datePerformed }),
+      })
       .where(and(eq(trainingSession.id, sessionId), eq(trainingSession.revision, expectedRevision)))
       .returning()
       .get();
@@ -1074,13 +1217,21 @@ export async function finalizeSession(
 }
 
 /**
- * Elimina una Sesión activa propia en una sola transacción; los hijos
- * (apariciones y Series) se eliminan en cascada por la clave foránea. La
- * unicidad de la Sesión activa queda liberada para una nueva. La eliminación
- * exige la revisión leída: una revisión obsoleta produce un conflicto
- * recuperable y no borra un agregado que cambió en otra pestaña.
+ * Elimina una Sesión propia —activa o finalizada— en una sola transacción;
+ * los hijos (apariciones y Series) se eliminan en cascada por la clave
+ * foránea. La unicidad de la Sesión activa queda liberada para una nueva.
+ *
+ * Eliminar una Sesión finalizada vinculada devuelve su Entrenamiento
+ * planificado a pendiente (spec «Planes de entrenamiento»): en un Plan
+ * activo el día vuelve a poder iniciar otra Sesión y, en un Plan completado,
+ * el estado del Plan se conserva y el inicio sigue bloqueado por el estado
+ * del Plan. La guarda sobre «realizado» evita tocar un día omitido o un
+ * Entrenamiento que cambió entre tanto; una Sesión libre o iniciada desde
+ * una Rutina no altera ningún Plan. La eliminación exige la revisión leída:
+ * una revisión obsoleta produce un conflicto recuperable y no borra un
+ * agregado que cambió en otra pestaña.
  */
-export async function deleteActiveSession(
+export async function deleteSession(
   database: AppDatabase,
   {
     accountId,
@@ -1109,9 +1260,21 @@ export async function deleteActiveSession(
       outcome = { ok: false, reason: "revision-conflict" };
       return;
     }
-    if (sessionRow.status !== "activa") {
-      outcome = { ok: false, reason: "not-active" };
-      return;
+
+    // Eliminar una Sesión finalizada originada en un Entrenamiento
+    // planificado devuelve el día a pendiente para que el progreso del Plan
+    // se recalcule al leer. Un Entrenamiento de un Plan completado conserva
+    // su calendario cerrado: el estado del Plan no cambia y no se reactiva.
+    if (sessionRow.status === "finalizada" && sessionRow.planTrainingId) {
+      tx.update(planTraining)
+        .set({ status: "pendiente" })
+        .where(
+          and(
+            eq(planTraining.id, sessionRow.planTrainingId),
+            eq(planTraining.status, "realizado"),
+          ),
+        )
+        .run();
     }
 
     // La comprobación de revisión ya ocurrió en esta misma transacción
