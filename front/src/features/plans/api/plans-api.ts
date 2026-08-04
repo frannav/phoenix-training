@@ -2,8 +2,12 @@ import { apiDelete, apiGet, apiPost, apiPut } from "../../../shared/http/api-cli
 
 export type PlanStatus = "borrador" | "activo" | "completado";
 
-/** Estado de un Entrenamiento planificado de un Plan activo o completado. */
-export type PlanTrainingStatus = "pendiente" | "omitido" | null;
+/**
+ * Estado de un Entrenamiento planificado de un Plan activo o completado.
+ * `realizado` solo lo alcanza un Entrenamiento pendiente cuando la Sesión
+ * originada en él finaliza; un día realizado queda cerrado ante las ediciones.
+ */
+export type PlanTrainingStatus = "pendiente" | "omitido" | "realizado" | null;
 
 export type PlanRecordingMode =
   | "fuerza_con_carga"

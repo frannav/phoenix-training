@@ -9,8 +9,9 @@ import {
   getSessionForAccount,
   replaceSession,
   sessionFieldKey,
-  startFreeSession,
+  startSession,
   type SessionExerciseInput,
+  type StartSessionInput,
 } from "./sessions";
 
 export type SessionsRouterDependencies = {
@@ -21,13 +22,35 @@ export type SessionsRouterDependencies = {
 
 type SessionsRouterEnv = { Variables: { accountId: string } };
 
-const startSessionSchema = z
-  .object({
-    origin: z.literal("libre", {
-      message: "El único origen disponible por ahora es «libre».",
-    }),
-  })
-  .strict();
+const startSessionSchema = z.discriminatedUnion("origin", [
+  z
+    .object({
+      origin: z.literal("libre"),
+    })
+    .strict(),
+  z
+    .object({
+      origin: z.literal("rutina"),
+      routineId: z
+        .string()
+        .min(1, "Indica la Rutina desde la que se inicia la Sesión.")
+        .max(200, "El identificador de la Rutina no es válido."),
+    })
+    .strict(),
+  z
+    .object({
+      origin: z.literal("plan"),
+      planId: z
+        .string()
+        .min(1, "Indica el Plan del Entrenamiento que se inicia.")
+        .max(200, "El identificador del Plan no es válido."),
+      trainingId: z
+        .string()
+        .min(1, "Indica el Entrenamiento planificado que se inicia.")
+        .max(200, "El identificador del Entrenamiento no es válido."),
+    })
+    .strict(),
+]);
 
 const seriesMagnitudesSchema = z
   .object({
@@ -81,6 +104,9 @@ const sessionRevisionQuerySchema = z.object({
 
 const unauthorizedMessage = "Debes iniciar sesión para gestionar tus Sesiones.";
 const notFoundMessage = "La Sesión solicitada no existe o no pertenece a tu Cuenta.";
+const routineNotFoundMessage = "La Rutina no existe o no pertenece a tu Cuenta.";
+const trainingNotFoundMessage =
+  "El Entrenamiento planificado no existe o no pertenece a tu Cuenta.";
 const activeSessionExistsMessage = "Ya tienes una Sesión activa.";
 const revisionConflictMessage =
   "La Sesión ha cambiado desde tu última lectura. Recarga la versión vigente antes de continuar.";
@@ -129,23 +155,41 @@ export function createSessionsRouter({
       return context.json(validationError(parsed.error), 400);
     }
 
-    const outcome = await startFreeSession(database, {
+    const outcome = await startSession(database, {
       accountId: context.get("accountId"),
+      input: parsed.data as unknown as StartSessionInput,
       now: now(),
     });
     if (!outcome.ok) {
-      // Conflicto recuperable: la Cuenta ya tiene una Sesión activa y la
-      // respuesta entrega su identificador para que la interfaz la abra.
-      return context.json(
-        {
-          error: {
-            code: "ACTIVE_SESSION_EXISTS",
-            message: activeSessionExistsMessage,
-            sessionId: outcome.sessionId,
-          },
-        },
-        409,
-      );
+      switch (outcome.reason) {
+        case "active-exists":
+          // Conflicto recuperable: la Cuenta ya tiene una Sesión activa y la
+          // respuesta entrega su identificador para que la interfaz la abra.
+          return context.json(
+            {
+              error: {
+                code: "ACTIVE_SESSION_EXISTS",
+                message: activeSessionExistsMessage,
+                sessionId: outcome.sessionId,
+              },
+            },
+            409,
+          );
+        case "routine-not-found":
+          return context.json(apiError("NOT_FOUND", routineNotFoundMessage), 404);
+        case "routine-not-available":
+          return context.json(
+            apiError("VALIDATION_ERROR", "La petición no es válida.", {
+              routineId: ["La Rutina no está disponible para usos nuevos."],
+            }),
+            400,
+          );
+        case "plan-not-found":
+        case "training-not-found":
+          return context.json(apiError("NOT_FOUND", trainingNotFoundMessage), 404);
+        case "transition-impossible":
+          return context.json(apiError("TRANSITION_IMPOSSIBLE", outcome.message), 409);
+      }
     }
     return context.json({ session: outcome.session }, 201);
   });

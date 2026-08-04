@@ -35,6 +35,9 @@ export type SeriesInput = {
   rpe?: number | null;
 };
 
+/** Origen de una Sesión: un Entrenamiento planificado, una Rutina o ninguno (libre). */
+export type SessionOrigin = "libre" | "rutina" | "plan";
+
 /**
  * Aparición de un Ejercicio dentro del documento canónico de una Sesión.
  * Incluye los datos del Ejercicio resuelto y sus Series para presentar la
@@ -44,6 +47,8 @@ export type SessionExerciseDocument = {
   id: string;
   exerciseId: string;
   sortOrder: number;
+  /** Aparición añadida durante la Sesión (`true`) o prevista del origen (`false`). */
+  added: boolean;
   exercise: {
     id: string;
     name: string;
@@ -58,14 +63,23 @@ export type SessionStatus = "activa" | "finalizada";
 
 /**
  * Documento canónico de una Sesión tal como lo entrega la API: el estado
- * confirmado completo con su revisión entera.
+ * confirmado completo con su revisión entera. La Sesión conserva la
+ * referencia de su Origen de sesión y sus dos fechas por separado: la Fecha
+ * realizada propia y la Fecha prevista del Entrenamiento planificado de
+ * origen.
  */
 export type SessionDocument = {
   id: string;
   revision: number;
-  origin: "libre";
+  origin: SessionOrigin;
   status: SessionStatus;
   datePerformed: string;
+  /** Fecha prevista del Entrenamiento planificado de origen; solo un origen «plan» la tiene. */
+  plannedDate: string | null;
+  /** Origen de sesión: Rutina desde la que se inició, o nulo. */
+  routineId: string | null;
+  /** Origen de sesión: Entrenamiento planificado desde el que se inició, o nulo. */
+  planTrainingId: string | null;
   lastExerciseId: string | null;
   exercises: SessionExerciseDocument[];
   startedAt: string;
@@ -91,8 +105,25 @@ export async function getActiveSession(): Promise<{ session: SessionDocument | n
   return { session: body.session ?? null };
 }
 
+/** Entrada de inicio de una Sesión según su Origen de sesión: libre, desde una Rutina o desde un Entrenamiento planificado. */
+export type SessionStartInput =
+  | { origin: "libre" }
+  | { origin: "rutina"; routineId: string }
+  | { origin: "plan"; planId: string; trainingId: string };
+
+/**
+ * Inicia una Sesión desde un Origen —Rutina o Entrenamiento planificado
+ * pendiente— o libre. Si la Cuenta ya tiene una Sesión activa, la respuesta
+ * es un conflicto recuperable con su identificador para abrir la existente.
+ */
+export async function startSession(
+  input: SessionStartInput,
+): Promise<{ session: SessionDocument }> {
+  return apiPost<{ session: SessionDocument }>("/api/sessions", input);
+}
+
 export async function startFreeSession(): Promise<{ session: SessionDocument }> {
-  return apiPost<{ session: SessionDocument }>("/api/sessions", { origin: "libre" });
+  return startSession({ origin: "libre" });
 }
 
 export async function getSession(id: string): Promise<{ session: SessionDocument }> {
@@ -130,7 +161,14 @@ export async function deleteSession(
 
 /** Nombre mostrado de una Sesión según su Origen de sesión. */
 export function sessionTitle(session: SessionDocument): string {
-  return session.origin === "libre" ? "Sesión libre" : "Sesión";
+  switch (session.origin) {
+    case "rutina":
+      return "Sesión de Rutina";
+    case "plan":
+      return "Sesión del Plan";
+    default:
+      return "Sesión libre";
+  }
 }
 
 /** Progreso de una Sesión para el acceso persistente y la cabecera. */

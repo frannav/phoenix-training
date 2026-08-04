@@ -3,11 +3,15 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import type { AppDatabase } from "../db/open-database";
 import {
   exercise,
+  planTraining,
+  routine,
   trainingSession,
   trainingSessionExercise,
   trainingSessionSeries,
   type RecordingMode,
 } from "../db/schema";
+import { resolvePlanTrainingStartContent } from "../plans/plans";
+import { resolveRoutineReferences } from "../routines/routines";
 
 /**
  * Fila persistida de una Sesión, de cada aparición de Ejercicio y de cada
@@ -32,6 +36,9 @@ export type SeriesStatus = "pendiente" | "completada" | "omitida";
 
 /** Estado de una Sesión: activa mientras se registra o finalizada como registro del Historial. */
 export type SessionStatus = "activa" | "finalizada";
+
+/** Origen de una Sesión: un Entrenamiento planificado, una Rutina o ninguno (libre). */
+export type SessionOrigin = "libre" | "rutina" | "plan";
 
 /** Magnitudes de una Serie: los tres campos de objetivo y resultado por Forma de registro. */
 export type SeriesMagnitudes = {
@@ -59,14 +66,23 @@ export type SeriesInput = {
 /**
  * Documento canónico de una Sesión tal como se entrega por la API. Contiene
  * la revisión entera del agregado y toda la información confirmada para
- * presentar y reanudar la Sesión sin consultas adicionales.
+ * presentar y reanudar la Sesión sin consultas adicionales. La Sesión
+ * conserva la referencia de su Origen de sesión y sus dos fechas por
+ * separado: la Fecha realizada propia y la Fecha prevista del Entrenamiento
+ * planificado de origen.
  */
 export type SessionDocument = {
   id: string;
   revision: number;
-  origin: "libre";
+  origin: SessionOrigin;
   status: SessionStatus;
   datePerformed: string;
+  /** Fecha prevista del Entrenamiento planificado de origen; solo un origen «plan» la tiene. */
+  plannedDate: string | null;
+  /** Origen de sesión: Rutina desde la que se inició, o nulo. */
+  routineId: string | null;
+  /** Origen de sesión: Entrenamiento planificado desde el que se inició, o nulo. */
+  planTrainingId: string | null;
   lastExerciseId: string | null;
   exercises: SessionExerciseDocument[];
   startedAt: string;
@@ -87,6 +103,8 @@ export type SessionExerciseDocument = {
   id: string;
   exerciseId: string;
   sortOrder: number;
+  /** Aparición añadida durante la Sesión (`true`) o prevista del origen (`false`). */
+  added: boolean;
   exercise: {
     id: string;
     name: string;
@@ -102,9 +120,20 @@ export type SessionExerciseInput = {
   series: SeriesInput[];
 };
 
+/** Entrada del cliente para iniciar una Sesión desde un origen (o libre). */
+export type StartSessionInput =
+  | { origin: "libre" }
+  | { origin: "rutina"; routineId: string }
+  | { origin: "plan"; planId: string; trainingId: string };
+
 export type StartSessionOutcome =
   | { ok: true; session: SessionDocument }
-  | { ok: false; reason: "active-exists"; sessionId: string };
+  | { ok: false; reason: "active-exists"; sessionId: string }
+  | { ok: false; reason: "routine-not-found" }
+  | { ok: false; reason: "routine-not-available" }
+  | { ok: false; reason: "plan-not-found" }
+  | { ok: false; reason: "training-not-found" }
+  | { ok: false; reason: "transition-impossible"; message: string };
 
 export type ReplaceSessionOutcome =
   | { ok: true; session: SessionDocument }
@@ -147,14 +176,18 @@ function toSessionDocument(aggregate: SessionAggregate): SessionDocument {
   return {
     id: aggregate.session.id,
     revision: aggregate.session.revision,
-    origin: aggregate.session.origin as "libre",
+    origin: aggregate.session.origin as SessionOrigin,
     status: aggregate.session.status as SessionStatus,
     datePerformed: aggregate.session.datePerformed,
+    plannedDate: aggregate.session.plannedDate,
+    routineId: aggregate.session.routineId,
+    planTrainingId: aggregate.session.planTrainingId,
     lastExerciseId: aggregate.session.lastExerciseId,
     exercises: aggregate.exercises.map((occurrence) => ({
       id: occurrence.id,
       exerciseId: occurrence.exerciseId,
       sortOrder: occurrence.sortOrder,
+      added: occurrence.added,
       exercise: {
         id: occurrence.exercise.id,
         name: occurrence.exercise.name,
@@ -233,14 +266,53 @@ async function loadSessionAggregate(
 }
 
 /**
- * Inicia una Sesión libre de la Cuenta autenticada. La comprobación de que no
- * exista otra Sesión activa ocurre dentro de la misma transacción y el índice
- * parcial de unicidad la respalda en la base de datos: un segundo inicio
- * devuelve el identificador de la Sesión existente en lugar de crear otra.
+ * Convierte el contenido vigente de un origen (Rutina o Entrenamiento
+ * planificado) en apariciones previstas de la Sesión: los Ejercicios y sus
+ * Series nacen como intención original — `added: false`, pendientes, con los
+ * Objetivos copiados y sin Resultado ni RPE. La Sesión copia estos valores y
+ * nunca vuelve a sincronizar con el origen.
  */
-export async function startFreeSession(
+function previstaOccurrencesFromContent(
+  content: Array<{
+    exerciseId: string;
+    series: Array<{ carga: number | null; repeticiones: number | null; duracion: number | null }>;
+  }>,
+): SessionExerciseInput[] {
+  return content.map((entry) => ({
+    exerciseId: entry.exerciseId,
+    series: entry.series.map((series) => ({
+      status: "pendiente",
+      goal: {
+        carga: series.carga,
+        repeticiones: series.repeticiones,
+        duracion: series.duracion,
+      },
+      result: null,
+      rpe: null,
+    })),
+  }));
+}
+
+/**
+ * Inicia una Sesión de la Cuenta autenticada desde un origen (Entrenamiento
+ * planificado pendiente, Rutina) o libre. La comprobación de que no exista
+ * otra Sesión activa ocurre en la misma transacción y el índice parcial de
+ * unicidad la respalda en la base de datos: un segundo inicio devuelve el
+ * identificador de la Sesión existente en lugar de crear otra.
+ *
+ * La Sesión conserva la referencia de su Origen de sesión y copia los
+ * objetivos vigentes del origen en el instante del inicio (intención
+ * original, `added: false`); los cambios posteriores de la Rutina o del Plan
+ * nunca modifican lo copiado. Desde un Entrenamiento planificado conserva
+ * además la Fecha prevista por separado de su Fecha realizada.
+ */
+export async function startSession(
   database: AppDatabase,
-  { accountId, now }: { accountId: string; now: Date },
+  {
+    accountId,
+    input,
+    now,
+  }: { accountId: string; input: StartSessionInput; now: Date },
 ): Promise<StartSessionOutcome> {
   return database.transaction(async (tx) => {
     const existing = await tx
@@ -254,13 +326,84 @@ export async function startFreeSession(
       return { ok: false, reason: "active-exists", sessionId: existing.id } as const;
     }
 
+    // Origen y contenido copiado como intención original. La validación de
+    // cada origen ocurre antes de escribir la Sesión.
+    let origin: SessionOrigin = "libre";
+    let routineId: string | null = null;
+    let planTrainingId: string | null = null;
+    let plannedDate: string | null = null;
+    let occurrences: SessionExerciseInput[] = [];
+
+    if (input.origin === "rutina") {
+      const routineRow = await tx
+        .select()
+        .from(routine)
+        .where(and(eq(routine.id, input.routineId), eq(routine.accountId, accountId)))
+        .get();
+      if (!routineRow) {
+        return { ok: false, reason: "routine-not-found" } as const;
+      }
+      if (routineRow.archived) {
+        return { ok: false, reason: "routine-not-available" } as const;
+      }
+      origin = "rutina";
+      routineId = routineRow.id;
+      const reference = (
+        await resolveRoutineReferences(database, {
+          accountId,
+          routineIds: [routineRow.id],
+        })
+      ).get(routineRow.id);
+      occurrences = previstaOccurrencesFromContent(
+        (reference?.exercises ?? []).map((entry) => ({
+          exerciseId: entry.exerciseId,
+          series: entry.series.map((series) => ({
+            carga: series.carga,
+            repeticiones: series.repeticiones,
+            duracion: series.duracion,
+          })),
+        })),
+      );
+    } else if (input.origin === "plan") {
+      const planSource = await resolvePlanTrainingStartContent(database, {
+        accountId,
+        planId: input.planId,
+        trainingId: input.trainingId,
+      });
+      if (!planSource.ok) {
+        return planSource as StartSessionOutcome;
+      }
+      if (planSource.planStatus !== "activo") {
+        return {
+          ok: false,
+          reason: "transition-impossible",
+          message: "Solo un Entrenamiento de un Plan activo puede iniciar una Sesión.",
+        } as const;
+      }
+      if (planSource.trainingStatus !== "pendiente") {
+        return {
+          ok: false,
+          reason: "transition-impossible",
+          message:
+            "El Entrenamiento ya no está pendiente y no puede iniciar una nueva Sesión.",
+        } as const;
+      }
+      origin = "plan";
+      planTrainingId = planSource.trainingId;
+      plannedDate = planSource.plannedDate;
+      occurrences = previstaOccurrencesFromContent(planSource.content);
+    }
+
     const row = {
       id: createOpaqueSessionId(),
       accountId,
-      origin: "libre" as const,
+      origin,
       status: "activa" as const,
       revision: 1,
       datePerformed: toDomainDate(now),
+      plannedDate,
+      routineId,
+      planTrainingId,
       lastExerciseId: null,
       startedAt: now,
       updatedAt: now,
@@ -268,7 +411,39 @@ export async function startFreeSession(
 
     try {
       const inserted = await tx.insert(trainingSession).values(row).returning().get();
-      return { ok: true, session: toSessionDocument({ session: inserted, exercises: [] }) };
+      for (let index = 0; index < occurrences.length; index += 1) {
+        const occurrence = occurrences[index]!;
+        const occurrenceId = createOpaqueSessionId();
+        await tx.insert(trainingSessionExercise).values({
+          id: occurrenceId,
+          sessionId: inserted.id,
+          exerciseId: occurrence.exerciseId,
+          sortOrder: index,
+          added: false,
+          createdAt: now,
+        });
+        let seriesPosition = 0;
+        for (const series of occurrence.series) {
+          await tx.insert(trainingSessionSeries).values({
+            id: createOpaqueSessionId(),
+            sessionExerciseId: occurrenceId,
+            status: series.status,
+            position: seriesPosition++,
+            added: false,
+            goalCarga: series.goal?.carga ?? null,
+            goalRepeticiones: series.goal?.repeticiones ?? null,
+            goalDuracion: series.goal?.duracion ?? null,
+            carga: null,
+            repeticiones: null,
+            duracion: null,
+            rpe: null,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+      const aggregate = await loadSessionAggregate(database, { sessionId: inserted.id });
+      return { ok: true, session: toSessionDocument(aggregate!) };
     } catch (error) {
       // Dos inicios concurrentes: el índice parcial de unicidad respalda la
       // transacción y el perdedor obtiene el mismo conflicto recuperable.
@@ -601,6 +776,7 @@ export async function replaceSession(
       const input = exercises[index]!;
       let occurrenceId: string;
       let mode: RecordingMode;
+      let occurrenceAdded = true;
 
       if (input.id !== undefined) {
         const existing = currentOccurrenceById.get(input.id);
@@ -610,12 +786,14 @@ export async function replaceSession(
         }
         usedOccurrenceIds.add(input.id);
         occurrenceId = existing.id;
+        occurrenceAdded = existing.added;
         mode = (exerciseRowsById.get(existing.exerciseId)?.recordingMode ?? "fuerza_con_carga") as RecordingMode;
         nextOccurrences.push({
           id: existing.id,
           sessionId,
           exerciseId: existing.exerciseId,
           sortOrder: index,
+          added: existing.added,
           createdAt: existing.createdAt,
         });
       } else {
@@ -638,6 +816,7 @@ export async function replaceSession(
           sessionId,
           exerciseId: input.exerciseId,
           sortOrder: index,
+          added: true,
           createdAt: now,
         });
       }
@@ -692,6 +871,40 @@ export async function replaceSession(
           createdAt,
           updatedAt: now,
         });
+      }
+
+      // Conservación de la intención original: las Series previstas de un
+      // Ejercicio del origen no se eliminan individualmente; se resuelven
+      // mediante omisión. Las Series añadidas conservan las reglas de la
+      // Sesión libre (pueden eliminarse).
+      if (!failed && !occurrenceAdded) {
+        for (const [seriesId, seriesRow] of existingSeries) {
+          if (!seriesRow.added && !usedSeriesIds.has(seriesId)) {
+            addError(
+              sessionFieldKey("exercises", index, "series"),
+              "Las Series previstas no pueden eliminarse; omítelas en su lugar.",
+            );
+          }
+        }
+      }
+    }
+
+    // Conservación de la intención original: un Ejercicio procedente del
+    // origen no se elimina de la Sesión; sus Series previstas se resuelven
+    // mediante omisión.
+    if (!failed) {
+      for (const current of currentOccurrences) {
+        if (current.added || usedOccurrenceIds.has(current.id)) {
+          continue;
+        }
+        failed = {
+          ok: false,
+          reason: "validation",
+          fields: {
+            exercises: ["Los Ejercicios del origen no pueden eliminarse de la Sesión."],
+          },
+        };
+        break;
       }
     }
 
@@ -830,6 +1043,23 @@ export async function finalizeSession(
       tx.update(trainingSessionSeries)
         .set({ status: "omitida", updatedAt: now })
         .where(inArray(trainingSessionSeries.id, pendingIds))
+        .run();
+    }
+
+    // El Entrenamiento planificado de origen pasa a realizado únicamente
+    // cuando la Sesión finaliza (ticket 28): un día pendiente con una Sesión
+    // finalizada deja de poder iniciar otra y queda cerrado ante las
+    // ediciones. La guarda sobre el estado pendiente evita sobrescribir un
+    // día omitido de un Plan que se cerró entre tanto.
+    if (sessionRow.planTrainingId) {
+      tx.update(planTraining)
+        .set({ status: "realizado" })
+        .where(
+          and(
+            eq(planTraining.id, sessionRow.planTrainingId),
+            eq(planTraining.status, "pendiente"),
+          ),
+        )
         .run();
     }
 

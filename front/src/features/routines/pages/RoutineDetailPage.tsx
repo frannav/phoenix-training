@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { ApiRequestError } from "../../../shared/http/api-client";
 import { PageIntro } from "../../../shared/ui/PageIntro";
 import { getRoutine, restoreRoutine } from "../api/routines-api";
+import { useStartSession } from "../../sessions/api/use-start-session";
 import { RoutineEditor } from "../components/RoutineEditor";
 import styles from "./RoutinesPage.module.css";
 
@@ -25,6 +27,8 @@ export function RoutineDetailPage() {
       void routineQuery.refetch();
     },
   });
+
+  const startMutation = useStartSession();
 
   if (routineQuery.isPending) {
     return <p className={styles.status}>Cargando la Rutina…</p>;
@@ -66,6 +70,35 @@ export function RoutineDetailPage() {
             Restaurar
           </button>
         </p>
+      )}
+
+      {!routine.archived && (
+        <section className={styles.startCard} aria-labelledby="iniciar-sesion-titulo">
+          <div className={styles.startCopy}>
+            <h2 id="iniciar-sesion-titulo" className={styles.startTitle}>
+              Iniciar una Sesión
+            </h2>
+            <p className={styles.startText}>
+              Empieza ahora con los Ejercicios y Objetivos vigentes de esta Rutina.
+              La Sesión copia el contenido y no vuelve a sincronizarse con la Rutina.
+            </p>
+          </div>
+          <button
+            className={styles.startButton}
+            type="button"
+            onClick={() => startMutation.mutate({ origin: "rutina", routineId: routine.id })}
+            disabled={startMutation.isPending}
+          >
+            {startMutation.isPending ? "Iniciando…" : "Iniciar"}
+          </button>
+          {startMutation.isError && (
+            <p className={styles.startError} role="alert">
+              {startMutation.error instanceof ApiRequestError
+                ? startMutation.error.message
+                : "No se pudo iniciar la Sesión. Inténtalo de nuevo."}
+            </p>
+          )}
+        </section>
       )}
 
       <RoutineEditor

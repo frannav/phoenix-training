@@ -71,6 +71,13 @@
       "when": 1785792179022,
       "tag": "0009_fair_the_hood",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785799580137,
+      "tag": "0010_public_morgan_stark",
+      "breakpoints": true
     }
   ]
 }

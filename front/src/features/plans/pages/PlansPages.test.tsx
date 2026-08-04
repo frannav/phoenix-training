@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { stubFetch } from "../../../test/mock-fetch";
 import type { ExerciseItem } from "../../exercises/api/exercises-api";
 import type { RoutineItem } from "../../routines/api/routines-api";
+import type { SessionDocument } from "../../sessions/api/sessions-api";
 import type { PlanItem } from "../api/plans-api";
 import { NewPlanPage } from "./NewPlanPage";
 import { PlanDetailPage } from "./PlanDetailPage";
@@ -104,6 +105,10 @@ type PlansHandlers = {
   duplicate?: (id: string, body: { revision: number; name?: string }) => PlanItem;
   routines?: () => RoutineItem[];
   availableExercises?: () => ExerciseItem[];
+  /** Inicio de una Sesión desde un Origen: responde al POST /api/sessions. */
+  startSession?: (body: unknown) => { status: number; body: unknown };
+  /** Sesión activa vigente de la Cuenta para el conflicto recuperable. */
+  activeSession?: () => SessionDocument | null;
 };
 
 function stubPlans(handlers: PlansHandlers) {
@@ -193,6 +198,12 @@ function stubPlans(handlers: PlansHandlers) {
         body: { items: handlers.availableExercises?.() ?? [press], nextCursor: null },
       };
     }
+    if (parsed.pathname === "/api/sessions" && method === "POST") {
+      return handlers.startSession!(body);
+    }
+    if (parsed.pathname === "/api/sessions/active" && method === "GET") {
+      return { status: 200, body: { session: handlers.activeSession?.() ?? null } };
+    }
     return { status: 404, body: { error: { code: "NOT_FOUND", message: "no" } } };
   });
 }
@@ -204,6 +215,31 @@ function renderWithRoutes(initialPath: string, routes: ReactNode) {
       <MemoryRouter initialEntries={[initialPath]}>{routes}</MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+/** Sesión activa creada desde un Entrenamiento planificado, tal como la entrega la API. */
+function sessionFixture(overrides: Partial<SessionDocument> = {}): SessionDocument {
+  return {
+    id: "88888888888888888888888888888888",
+    revision: 1,
+    origin: "plan",
+    status: "activa",
+    datePerformed: "2025-08-06",
+    plannedDate: "2025-08-04",
+    routineId: null,
+    planTrainingId: "66666666666666666666666666666666",
+    lastExerciseId: null,
+    exercises: [],
+    startedAt: "2025-08-06T09:00:00.000Z",
+    updatedAt: "2025-08-06T09:00:00.000Z",
+    ...overrides,
+  };
+}
+
+/** Destino de la Sesión: muestra el identificador al que se navegó. */
+function SessionRoute() {
+  const { sesionId } = useParams<{ sesionId: string }>();
+  return <div>Sesión {sesionId}</div>;
 }
 
 describe("listado de Planes", () => {
@@ -902,5 +938,147 @@ describe("un Plan completado en solo lectura", () => {
     expect(screen.queryByRole("button", { name: "Omitir este día" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Completar Plan" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Duplicar Plan" })).toBeInTheDocument();
+  });
+});
+
+describe("iniciar una Sesión desde un Entrenamiento planificado", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  test("un Entrenamiento pendiente ofrece Iniciar y abre la Sesión creada desde él", async () => {
+    const user = userEvent.setup();
+    const plan = activePlanFixture();
+    const trainingId = plan.weeks[0]!.trainings[0]!.id;
+    const posts: unknown[] = [];
+    const created = sessionFixture();
+    stubPlans({
+      list: () => [plan],
+      get: () => plan,
+      startSession: (body) => {
+        posts.push(body);
+        return { status: 201, body: { session: created } };
+      },
+    });
+    renderWithRoutes(
+      `/planes/${plan.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+        <Route path="/sesion/:sesionId" element={<SessionRoute />} />
+      </Routes>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Iniciar" }));
+
+    expect(posts).toEqual([{ origin: "plan", planId: plan.id, trainingId }]);
+    expect(await screen.findByText(`Sesión ${created.id}`)).toBeInTheDocument();
+  });
+
+  test("si ya existe una Sesión activa, Iniciar conduce a ella sin crear otra", async () => {
+    const user = userEvent.setup();
+    const plan = activePlanFixture();
+    const existing = sessionFixture({
+      id: "99999999999999999999999999999999",
+      revision: 3,
+    });
+    stubPlans({
+      list: () => [plan],
+      get: () => plan,
+      startSession: () => ({
+        status: 409,
+        body: {
+          error: {
+            code: "ACTIVE_SESSION_EXISTS",
+            message: "Ya tienes una Sesión activa.",
+            sessionId: existing.id,
+          },
+        },
+      }),
+      activeSession: () => existing,
+    });
+    renderWithRoutes(
+      `/planes/${plan.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+        <Route path="/sesion/:sesionId" element={<SessionRoute />} />
+      </Routes>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Iniciar" }));
+
+    expect(await screen.findByText(`Sesión ${existing.id}`)).toBeInTheDocument();
+  });
+
+  test("un día omitido no ofrece Iniciar", async () => {
+    const routine = routineFixture();
+    const omitted = activePlanFixture({
+      weeks: [
+        {
+          id: "55555555555555555555555555555555",
+          order: 0,
+          trainings: [
+            {
+              id: "66666666666666666666666666666666",
+              day: 0,
+              plannedDate: "2025-08-04",
+              status: "omitido",
+              source: "rutina",
+              routineId: routine.id,
+              routine: { id: routine.id, name: routine.name, archived: false },
+              content: routine.exercises,
+            },
+          ],
+        },
+      ],
+    });
+    stubPlans({ list: () => [omitted], get: () => omitted });
+    renderWithRoutes(
+      `/planes/${omitted.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+      </Routes>,
+    );
+
+    expect(
+      await screen.findByRole("article", { name: "Lunes omitido" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Iniciar" })).not.toBeInTheDocument();
+  });
+
+  test("un fallo al iniciar muestra el error del servidor sin navegar", async () => {
+    const user = userEvent.setup();
+    const plan = activePlanFixture();
+    stubPlans({
+      list: () => [plan],
+      get: () => plan,
+      startSession: () => ({
+        status: 409,
+        body: {
+          error: {
+            code: "TRANSITION_IMPOSSIBLE",
+            message: "El Entrenamiento ya no puede iniciar una Sesión.",
+          },
+        },
+      }),
+    });
+    renderWithRoutes(
+      `/planes/${plan.id}`,
+      <Routes>
+        <Route path="/planes/:planId" element={<PlanDetailPage />} />
+        <Route path="/sesion/:sesionId" element={<SessionRoute />} />
+      </Routes>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Iniciar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /ya no puede iniciar una Sesión/i,
+    );
+    expect(screen.queryByText(/^Sesión /)).not.toBeInTheDocument();
   });
 });

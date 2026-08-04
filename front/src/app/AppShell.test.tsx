@@ -21,12 +21,16 @@ const activeSession: SessionDocument = {
   origin: "libre",
   status: "activa",
   datePerformed: "2025-03-10",
+  plannedDate: null,
+  routineId: null,
+  planTrainingId: null,
   lastExerciseId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   exercises: [
     {
       id: "cccccccccccccccccccccccccccccccc",
       exerciseId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       sortOrder: 0,
+      added: false,
       exercise: {
         id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         name: "Press de banca con barra",
@@ -39,6 +43,7 @@ const activeSession: SessionDocument = {
       id: "dddddddddddddddddddddddddddddddd",
       exerciseId: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       sortOrder: 1,
+      added: false,
       exercise: {
         id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         name: "Sentadilla búlgara",

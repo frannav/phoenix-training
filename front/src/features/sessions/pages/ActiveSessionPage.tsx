@@ -768,21 +768,23 @@ export function ActiveSessionPage() {
                                 Último Ejercicio utilizado
                               </span>
                             )}
-                            <button
-                              className={styles.deleteExerciseButton}
-                              type="button"
-                              onClick={() => {
-                                const hasResult = occurrence.series.some(seriesHasResult);
-                                if (hasResult) {
-                                  setConfirmation({ kind: "delete-exercise", occurrence });
-                                } else {
-                                  removeExercise(occurrence);
-                                }
-                              }}
-                              disabled={saveState === "saving"}
-                            >
-                              Eliminar ejercicio
-                            </button>
+                            {occurrence.added && (
+                              <button
+                                className={styles.deleteExerciseButton}
+                                type="button"
+                                onClick={() => {
+                                  const hasResult = occurrence.series.some(seriesHasResult);
+                                  if (hasResult) {
+                                    setConfirmation({ kind: "delete-exercise", occurrence });
+                                  } else {
+                                    removeExercise(occurrence);
+                                  }
+                                }}
+                                disabled={saveState === "saving"}
+                              >
+                                Eliminar ejercicio
+                              </button>
+                            )}
                           </span>
                         </div>
 

@@ -60,7 +60,7 @@ type EditorTraining = {
   day: string;
   /** Fecha prevista y estado: solo existen en un Plan activo o completado. */
   plannedDate: string | null;
-  status: "pendiente" | "omitido" | null;
+  status: "pendiente" | "omitido" | "realizado" | null;
   source: "rutina" | "especifico";
   routineId: string;
   routine: ResolvedRoutine | null;
@@ -447,6 +447,10 @@ type PlanEditorProps = {
   onRequestOmit?: (training: { id: string; day: number; plannedDate: string | null }) => void;
   /** Pide al padre devolver a pendiente un día omitido de un Plan activo. */
   onRequestRestore?: (training: { id: string; day: number; plannedDate: string | null }) => void;
+  /** Pide al padre iniciar una Sesión desde un Entrenamiento planificado pendiente. */
+  onRequestStart?: (training: { id: string; day: number; plannedDate: string | null }) => void;
+  /** El padre está iniciando una Sesión: deshabilita los botones de inicio. */
+  startPending?: boolean;
 };
 
 export function PlanEditor({
@@ -457,6 +461,8 @@ export function PlanEditor({
   onConflict,
   onRequestOmit,
   onRequestRestore,
+  onRequestStart,
+  startPending,
 }: PlanEditorProps) {
   const [name, setName] = useState(plan?.name ?? "");
   const [weeks, setWeeks] = useState<EditorWeek[]>(() =>
@@ -819,7 +825,20 @@ export function PlanEditor({
             )}
 
             {week.trainings.map((training, trainingIndex) => {
-              const isClosed = isActive && training.status === "omitido";
+              const isClosed =
+                isActive &&
+                (training.status === "omitido" || training.status === "realizado");
+              // Identificador persistido del Entrenamiento pendiente: solo un
+              // día pendiente con identidad puede iniciar una Sesión (una
+              // entrada recién añadida sin guardar todavía no existe en el
+              // servidor). Se captura en una constante para conservar el
+              // estrechamiento dentro del manejador del botón.
+              const startTrainingId =
+                isActive &&
+                onRequestStart !== undefined &&
+                training.status === "pendiente"
+                  ? training.id
+                  : undefined;
               if (isClosed) {
                 const plannedLabel =
                   training.plannedDate === null ? "" : formatDomainDate(training.plannedDate);
@@ -829,11 +848,12 @@ export function PlanEditor({
                     : training.specific
                         .map((entry) => entry.exercise?.name ?? "Ejercicio")
                         .join(" · ");
+                const realized = training.status === "realizado";
                 return (
                   <article
                     key={training.key}
                     className={styles.closedTraining}
-                    aria-label={`${dayLabels[Number(training.day)]} omitido`}
+                    aria-label={`${dayLabels[Number(training.day)]} ${realized ? "realizado" : "omitido"}`}
                   >
                     <div className={styles.closedTrainingHeader}>
                       <div className={styles.closedTrainingDay}>
@@ -844,11 +864,11 @@ export function PlanEditor({
                       </div>
                       <span className={styles.closedStatus}>
                         <span className={styles.statusDot} aria-hidden="true" />
-                        Omitido
+                        {realized ? "Realizado" : "Omitido"}
                       </span>
                     </div>
                     <p className={styles.closedContent}>{contentLabel}</p>
-                    {onRequestRestore && (
+                    {!realized && onRequestRestore && (
                       <button
                         type="button"
                         className={styles.restoreTraining}
@@ -932,20 +952,40 @@ export function PlanEditor({
                     </p>
                   )}
 
-                  {isActive && onRequestOmit && (
-                    <button
-                      type="button"
-                      className={styles.omitTraining}
-                      onClick={() =>
-                        onRequestOmit({
-                          id: training.id ?? "",
-                          day: Number(training.day),
-                          plannedDate: training.plannedDate,
-                        })
-                      }
-                    >
-                      Omitir este día
-                    </button>
+                  {isActive && (onRequestOmit || startTrainingId !== undefined) && (
+                    <div className={styles.trainingActions}>
+                      {onRequestStart && startTrainingId !== undefined && (
+                        <button
+                          type="button"
+                          className={styles.startTraining}
+                          disabled={startPending}
+                          onClick={() =>
+                            onRequestStart({
+                              id: startTrainingId,
+                              day: Number(training.day),
+                              plannedDate: training.plannedDate,
+                            })
+                          }
+                        >
+                          {startPending ? "Iniciando…" : "Iniciar"}
+                        </button>
+                      )}
+                      {onRequestOmit && (
+                        <button
+                          type="button"
+                          className={styles.omitTraining}
+                          onClick={() =>
+                            onRequestOmit({
+                              id: training.id ?? "",
+                              day: Number(training.day),
+                              plannedDate: training.plannedDate,
+                            })
+                          }
+                        >
+                          Omitir este día
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   <div className={styles.sourceToggle} role="group" aria-label="Contenido del Entrenamiento">

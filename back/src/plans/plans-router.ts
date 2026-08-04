@@ -395,6 +395,15 @@ export function createPlansRouter({
       if (outcome.reason === "not-active") {
         return context.json(apiError("TRANSITION_IMPOSSIBLE", completeNotActiveMessage), 409);
       }
+      if (outcome.reason === "active-session-exists") {
+        return context.json(
+          apiError(
+            "TRANSITION_IMPOSSIBLE",
+            "Completa o elimina la Sesión activa originada en este Plan antes de completarlo.",
+          ),
+          409,
+        );
+      }
       return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
     }
     const document = await getPlanDocument(database, {
