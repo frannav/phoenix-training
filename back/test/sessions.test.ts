@@ -1465,7 +1465,11 @@ describe("conflicto recuperable entre escrituras", () => {
       ],
     });
     expect(stale.status).toBe(409);
-    expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
+    const conflict = (stale.body as { error: { code: string; session?: SessionDocument } }).error;
+    expect(conflict.code).toBe("REVISION_CONFLICT");
+    // el conflicto carga la versión vigente sin aplicar la escritura obsoleta
+    expect(conflict.session?.id).toBe(session.id);
+    expect(conflict.session?.revision).toBe(2);
 
     // nada cambió: no se duplicó ningún Ejercicio
     const current = await getActiveSession(context!, cookie);
@@ -2482,7 +2486,11 @@ describe("eliminar una Sesión activa", () => {
 
     const stale = await deleteSessionRequest(context!, cookie, session.id, session.revision - 1);
     expect(stale.status).toBe(409);
-    expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
+    const conflict = (stale.body as { error: { code: string; session?: SessionDocument } }).error;
+    expect(conflict.code).toBe("REVISION_CONFLICT");
+    // el conflicto carga la versión vigente sin eliminar ni mezclar cambios
+    expect(conflict.session?.id).toBe(session.id);
+    expect(conflict.session?.revision).toBe(session.revision);
 
     const active = await getActiveSession(context!, cookie);
     const after = (active.body as { session: SessionDocument }).session;
@@ -3057,7 +3065,13 @@ describe("corregir una Sesión finalizada", () => {
       ],
     });
     expect(stale.status).toBe(409);
-    expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
+    const conflict = (stale.body as { error: { code: string; session?: SessionDocument } }).error;
+    expect(conflict.code).toBe("REVISION_CONFLICT");
+    // el conflicto carga la versión vigente sin aplicar la corrección obsoleta
+    expect(conflict.session?.id).toBe(finalized.id);
+    expect(conflict.session?.revision).toBe(finalized.revision);
+    expect(conflict.session?.datePerformed).toBe(finalized.datePerformed);
+    expect(conflict.session?.exercises[0]!.series[0]!.result).toEqual({ carga: 80, repeticiones: 10, duracion: null });
 
     const current = (await getSession(context!, cookie, finalized.id)).body as { session: SessionDocument };
     expect(current.session.revision).toBe(finalized.revision);
@@ -3085,6 +3099,36 @@ describe("corregir una Sesión finalizada", () => {
       exercises: finalized.exercises.map(echoExerciseInput),
     });
     expect(status).toBe(400);
+  });
+
+  test("una Sesión activa no admite la corrección de la Fecha realizada: solo el Historial la corrige (ticket 29)", async () => {
+    const exerciseId = await createCustomExercise(context!, cookie, { recordingMode: "fuerza_con_carga" });
+    const session = await sessionWithExercise(context!, cookie, exerciseId, [
+      { status: "completada", goal: null, result: { carga: 80, repeticiones: 10 } },
+    ]);
+    expect(session.status).toBe("activa");
+
+    // la Fecha realizada se fija al iniciar; una Sesión activa no puede moverla
+    const rejected = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      datePerformed: "2025-03-08",
+      exercises: session.exercises.map(echoExerciseInput),
+    });
+    expect(rejected.status).toBe(400);
+    const error = (rejected.body as { error: { code: string; fields?: Record<string, string[]> } }).error;
+    expect(error.code).toBe("VALIDATION_ERROR");
+    expect(error.fields?.datePerformed).toBeDefined();
+
+    const after = (await getActiveSession(context!, cookie)).body as { session: SessionDocument };
+    expect(after.session.datePerformed).toBe(session.datePerformed);
+    expect(after.session.revision).toBe(session.revision);
+
+    // sin Fecha realizada la sustitución de la Sesión activa sigue funcionando
+    const ok = await replaceSession(context!, cookie, session.id, {
+      revision: session.revision,
+      exercises: session.exercises.map(echoExerciseInput),
+    });
+    expect(ok.status).toBe(200);
   });
 
   test("corregir una Sesión finalizada ajena se comporta como inexistente", async () => {
@@ -3460,7 +3504,12 @@ describe("eliminar una Sesión finalizada", () => {
 
     const stale = await deleteSessionRequest(context!, cookie, session.id, session.revision - 1);
     expect(stale.status).toBe(409);
-    expect((stale.body as { error: { code: string } }).error.code).toBe("REVISION_CONFLICT");
+    const conflict = (stale.body as { error: { code: string; session?: SessionDocument } }).error;
+    expect(conflict.code).toBe("REVISION_CONFLICT");
+    // el conflicto carga la versión vigente sin eliminar ni mezclar cambios
+    expect(conflict.session?.id).toBe(session.id);
+    expect(conflict.session?.status).toBe("finalizada");
+    expect(conflict.session?.revision).toBe(session.revision);
 
     const current = (await getSession(context!, cookie, session.id)).body as { session: SessionDocument };
     expect(current.session.status).toBe("finalizada");

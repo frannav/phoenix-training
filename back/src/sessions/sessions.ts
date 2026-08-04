@@ -141,13 +141,15 @@ export type ReplaceSessionOutcome =
       ok: false;
       reason:
         | "not-found"
-        | "revision-conflict"
         | "invalid-exercises"
         | "unknown-child"
         | "validation";
       message?: string;
       fields?: Record<string, string[]>;
-    };
+    }
+  // Conflicto recuperable: la respuesta carga la versión vigente (spec «API y
+  // concurrencia») para que la interfaz la presente sin mezclar cambios.
+  | { ok: false; reason: "revision-conflict"; session?: SessionDocument };
 
 export type FinalizeSessionOutcome =
   | { ok: true; session: SessionDocument }
@@ -158,7 +160,10 @@ export type FinalizeSessionOutcome =
 
 export type DeleteSessionOutcome =
   | { ok: true }
-  | { ok: false; reason: "not-found" | "revision-conflict" };
+  | { ok: false; reason: "not-found" }
+  // Conflicto recuperable: la respuesta carga la versión vigente (spec «API y
+  // concurrencia») para que la interfaz la presente sin mezclar cambios.
+  | { ok: false; reason: "revision-conflict"; session?: SessionDocument };
 
 /** Filtros explícitos del Historial (spec «API y concurrencia»): origen y rango de Fecha realizada. */
 export type SessionHistoryFilters = {
@@ -1046,6 +1051,16 @@ export async function replaceSession(
       }
     }
 
+    // La corrección de la Fecha realizada es del Historial (ticket 29): la
+    // Sesión activa conserva la Fecha realizada fijada al iniciar y su
+    // sustitución no puede moverla; solo una Sesión finalizada la corrige.
+    if (!failed && !finalized && datePerformed !== undefined) {
+      addError(
+        "datePerformed",
+        "La Fecha realizada solo puede corregirse en Sesiones finalizadas.",
+      );
+    }
+
     if (failed) {
       outcome = failed;
       return;
@@ -1091,6 +1106,16 @@ export async function replaceSession(
   });
 
   if (!succeeded) {
+    // El CFA no observa las asignaciones dentro del cierre de la transacción,
+    // así que el discriminador se comprueba sobre la unión declarada.
+    const declared = outcome as ReplaceSessionOutcome;
+    if (!declared.ok && declared.reason === "revision-conflict") {
+      // Conflicto recuperable: la transacción no escribió nada y la respuesta
+      // carga la versión vigente para que la interfaz la presente sin mezclar
+      // cambios (spec «API y concurrencia», «Rutinas, Planes y Sesiones»).
+      const aggregate = await loadSessionAggregate(database, { sessionId });
+      return aggregate ? { ...declared, session: toSessionDocument(aggregate) } : declared;
+    }
     return outcome;
   }
   const aggregate = await loadSessionAggregate(database, { sessionId });
@@ -1284,5 +1309,18 @@ export async function deleteSession(
     deleted = true;
   });
 
-  return deleted ? { ok: true } : outcome;
+  if (!deleted) {
+    // El CFA no observa las asignaciones dentro del cierre de la transacción,
+    // así que el discriminador se comprueba sobre la unión declarada.
+    const declared = outcome as DeleteSessionOutcome;
+    if (!declared.ok && declared.reason === "revision-conflict") {
+      // Conflicto recuperable: la transacción no borró nada y la respuesta
+      // carga la versión vigente para que la interfaz la presente sin mezclar
+      // cambios (spec «API y concurrencia», «Rutinas, Planes y Sesiones»).
+      const aggregate = await loadSessionAggregate(database, { sessionId });
+      return aggregate ? { ...declared, session: toSessionDocument(aggregate) } : declared;
+    }
+    return outcome;
+  }
+  return { ok: true };
 }

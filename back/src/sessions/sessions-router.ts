@@ -292,7 +292,19 @@ export function createSessionsRouter({
     if (!outcome.ok) {
       switch (outcome.reason) {
         case "revision-conflict":
-          return context.json(apiError("REVISION_CONFLICT", revisionConflictMessage), 409);
+          // Conflicto recuperable: la respuesta carga la versión vigente sin
+          // mezclar cambios (spec «API y concurrencia») para que la interfaz
+          // la presente y reintente con la revisión actual.
+          return context.json(
+            {
+              error: {
+                code: "REVISION_CONFLICT",
+                message: revisionConflictMessage,
+                ...(outcome.session === undefined ? {} : { session: outcome.session }),
+              },
+            },
+            409,
+          );
         case "validation":
           return context.json(
             apiError("VALIDATION_ERROR", "La petición no es válida.", outcome.fields),
@@ -361,7 +373,19 @@ export function createSessionsRouter({
     if (!outcome.ok) {
       switch (outcome.reason) {
         case "revision-conflict":
-          return context.json(apiError("REVISION_CONFLICT", revisionConflictMessage), 409);
+          // Conflicto recuperable: la respuesta carga la versión vigente sin
+          // mezclar cambios (spec «API y concurrencia») para que la interfaz
+          // la presente y reintente con la revisión actual.
+          return context.json(
+            {
+              error: {
+                code: "REVISION_CONFLICT",
+                message: revisionConflictMessage,
+                ...(outcome.session === undefined ? {} : { session: outcome.session }),
+              },
+            },
+            409,
+          );
         default:
           return context.json(apiError("NOT_FOUND", notFoundMessage), 404);
       }
