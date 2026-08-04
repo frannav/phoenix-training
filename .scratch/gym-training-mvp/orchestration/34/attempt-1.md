@@ -19,7 +19,7 @@ la presentación responsive en el seam aprobado `HomePage.test.tsx`.
 
 ## Commit
 
-`<SHA del commit de implementación>` — `feat(dashboard): integrar los cinco bloques de Inicio con el contrato del dashboard (ticket 34)`.
+`71064f3` — `feat(dashboard): integrar los cinco bloques de Inicio con el contrato del dashboard (ticket 34)` (23 archivos: +2044 −187; árbol de trabajo limpio).
 
 ## Rutas autoradas en este intento
 
