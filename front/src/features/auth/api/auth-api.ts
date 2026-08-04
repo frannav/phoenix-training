@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "../../../shared/http/api-client";
+import { apiDelete, apiGet, apiPost } from "../../../shared/http/api-client";
 
 export type AccountUser = {
   id: string;
@@ -64,6 +64,19 @@ export function changePassword(
 
 export function revokeAllSessions(): Promise<{ status: boolean }> {
   return apiPost<{ status: boolean }>("/api/auth/revoke-sessions", {});
+}
+
+/**
+ * Elimina definitivamente la Cuenta autenticada y todos sus datos privados.
+ * Exige volver a introducir la contraseña actual y una confirmación explícita
+ * de la advertencia; el servidor revoca todas las sesiones y expira la cookie
+ * local en la misma respuesta.
+ */
+export function deleteAccount(password: string): Promise<{ status: boolean }> {
+  return apiDelete<{ status: boolean }>("/api/account", {
+    password,
+    confirmed: true,
+  });
 }
 
 export function signIn(values: { email: string; password: string }): Promise<SignInResult> {

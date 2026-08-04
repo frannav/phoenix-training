@@ -18,6 +18,7 @@ import { createExercisesRouter } from "./exercises/exercises-router";
 import { createSessionsRouter } from "./sessions/sessions-router";
 import { createRoutinesRouter } from "./routines/routines-router";
 import { createPlansRouter } from "./plans/plans-router";
+import { createAccountRouter } from "./account/account-router";
 import type { MailAdapter } from "./mail/mail-adapter";
 
 export type AuthDependencies = {
@@ -229,6 +230,10 @@ export function createApp({
       return jsonResponse(passwordResetResponse);
     };
 
+    const clearSessionCookie = async (request: Request): Promise<Response> => {
+      return auth.handler(forwardedAuthRequest(request, "/api/auth/sign-out"));
+    };
+
     const revokeAllSessions = async (request: Request): Promise<Response> => {
       const revoked = await auth.handler(
         forwardedAuthRequest(request, "/api/auth/revoke-sessions"),
@@ -237,9 +242,7 @@ export function createApp({
         return revoked;
       }
 
-      const signedOut = await auth.handler(
-        forwardedAuthRequest(request, "/api/auth/sign-out"),
-      );
+      const signedOut = await clearSessionCookie(request);
       return jsonResponse({ status: true }, 200, signedOut.headers);
     };
 
@@ -415,6 +418,15 @@ export function createApp({
         database,
         authenticatedUserId,
         now,
+      }),
+    );
+
+    app.route(
+      "/api",
+      createAccountRouter({
+        database,
+        authenticatedUserId,
+        clearSessionCookie,
       }),
     );
   }
