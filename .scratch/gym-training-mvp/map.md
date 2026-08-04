@@ -49,6 +49,13 @@ Una especificación funcional, de experiencia y técnica del MVP lista para conv
 - [Registrar resultados por Serie](issues/26-registrar-resultados-serie.md) — Implementado en `33a1b03` (merge de `bf2efef`) y reparado en `842f6c1`; las Sesiones activas registran estados, objetivos, resultados y RPE con validación atómica, guardado inmediato, conflictos de revisión e interfaz compacta.
 - [Consultar y corregir el Historial](issues/29-consultar-corregir-historial.md) — Implementado en `7d46dc1`, reparado en `04d4ed6`; el Historial permite listar, consultar, corregir y eliminar Sesiones finalizadas con paginación opaca, invariantes de Series, conflictos que cargan la versión vigente y transiciones correctas de Planes.
 
+## Plan de ejecución paralela
+
+- Primera ola: los modelos de lectura de [30](issues/30-mostrar-accion-diaria-progreso-plan.md), [31](issues/31-mostrar-analitica-dashboard.md) y la eliminación de Cuenta de [32](issues/32-eliminar-definitivamente-cuenta.md) pueden trabajarse simultáneamente.
+- Segunda ola: [33](issues/33-componer-contrato-api-dashboard.md) compone la ruta única del dashboard cuando 30 y 31 estén resueltos.
+- Tercera ola: [34](issues/34-integrar-dashboard-en-inicio.md) integra la interfaz cuando el contrato API esté estable.
+- Para evitar conflictos, 30 y 31 no modifican la ruta de dashboard ni `HomePage`; 32 no toca la superficie del dashboard.
+
 ## Deferred to implementation planning
 
 - El texto final de estados vacíos y errores y la revisión de accesibilidad pantalla por pantalla; deben respetar las reglas funcionales ya decididas en los prototipos.

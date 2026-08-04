@@ -1,10 +1,18 @@
-# 31 — Mostrar la analítica del dashboard
+# 31 — Preparar la analítica del dashboard
 
-**What to build:** Las métricas históricas y los tres bloques analíticos restantes de Inicio, calculados directamente desde Sesiones finalizadas y RM registrados.
+**What to build:** El modelo de lectura de las métricas históricas y los tres bloques
+analíticos restantes de Inicio, calculados directamente desde Sesiones finalizadas y
+RM registrados. La ruta HTTP y la interfaz se integran en los tickets 33 y 34.
 
-**Blocked by:** 20 — Mantener RM registrados; 29 — Consultar y corregir el Historial; 30 — Mostrar la acción diaria y el progreso del Plan.
+**Blocked by:** 20 — Mantener RM registrados; 29 — Consultar y corregir el Historial.
 
 **Status:** ready-for-agent
+
+**Parallelizable with:** 30 — Preparar la acción diaria y el progreso del Plan; 32 — Eliminar definitivamente una Cuenta.
+
+**Owns:** los servicios/modelos de lectura de analítica y sus pruebas. No registra
+`GET /api/dashboard`, no modifica `HomePage.tsx` ni sus estilos y no cambia el contrato
+de composición que usará el ticket 33.
 
 - [ ] Solo las Series completadas de Sesiones finalizadas participan en métricas; se excluyen objetivos, pendientes, omitidas, activas y eliminadas.
 - [ ] Volumen suma `carga × repeticiones` para fuerza con carga; carga máxima, repeticiones, duración y RPE medio siguen las agrupaciones y exclusiones de la especificación.
@@ -14,6 +22,5 @@
 - [ ] Volumen semanal muestra el total actual, comparación porcentual con la semana anterior y barras de las últimas seis semanas en `kg·rep`.
 - [ ] RM recientes muestra hasta tres marcas expresas con Ejercicio, carga, repeticiones y fecha, sin presentar resultados calculados como récords.
 - [ ] Evolución permite elegir un Ejercicio y muestra carga máxima, repeticiones totales o duración total según su Forma de registro; cardio informa que no tiene analítica.
-- [ ] Las gráficas reciben datos agregados desde la API e incluyen título, unidad, último valor y resumen textual; los estados sin datos orientan a una acción y no dibujan gráficas vacías.
 - [ ] Las métricas se calculan al leer, sin cachés ni tablas derivadas, y las pruebas HTTP integradas cubren fórmulas, exclusiones, periodos, redondeo, correcciones y aislamiento.
-- [ ] Vitest y Testing Library comprueban selector, estados vacíos y alternativas textuales sin duplicar las reglas de dominio demostradas por la API.
+- [ ] El modelo devuelve datos agregados suficientes para que el cliente presente volumen semanal, RM recientes y evolución sin duplicar reglas de dominio.

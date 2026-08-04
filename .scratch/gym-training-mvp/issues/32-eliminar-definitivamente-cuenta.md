@@ -6,6 +6,11 @@
 
 **Status:** ready-for-agent
 
+**Parallelizable with:** 30 — Preparar la acción diaria y el progreso del Plan; 31 — Preparar la analítica del dashboard; 33 — Componer el contrato API del dashboard.
+
+**Owns:** Cuenta, autenticación, persistencia de datos privados y la pantalla de Cuenta.
+No modifica `back/src/dashboard/**`, `HomePage.tsx` ni el contrato de `GET /api/dashboard`.
+
 - [ ] La acción está disponible en Cuenta, exige volver a introducir la contraseña y presenta una advertencia explícita que debe confirmarse.
 - [ ] Una contraseña incorrecta o una confirmación ausente no elimina ni modifica ningún dato.
 - [ ] Una única transacción elimina credenciales, sesiones, Rutinas, Planes, Sesiones, Ejercicios personalizados y RM registrados de la Cuenta.
