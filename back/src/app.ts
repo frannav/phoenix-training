@@ -19,6 +19,7 @@ import { createSessionsRouter } from "./sessions/sessions-router";
 import { createRoutinesRouter } from "./routines/routines-router";
 import { createPlansRouter } from "./plans/plans-router";
 import { createAccountRouter } from "./account/account-router";
+import { createDashboardRouter } from "./dashboard/dashboard-router";
 import type { MailAdapter } from "./mail/mail-adapter";
 
 export type AuthDependencies = {
@@ -427,6 +428,15 @@ export function createApp({
         database,
         authenticatedUserId,
         clearSessionCookie,
+      }),
+    );
+
+    app.route(
+      "/api",
+      createDashboardRouter({
+        database,
+        authenticatedUserId,
+        now,
       }),
     );
   }
