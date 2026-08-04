@@ -200,6 +200,76 @@ export async function recentRecordedMaxes(
 }
 
 // ---------------------------------------------------------------------------
+// Opciones del selector de evolución
+// ---------------------------------------------------------------------------
+
+/**
+ * Opción del selector de evolución del bloque «Evolución» de Inicio: un
+ * Ejercicio con Series completadas en Sesiones finalizadas y la métrica
+ * propia de su Forma de registro, para que el cliente presente el selector
+ * sin duplicar las reglas de dominio.
+ */
+export type EvolutionOption = {
+  id: string;
+  name: string;
+  recordingMode: RecordingMode;
+  /** Métrica de la serie temporal; nula para cardio continuo (sin analítica). */
+  metric: EvolutionMetric | null;
+};
+
+/**
+ * Opciones del selector de evolución para la Cuenta autenticada: los
+ * Ejercicios con al menos una Serie completada en una Sesión finalizada,
+ * ordenados del más reciente al más antiguo por la Fecha realizada de su
+ * última aparición. Un Ejercicio sin Series completadas nunca aparece: no
+ * hay serie temporal que mostrar y el bloque evita las gráficas vacías. El
+ * cardio continuo conserva su opción con métrica nula para que el cliente
+ * informe de que no dispone de analítica.
+ */
+export async function evolutionOptions(
+  database: AppDatabase,
+  { accountId }: { accountId: string },
+): Promise<EvolutionOption[]> {
+  const rows = await database
+    .select({
+      id: exercise.id,
+      name: exercise.name,
+      recordingMode: exercise.recordingMode,
+    })
+    .from(exercise)
+    .innerJoin(
+      trainingSessionExercise,
+      eq(trainingSessionExercise.exerciseId, exercise.id),
+    )
+    .innerJoin(trainingSession, eq(trainingSession.id, trainingSessionExercise.sessionId))
+    .innerJoin(
+      trainingSessionSeries,
+      eq(trainingSessionSeries.sessionExerciseId, trainingSessionExercise.id),
+    )
+    .where(
+      and(
+        eq(trainingSession.accountId, accountId),
+        eq(trainingSession.status, "finalizada"),
+        eq(trainingSessionSeries.status, "completada"),
+      ),
+    )
+    .groupBy(exercise.id, exercise.name, exercise.recordingMode)
+    .orderBy(
+      desc(sql`MAX(${trainingSession.datePerformed})`),
+      asc(exercise.name),
+      asc(exercise.id),
+    )
+    .all();
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    recordingMode: row.recordingMode as RecordingMode,
+    metric: metricByMode[row.recordingMode as RecordingMode],
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // Evolución de un Ejercicio
 // ---------------------------------------------------------------------------
 
