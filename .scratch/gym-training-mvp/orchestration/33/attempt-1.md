@@ -4,7 +4,7 @@
 - **Spec:** `.scratch/gym-training-mvp/spec.md`
 - **Fixed point:** `43b4ca065c17d12e9ecffe7ddeb65428e18f42c8`
 - **Branch:** `feature/ticket-33`
-- **Commit:** `e54a101` — «feat(dashboard): componer GET /api/dashboard con los cinco bloques de Inicio (ticket 33)»
+- **Commit:** `6ad20c3` — «feat(dashboard): componer GET /api/dashboard con los cinco bloques de Inicio (ticket 33)» (el reporte se añade en un commit aparte)
 - **Estado:** succeeded (la revisión definitiva la conserva el coordinador)
 
 ## Qué se construyó
