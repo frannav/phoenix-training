@@ -5,7 +5,7 @@ contrato de `GET /api/dashboard`.
 
 **Blocked by:** 33 — Componer el contrato API del dashboard.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Owns:** cliente HTTP del dashboard, `HomePage`, estilos, gráficas y pruebas de
 Vitest/Testing Library. No duplica reglas de cálculo del backend.
