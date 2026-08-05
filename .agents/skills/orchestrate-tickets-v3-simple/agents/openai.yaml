@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orchestrate Tasks v3 Simple"
+  short_description: "Delegate, review, repair, and parallelize tasks"
+  default_prompt: "Use $orchestrate-tickets-v3-simple to delegate this objective to supervised Pi workers, review the results, and repair or parallelize as needed."
