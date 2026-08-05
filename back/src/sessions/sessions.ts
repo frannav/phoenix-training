@@ -202,7 +202,7 @@ export function toDomainDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function toSessionDocument(aggregate: SessionAggregate): SessionDocument {
+export function toSessionDocument(aggregate: SessionAggregate): SessionDocument {
   return {
     id: aggregate.session.id,
     revision: aggregate.session.revision,
@@ -247,7 +247,7 @@ function toSessionDocument(aggregate: SessionAggregate): SessionDocument {
   };
 }
 
-async function loadSessionAggregate(
+export async function loadSessionAggregate(
   database: AppDatabase,
   { sessionId }: { sessionId: string },
 ): Promise<SessionAggregate | null> {

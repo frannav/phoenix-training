@@ -8,6 +8,8 @@ import { RegisterPage } from "../features/auth/pages/RegisterPage";
 import { ResetPasswordPage } from "../features/auth/pages/ResetPasswordPage";
 import { VerifyPage } from "../features/auth/pages/VerifyPage";
 import { HomePage } from "../features/dashboard/pages/HomePage";
+import { DiaryDayPage } from "../features/diary/pages/DiaryDayPage";
+import { DiaryPage } from "../features/diary/pages/DiaryPage";
 import { ExercisesPage } from "../features/exercises/pages/ExercisesPage";
 import { HistoryDetailPage, HistoryPage } from "../features/history/pages/HistoryPage";
 import { PlansPage } from "../features/plans/pages/PlansPage";
@@ -52,6 +54,8 @@ export function App() {
               <Route path="rutinas/:rutinaId" element={<RoutineDetailPage />} />
               <Route path="historial" element={<HistoryPage />} />
               <Route path="historial/:sesionId" element={<HistoryDetailPage />} />
+              <Route path="diario" element={<DiaryPage />} />
+              <Route path="diario/:fecha" element={<DiaryDayPage />} />
               <Route path="ejercicios" element={<ExercisesPage />} />
               <Route path="cuenta" element={<AccountPage />} />
             </Route>
