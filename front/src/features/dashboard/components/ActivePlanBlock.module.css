@@ -65,6 +65,22 @@
   color: var(--color-ink);
 }
 
+.barDescription,
+.progressExplanation {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.78rem;
+}
+
+.barDescription {
+  margin-top: -0.2rem;
+}
+
+.progressExplanation {
+  max-width: 30rem;
+  line-height: 1.45;
+}
+
 .bar {
   overflow: hidden;
   height: 0.6rem;
@@ -77,12 +93,6 @@
   height: 100%;
   border-radius: inherit;
   background: var(--color-accent);
-}
-
-.planMeta {
-  margin: 0;
-  color: var(--color-ink-muted);
-  font-size: 0.875rem;
 }
 
 .detailLink,

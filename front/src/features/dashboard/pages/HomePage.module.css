@@ -10,9 +10,18 @@
   gap: 1rem;
 }
 
+.priorityBlock {
+  display: grid;
+}
+
+.planRow {
+  display: grid;
+  max-width: 32rem;
+}
+
 @media (min-width: 48rem) {
-  /* Escritorio: entrenamiento y Plan comparten la primera fila; volumen y
-     RM recientes la segunda. La evolución conserva el ancho completo. */
+  /* Si no hay una Sesión en curso, iniciar Entrenamiento y Plan comparten
+     fila; volumen y RM recientes ocupan la segunda. */
   .topRow {
     grid-template-columns: 1.1fr 1fr;
   }

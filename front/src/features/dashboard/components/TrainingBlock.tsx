@@ -14,9 +14,9 @@ type TrainingBlockProps = {
 /** Progreso de la Sesión activa para «Continuar»: Series completadas sobre el total. */
 function sessionProgressLabel(progress: { completadas: number; total: number }): string {
   if (progress.total === 0) {
-    return "Sin Series";
+    return "Todavía no hay series registradas";
   }
-  return `${progress.completadas} de ${progress.total} Series`;
+  return `${progress.completadas} de ${progress.total} series completadas`;
 }
 
 /**
@@ -40,10 +40,13 @@ export function TrainingBlock({
           Entrenamiento actual
         </h2>
         <div className={styles.activeSessionCard}>
-          <span className={styles.activeSessionName}>{training.name}</span>
-          <span className={styles.activeSessionProgress}>
-            {sessionProgressLabel(training.progress)}
-          </span>
+          <div className={styles.activeSessionCopy}>
+            <p className={styles.activeSessionEyebrow}>Sesión en curso</p>
+            <span className={styles.activeSessionName}>{training.name}</span>
+            <span className={styles.activeSessionProgress}>
+              {sessionProgressLabel(training.progress)}
+            </span>
+          </div>
           <Link className={styles.continueButton} to={`/sesion/${training.sessionId}`}>
             Continuar
           </Link>

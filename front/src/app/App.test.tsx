@@ -155,7 +155,6 @@ describe("application navigation", () => {
       "Inicio",
       "Planes",
       "Rutinas",
-      "Historial",
       "Ejercicios",
       "Cuenta",
     ]) {
@@ -163,6 +162,9 @@ describe("application navigation", () => {
         within(desktopNavigation).getByRole("link", { name: destination }),
       ).toBeInTheDocument();
     }
+    expect(
+      within(desktopNavigation).queryByRole("link", { name: "Historial" }),
+    ).not.toBeInTheDocument();
   });
 
   test("the login route is navigable outside the private AppShell", () => {

@@ -101,7 +101,7 @@ export function ActiveSessionPage() {
   const navigate = useNavigate();
   const [session, setSession] = useState<SessionDocument | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [retryTarget, setRetryTarget] = useState<SessionExerciseInput[] | null>(null);
@@ -121,7 +121,8 @@ export function ActiveSessionPage() {
     const loaded = sessionQuery.data?.session;
     if (loaded) {
       setSession(loaded);
-      setExpandedId(occurrenceIdFor(loaded, loaded.lastExerciseId));
+      const lastExerciseOccurrenceId = occurrenceIdFor(loaded, loaded.lastExerciseId);
+      setExpandedIds(lastExerciseOccurrenceId ? [lastExerciseOccurrenceId] : []);
       setPickerOpen(loaded.exercises.length === 0);
     }
   }, [sessionQuery.data]);
@@ -172,16 +173,18 @@ export function ActiveSessionPage() {
       const { session: next } = await saveSession(session.id, session.revision, exercises);
       setSession(next);
       setSaveState("saved");
+      setConfirmation(null);
       // La Sesión vacía vuelve a abrir el selector para añadir un Ejercicio;
       // con contenido, el selector se cierra tras cada acción confirmada.
       setPickerOpen(next.exercises.length === 0);
-      // Se conserva el Ejercicio desplegado mientras siga en la Sesión: la
-      // confirmación no interrumpe el registro en curso.
-      setExpandedId((current) =>
-        current !== null && next.exercises.some((entry) => entry.id === current)
-          ? current
-          : occurrenceIdFor(next, next.lastExerciseId),
-      );
+      // Se conservan los Ejercicios desplegados mientras sigan en la Sesión:
+      // la confirmación no interrumpe el registro en curso.
+      setExpandedIds((current) => {
+        const nextIds = current.filter((id) =>
+          next.exercises.some((entry) => entry.id === id),
+        );
+        return nextIds;
+      });
       void queryClient.setQueryData(activeSessionQueryKey, { session: next });
       return next;
     } catch (error) {
@@ -347,7 +350,7 @@ export function ActiveSessionPage() {
     }
   };
 
-  const addExercise = (exercise: ExerciseItem) => {
+  const addExercise = async (exercise: ExerciseItem) => {
     if (!session) {
       return;
     }
@@ -357,7 +360,20 @@ export function ActiveSessionPage() {
       exercise.recordingMode === "cardio_continuo"
         ? [{ status: "pendiente" as const, goal: null, result: null }]
         : [];
-    void persist([...toAggregateInput(session), { exerciseId: exercise.id, series }]);
+    const next = await persist([
+      ...toAggregateInput(session),
+      { exerciseId: exercise.id, series },
+    ]);
+    if (next) {
+      const addedOccurrenceId = occurrenceIdFor(next, exercise.id);
+      if (addedOccurrenceId) {
+        setExpandedIds((current) =>
+          current.includes(addedOccurrenceId)
+            ? current
+            : [...current, addedOccurrenceId],
+        );
+      }
+    }
   };
 
   const retrySave = () => {
@@ -377,7 +393,11 @@ export function ActiveSessionPage() {
       const fresh = await getSession(session.id);
       void queryClient.setQueryData(sessionDetailQueryKey(session.id), fresh);
       setSession(fresh.session);
-      setExpandedId(occurrenceIdFor(fresh.session, fresh.session.lastExerciseId));
+      const lastExerciseOccurrenceId = occurrenceIdFor(
+        fresh.session,
+        fresh.session.lastExerciseId,
+      );
+      setExpandedIds(lastExerciseOccurrenceId ? [lastExerciseOccurrenceId] : []);
       return fresh.session;
     } catch {
       return null;
@@ -474,10 +494,11 @@ export function ActiveSessionPage() {
   };
 
   const toggleExercise = (id: string) => {
-    // La pantalla mantiene un Ejercicio desplegado (spec «Experiencia de la
-    // Sesión activa»): abrir otro intercambia el único desplegado y pulsar el
-    // actual no pliega el último.
-    setExpandedId((current) => (current === id ? current : id));
+    setExpandedIds((current) =>
+      current.includes(id)
+        ? current.filter((currentId) => currentId !== id)
+        : [...current, id],
+    );
   };
 
   /** Diálogo de confirmación destructiva: cada acción explica qué se perderá. */
@@ -743,7 +764,12 @@ export function ActiveSessionPage() {
                     <button
                       className={styles.exerciseButton}
                       type="button"
-                      aria-expanded={expandedId === occurrence.id}
+                      aria-expanded={expandedIds.includes(occurrence.id)}
+                      title={
+                        expandedIds.includes(occurrence.id)
+                          ? "Contraer Ejercicio"
+                          : "Expandir Ejercicio"
+                      }
                       onClick={() => toggleExercise(occurrence.id)}
                     >
                       <span className={styles.exerciseName}>
@@ -755,9 +781,17 @@ export function ActiveSessionPage() {
                           : "Catálogo"}{" "}
                         · {recordingModeLabels[occurrence.exercise.recordingMode]}
                       </span>
+                      <span
+                        className={styles.exerciseToggleIcon}
+                        aria-hidden="true"
+                        data-expanded={expandedIds.includes(occurrence.id)}
+                      />
                     </button>
-                    {expandedId === occurrence.id && (
-                      <div className={styles.exerciseDetails}>
+                    {expandedIds.includes(occurrence.id) && (
+                      <div
+                        className={styles.exerciseDetails}
+                        id={`exercise-details-${occurrence.id}`}
+                      >
                         <div className={styles.exerciseDetailsHeader}>
                           <span className={styles.exerciseProgress}>
                             {occurrenceProgressLabel(occurrence)}

@@ -18,7 +18,7 @@
   bottom: 0;
   left: 0;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 1px solid var(--color-border);
   background: rgba(250, 251, 247, 0.96);
 }
@@ -77,6 +77,21 @@
   font-weight: 800;
 }
 
+.sessionAccessCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.sessionAccessContext {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sessionAccessProgress {
   margin-left: auto;
   color: var(--color-ink-muted);
@@ -92,6 +107,20 @@
   font-size: 0.85rem;
   font-weight: 800;
   text-decoration: none;
+}
+
+@media (max-width: 35rem) {
+  .sessionAccess {
+    gap: 0.5rem;
+  }
+
+  .sessionAccessProgress {
+    font-size: 0.75rem;
+  }
+
+  .sessionAccessContinue {
+    padding-inline: 0.7rem;
+  }
 }
 
 .moreHeader {
@@ -203,4 +232,3 @@
     display: none;
   }
 }
-

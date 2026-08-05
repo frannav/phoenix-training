@@ -194,6 +194,28 @@ function routineToResolved(routine: RoutineItem): ResolvedRoutine {
   };
 }
 
+function formatDisplayNumber(value: number): string {
+  return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatRoutineSeries(
+  series: PlanExerciseContent["series"][number],
+  mode: PlanRecordingMode,
+  index: number,
+): string {
+  const target =
+    mode === "tiempo_por_serie" || mode === "cardio_continuo"
+      ? series.duracion === null
+        ? null
+        : `1×${formatDisplayNumber(series.duracion)} s`
+      : series.repeticiones === null
+        ? null
+        : `1×${formatDisplayNumber(series.repeticiones)}`;
+  const load = series.carga === null ? null : `${formatDisplayNumber(series.carga)} kg`;
+
+  return [target, load].filter((part): part is string => part !== null).join(" · ") || `Serie ${index + 1}`;
+}
+
 function parseTarget(value: string): number | null | "invalid" {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
@@ -383,6 +405,7 @@ function ExercisePicker({ selectedExerciseIds, onPick, onClose }: ExercisePicker
 
   return (
     <div className={styles.pickerPanel} role="region" aria-label="Añadir Ejercicio al Entrenamiento">
+      <h4 className={styles.pickerHeading}>Añade los ejercicios de este día</h4>
       <form className={styles.pickerSearch} onSubmit={applySearch} role="search">
         <label className={styles.visuallyHidden} htmlFor="plan-picker-busqueda">
           Buscar Ejercicios disponibles
@@ -473,6 +496,9 @@ export function PlanEditor({
   const [staleRevision, setStaleRevision] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pickerTraining, setPickerTraining] = useState<string | null>(null);
+  const [openWeeks, setOpenWeeks] = useState<Set<string>>(
+    () => new Set(weeks[0] ? [weeks[0].key] : []),
+  );
 
   const isEdit = plan !== undefined && plan !== null;
   const prefix = isEdit ? `plan-${plan!.id}` : "plan-nuevo";
@@ -509,8 +535,22 @@ export function PlanEditor({
   };
 
   const addWeek = () => {
-    setWeeks((previous) => [...previous, emptyWeek()]);
+    const newWeek = emptyWeek();
+    setWeeks((previous) => [...previous, newWeek]);
+    setOpenWeeks((previous) => new Set(previous).add(newWeek.key));
     setErrors({});
+  };
+
+  const toggleWeek = (weekKey: string) => {
+    setOpenWeeks((previous) => {
+      const next = new Set(previous);
+      if (next.has(weekKey)) {
+        next.delete(weekKey);
+      } else {
+        next.add(weekKey);
+      }
+      return next;
+    });
   };
 
   const removeWeek = (weekKey: string) => {
@@ -519,6 +559,11 @@ export function PlanEditor({
         return previous;
       }
       return previous.filter((week) => week.key !== weekKey);
+    });
+    setOpenWeeks((previous) => {
+      const next = new Set(previous);
+      next.delete(weekKey);
+      return next;
     });
     setErrors({});
   };
@@ -562,6 +607,7 @@ export function PlanEditor({
         };
       }),
     );
+    setOpenWeeks((previous) => new Set(previous).add(weekKey));
     setErrors({});
   };
 
@@ -597,6 +643,7 @@ export function PlanEditor({
           : week,
       );
     });
+    setOpenWeeks((previous) => new Set(previous).add(targetWeekKey));
     setErrors({});
   };
 
@@ -802,29 +849,66 @@ export function PlanEditor({
           </p>
         )}
 
-        {weeks.map((week, weekIndex) => (
+        {weeks.map((week, weekIndex) => {
+          const isWeekOpen = openWeeks.has(week.key);
+          const weekPanelId = `${prefix}-week-${week.key}`;
+          const trainingCountLabel =
+            week.trainings.length === 0
+              ? "Sin entrenamientos"
+              : `${week.trainings.length} entrenamiento${week.trainings.length === 1 ? "" : "s"}`;
+
+          return (
           <article key={week.key} className={styles.weekCard} aria-label={`Semana ${weekIndex + 1}`}>
             <div className={styles.weekHeader}>
-              <h3 className={styles.weekTitle}>Semana {weekIndex + 1}</h3>
-              {!isActive && (
+              <button
+                type="button"
+                className={styles.weekToggle}
+                aria-expanded={isWeekOpen}
+                aria-controls={weekPanelId}
+                onClick={() => toggleWeek(week.key)}
+              >
+                <span
+                  className={`${styles.weekChevron} ${isWeekOpen ? styles.weekChevronOpen : styles.weekChevronClosed}`}
+                  aria-hidden="true"
+                />
+                <span className={styles.weekHeading}>
+                  <span className={styles.weekTitle} role="heading" aria-level={3}>
+                    Semana {weekIndex + 1}
+                  </span>
+                  <span className={styles.weekSummary}>{trainingCountLabel}</span>
+                </span>
+              </button>
+              <div className={styles.weekActions}>
                 <button
                   type="button"
-                  className={styles.removeWeek}
-                  disabled={weeks.length <= 1}
-                  onClick={() => removeWeek(week.key)}
+                  className={styles.addTraining}
+                  disabled={week.trainings.length >= 7}
+                  onClick={() => addTraining(week.key)}
                 >
-                  Quitar semana
+                  <span aria-hidden="true">+ </span>Añadir entrenamiento
                 </button>
-              )}
+                {!isActive && (
+                  <button
+                    type="button"
+                    className={styles.removeWeek}
+                    disabled={weeks.length <= 1}
+                    onClick={() => removeWeek(week.key)}
+                  >
+                    Quitar semana
+                  </button>
+                )}
+              </div>
             </div>
 
-            {week.trainings.length === 0 && (
-              <p className={styles.emptyTrainings}>
-                Esta semana todavía no tiene Entrenamientos planificados.
-              </p>
-            )}
+            {isWeekOpen && (
+              <div id={weekPanelId} className={styles.weekContent}>
+                {week.trainings.length === 0 && (
+                  <p className={styles.emptyTrainings}>
+                    Esta semana todavía no tiene entrenamientos. Añade el primero para empezar.
+                  </p>
+                )}
 
-            {week.trainings.map((training, trainingIndex) => {
+                {week.trainings.map((training, trainingIndex) => {
               const isClosed =
                 isActive &&
                 (training.status === "omitido" || training.status === "realizado");
@@ -902,6 +986,17 @@ export function PlanEditor({
                   className={styles.trainingCard}
                   aria-label={`Entrenamiento ${trainingIndex + 1} de la semana ${weekIndex + 1}`}
                 >
+                  <div className={styles.trainingSummary}>
+                    <div>
+                      <p className={styles.trainingEyebrow}>Entrenamiento {trainingIndex + 1}</p>
+                      <p className={styles.trainingTitle}>
+                        {dayLabels[Number(training.day)]} · {training.source === "rutina" ? "Rutina" : "Desde cero"}
+                      </p>
+                    </div>
+                    <span className={styles.trainingStep}>
+                      {training.source === "rutina" ? "Contenido reutilizable" : "Contenido personalizado"}
+                    </span>
+                  </div>
                   <div className={styles.trainingHeader}>
                     <div className={styles.trainingPlacement}>
                       <label className={styles.placementField}>
@@ -988,7 +1083,9 @@ export function PlanEditor({
                     </div>
                   )}
 
-                  <div className={styles.sourceToggle} role="group" aria-label="Contenido del Entrenamiento">
+                  <div className={styles.contentChoice}>
+                    <p className={styles.contentHeading}>Contenido del entrenamiento</p>
+                    <div className={styles.sourceToggle} role="group" aria-label="Tipo de contenido del Entrenamiento">
                     <label className={styles.sourceOption}>
                       <input
                         type="radio"
@@ -1001,7 +1098,7 @@ export function PlanEditor({
                           }))
                         }
                       />
-                      Usar Rutina
+                      Usar rutina
                     </label>
                     <label className={styles.sourceOption}>
                       <input
@@ -1015,16 +1112,17 @@ export function PlanEditor({
                           }))
                         }
                       />
-                      Entrenamiento específico
+                      Desde cero
                     </label>
+                    </div>
                   </div>
 
                   {training.source === "rutina" ? (
                     <div className={styles.routineBlock}>
-                      <label className={styles.placementField}>
+                      <label className={`${styles.placementField} ${styles.routineField}`}>
                         <span className={styles.placementLabel}>Rutina</span>
                         <select
-                          className={styles.select}
+                          className={`${styles.select} ${styles.routineSelect}`}
                           value={training.routineId}
                           aria-label="Rutina"
                           onChange={(event) => pickRoutine(training, event.target.value)}
@@ -1050,11 +1148,20 @@ export function PlanEditor({
                               <span className={styles.archivedNote}> · archivada</span>
                             )}
                           </p>
-                          <p className={styles.routineContent}>
-                            {training.routine.content
-                              .map((entry) => `${entry.exercise.name} (${entry.series.length} Serie${entry.series.length === 1 ? "" : "s"})`)
-                              .join(" · ")}
-                          </p>
+                          <ul className={styles.routineExercises}>
+                            {training.routine.content.map((entry) => (
+                              <li key={entry.id} className={styles.routineExercise}>
+                                <p className={styles.routineExerciseName}>{entry.exercise.name}</p>
+                                <ul className={styles.routineSeries}>
+                                  {entry.series.map((series, seriesIndex) => (
+                                    <li key={series.id} className={styles.routineSeriesItem}>
+                                      {formatRoutineSeries(series, entry.exercise.recordingMode, seriesIndex)}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </li>
+                            ))}
+                          </ul>
                           <button
                             type="button"
                             className={styles.personalize}
@@ -1074,7 +1181,7 @@ export function PlanEditor({
                       )}
                       {training.specific.length === 0 && (
                         <p className={styles.emptySpecific}>
-                          Todavía no has añadido Ejercicios. Usa «Añadir ejercicio» para empezar.
+                          Empieza añadiendo los ejercicios de este día en el orden en que los harás.
                         </p>
                       )}
                       {training.specific.map((entry, entryIndex) => {
@@ -1225,16 +1332,11 @@ export function PlanEditor({
               );
             })}
 
-            <button
-              type="button"
-              className={styles.addTraining}
-              disabled={week.trainings.length >= 7}
-              onClick={() => addTraining(week.key)}
-            >
-              Añadir entrenamiento
-            </button>
+              </div>
+            )}
           </article>
-        ))}
+          );
+        })}
 
         {!isActive && (
           <button type="button" className={styles.addWeek} onClick={addWeek}>
