@@ -1,0 +1,181 @@
+.backLink {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-weight: 700;
+  color: var(--color-accent-strong);
+}
+
+.dayVolume {
+  margin: 1rem 0 0;
+  color: var(--color-ink-muted);
+}
+
+.dayVolume strong {
+  color: var(--color-ink);
+}
+
+.status {
+  margin: 1rem 0 0;
+  color: var(--color-ink-muted);
+  font-weight: 700;
+}
+
+.error {
+  display: grid;
+  justify-items: start;
+  gap: 0.7rem;
+  margin: 1rem 0 0;
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.error button {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  font-weight: 700;
+  background: var(--color-surface);
+}
+
+.sessions {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.session {
+  max-width: 46rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem;
+  background: var(--color-surface);
+}
+
+.sessionHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.sessionTitle {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.originBadge {
+  border-radius: 0.6rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--color-surface-muted);
+  color: var(--color-ink-muted);
+}
+
+.originBadge[data-origin="plan"],
+.originBadge[data-origin="rutina"] {
+  background: var(--color-success-soft);
+  color: var(--color-accent-strong);
+}
+
+.sessionVolume {
+  margin-left: auto;
+  color: var(--color-ink-muted);
+  font-weight: 700;
+}
+
+.plannedDate,
+.originLine {
+  margin: 0.4rem 0 0;
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+}
+
+.exerciseList {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.exercise {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.8rem;
+}
+
+.exerciseName {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.exerciseMode {
+  margin: 0.15rem 0 0;
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+}
+
+.seriesList {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.series {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.92rem;
+}
+
+.seriesOrder {
+  font-weight: 700;
+}
+
+.seriesStatus {
+  color: var(--color-ink-muted);
+}
+
+.series[data-status="completada"] .seriesStatus {
+  color: var(--color-success);
+}
+
+.series[data-status="omitida"] .seriesStatus {
+  color: var(--color-ink-muted);
+}
+
+.seriesResult {
+  font-weight: 700;
+}
+
+.seriesRpe {
+  color: var(--color-ink-muted);
+}
+
+.emptyState {
+  max-width: 46rem;
+  margin-top: 1rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 0.9rem;
+  padding: 1.5rem;
+  display: grid;
+  gap: 0.9rem;
+  color: var(--color-ink-muted);
+}
+
+.emptyState p {
+  margin: 0;
+}
+
+.emptyAction {
+  justify-self: start;
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+}

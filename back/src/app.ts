@@ -20,6 +20,7 @@ import { createRoutinesRouter } from "./routines/routines-router";
 import { createPlansRouter } from "./plans/plans-router";
 import { createAccountRouter } from "./account/account-router";
 import { createDashboardRouter } from "./dashboard/dashboard-router";
+import { createDiaryRouter } from "./diary/diary-router";
 import type { MailAdapter } from "./mail/mail-adapter";
 
 export type AuthDependencies = {
@@ -437,6 +438,14 @@ export function createApp({
         database,
         authenticatedUserId,
         now,
+      }),
+    );
+
+    app.route(
+      "/api",
+      createDiaryRouter({
+        database,
+        authenticatedUserId,
       }),
     );
   }

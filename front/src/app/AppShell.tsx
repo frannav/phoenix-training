@@ -31,6 +31,7 @@ const desktopGroups = [
   {
     label: "Entrenamiento",
     destinations: [
+      { to: "/diario", label: "Diario" },
       { to: "/historial", label: "Historial" },
       { to: "/ejercicios", label: "Ejercicios" },
     ],
@@ -114,6 +115,9 @@ export function AppShell() {
               ×
             </button>
           </div>
+          <Link to="/diario" onClick={() => setIsMoreOpen(false)}>
+            Diario
+          </Link>
           <Link to="/ejercicios" onClick={() => setIsMoreOpen(false)}>
             Ejercicios
           </Link>

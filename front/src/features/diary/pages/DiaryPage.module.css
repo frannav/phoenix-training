@@ -1,0 +1,128 @@
+.calendar {
+  max-width: 52rem;
+  margin-top: 2rem;
+}
+
+.monthHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.monthTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  flex: 1;
+  text-align: center;
+}
+
+.navButton,
+.todayButton {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.8rem;
+  font-weight: 700;
+  background: var(--color-surface);
+}
+
+.todayButton {
+  margin-left: auto;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0.3rem;
+  table-layout: fixed;
+}
+
+.weekday {
+  padding: 0.2rem 0 0.4rem;
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+}
+
+.cell,
+.blankCell,
+.trainingCell {
+  height: 5.2rem;
+  vertical-align: top;
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  background: var(--color-surface);
+}
+
+.blankCell {
+  border-color: transparent;
+  background: transparent;
+}
+
+.trainingCell {
+  border-color: var(--color-accent);
+  background: var(--color-success-soft);
+}
+
+.dayLink {
+  display: grid;
+  gap: 0.25rem;
+  height: 100%;
+  padding: 0.45rem;
+  text-decoration: none;
+  color: var(--color-ink);
+}
+
+.dayNumber {
+  font-weight: 700;
+}
+
+.daySummary {
+  display: grid;
+  gap: 0.1rem;
+  font-size: 0.75rem;
+}
+
+.sessionCount {
+  color: var(--color-accent-strong);
+  font-weight: 700;
+}
+
+.dayVolume {
+  color: var(--color-ink-muted);
+}
+
+.status {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-weight: 700;
+}
+
+.error {
+  display: grid;
+  justify-items: start;
+  gap: 0.7rem;
+  margin: 0;
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.error button {
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  font-weight: 700;
+  background: var(--color-surface);
+}
+
+.emptyMonth {
+  margin: 0.9rem 0 0;
+  color: var(--color-ink-muted);
+}
+
+@media (min-width: 40rem) {
+  .cell,
+  .blankCell,
+  .trainingCell {
+    height: 6rem;
+  }
+}
