@@ -1070,6 +1070,7 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
     await user.click(within(dialog).getByRole("button", { name: "Volver a pendiente" }));
 
     expect(await screen.findByText("Pendiente")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     const payload = (putBodies[0] as { exercises: { series: { status: string; result: unknown; rpe: unknown }[] }[] }).exercises[0]!.series;
     expect(payload[0]).toMatchObject({
       status: "pendiente",
@@ -1419,7 +1420,7 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
     expect(putBodies).toEqual([{ revision: 2, exercises: [] }]);
   });
 
-  test("el acordeón de una sola columna mantiene un Ejercicio desplegado y muestra el progreso", async () => {
+  test("cada Ejercicio se puede expandir y contraer de forma independiente", async () => {
     const session = {
       ...emptySession,
       revision: 3,
@@ -1448,22 +1449,27 @@ describe("transiciones y eliminación de Series en la interfaz", () => {
     const bench = await screen.findByRole("button", { name: /Press de banca con barra/ });
     const squats = screen.getByRole("button", { name: /Sentadilla búlgara/ });
 
-    // al desplegar un Ejercicio se muestra su progreso; al abrir otro, el
-    // anterior se pliega: una sola columna activa
+    // al desplegar un Ejercicio se muestra su progreso
+    expect(bench).toHaveAttribute("title", "Expandir Ejercicio");
     await user.click(bench);
     expect(screen.getByRole("button", { name: /Press de banca con barra/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Press de banca con barra/ })).toHaveAttribute("title", "Contraer Ejercicio");
     expect(screen.getByText("1 completadas · 1 pendientes")).toBeInTheDocument();
 
-    // pulsar el Ejercicio desplegado no pliega el último: la Sesión mantiene
-    // un Ejercicio desplegado en todo momento
-    await user.click(screen.getByRole("button", { name: /Press de banca con barra/ }));
+    // abrir otro no pliega el anterior
+    await user.click(squats);
     expect(screen.getByRole("button", { name: /Press de banca con barra/ })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: /Sentadilla búlgara/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: /Sentadilla búlgara/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("0 completadas · 1 omitidas")).toBeInTheDocument();
+
+    // cada fila se puede cerrar sin afectar a las demás
+    await user.click(screen.getByRole("button", { name: /Press de banca con barra/ }));
+    expect(screen.getByRole("button", { name: /Press de banca con barra/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: /Sentadilla búlgara/ })).toHaveAttribute("aria-expanded", "true");
 
     await user.click(squats);
     expect(screen.getByRole("button", { name: /Press de banca con barra/ })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByRole("button", { name: /Sentadilla búlgara/ })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("0 completadas · 1 omitidas")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sentadilla búlgara/ })).toHaveAttribute("aria-expanded", "false");
   });
 });
 

@@ -238,6 +238,20 @@
   font-weight: 700;
 }
 
+.exerciseToggleIcon {
+  flex: 0 0 auto;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-0.15rem) rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.exerciseToggleIcon[data-expanded="true"] {
+  transform: translateY(0.15rem) rotate(225deg);
+}
+
 .exerciseDetails {
   border-top: 1px solid var(--color-border);
   padding: 0.9rem 1rem;

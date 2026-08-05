@@ -95,12 +95,23 @@ describe("acceso persistente a la Sesión activa", () => {
     vi.unstubAllGlobals();
   });
 
-  test("con Sesión activa muestra nombre, progreso y Continuar desde cualquier área", async () => {
+  test("con Sesión activa muestra el acceso persistente fuera de Inicio", async () => {
     stubApp(activeSession);
     render(<App />);
 
+    expect(await screen.findByRole("heading", { name: "Inicio" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Sesión activa" })).not.toBeInTheDocument();
+
+    const mobileNavigation = await screen.findByRole("navigation", {
+      name: "Navegación móvil",
+    });
+    await userEvent
+      .setup()
+      .click(within(mobileNavigation).getByRole("link", { name: "Rutinas" }));
+
     const access = await screen.findByRole("region", { name: "Sesión activa" });
     expect(within(access).getByText("Sesión libre")).toBeInTheDocument();
+    expect(within(access).getByText("Entrenamiento libre · 10/03/2025")).toBeInTheDocument();
     expect(within(access).getByText("2 ejercicios")).toBeInTheDocument();
 
     const user = userEvent.setup();

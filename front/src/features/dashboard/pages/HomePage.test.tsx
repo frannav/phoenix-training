@@ -331,7 +331,7 @@ describe("primer bloque de Inicio: entrenamiento actual", () => {
 
     const continuar = (await screen.findAllByRole("link", { name: "Continuar" })).at(-1)!;
     expect(continuar).toHaveAttribute("href", `/sesion/${existingSession.id}`);
-    expect(screen.getByText("2 de 5 Series")).toBeInTheDocument();
+    expect(screen.getByText("2 de 5 series completadas")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Iniciar Sesión libre" }),
     ).not.toBeInTheDocument();
@@ -427,13 +427,21 @@ describe("segundo bloque de Inicio: Plan activo", () => {
     expect(await screen.findByRole("heading", { name: "Plan activo" })).toBeInTheDocument();
     expect(screen.getByText("Ciclo base")).toBeInTheDocument();
     expect(screen.getByText("Semana 1 de 2")).toBeInTheDocument();
-    expect(screen.getByText("1 realizado · 1 omitido")).toBeInTheDocument();
-    expect(screen.getByText("50 % de avance · 25 % de cumplimiento")).toBeInTheDocument();
+    expect(screen.getByText("1 realizado · 1 omitido · 2 pendientes")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "El progreso cuenta entrenamientos realizados u omitidos. El cumplimiento solo cuenta los realizados.",
+      ),
+    ).toBeInTheDocument();
 
-    const avance = screen.getByRole("progressbar", { name: "Avance: 50 %" });
-    expect(avance).toHaveAttribute("aria-valuenow", "50");
-    const cumplimiento = screen.getByRole("progressbar", { name: "Cumplimiento: 25 %" });
-    expect(cumplimiento).toHaveAttribute("aria-valuenow", "25");
+    const entrenamientosConResultado = screen.getByRole("progressbar", {
+      name: "Entrenamientos con resultado: 50 % · Realizadas u omitidas",
+    });
+    expect(entrenamientosConResultado).toHaveAttribute("aria-valuenow", "50");
+    const entrenamientosRealizados = screen.getByRole("progressbar", {
+      name: "Entrenamientos realizados: 25 % · Completadas de las previstas",
+    });
+    expect(entrenamientosRealizados).toHaveAttribute("aria-valuenow", "25");
 
     const detail = screen.getByRole("link", { name: /Ver Plan/ });
     expect(detail).toHaveAttribute("href", "/planes/plan-1");
@@ -657,19 +665,13 @@ describe("presentación responsive de Inicio", () => {
     vi.unstubAllGlobals();
   });
 
-  test("en escritorio entrenamiento y Plan comparten la primera fila y el resto conserva la jerarquía", async () => {
+  test("prioriza la Sesión en curso y conserva la jerarquía del resto de Inicio", async () => {
     stubHome({ dashboard: fullDashboard });
     render(<App />);
 
-    const topRow = await screen.findByRole("region", {
-      name: "Entrenamiento y Plan",
-    });
-    expect(
-      within(topRow).getByRole("region", { name: "Entrenamiento actual" }),
-    ).toBeInTheDocument();
-    expect(
-      within(topRow).getByRole("region", { name: "Plan activo" }),
-    ).toBeInTheDocument();
+    const training = await screen.findByRole("region", { name: "Entrenamiento actual" });
+    const plan = screen.getByRole("region", { name: "Plan activo" });
+    expect(training.compareDocumentPosition(plan)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     const analyticsRow = screen.getByRole("region", {
       name: "Volumen y RM recientes",
@@ -682,14 +684,16 @@ describe("presentación responsive de Inicio", () => {
     ).toBeInTheDocument();
 
     const evolution = screen.getByRole("region", { name: "Evolución" });
-    expect(topRow).not.toContainElement(evolution);
+    expect(training).not.toContainElement(evolution);
+    expect(plan).not.toContainElement(evolution);
     expect(analyticsRow).not.toContainElement(evolution);
 
-    // El recorrido vertical conserva el orden acordado: primera fila,
-    // segunda fila y evolución a todo el ancho debajo.
-    expect(topRow.compareDocumentPosition(analyticsRow)).toBe(
+    // El recorrido vertical conserva el orden acordado: Sesión prioritaria,
+    // Plan activo, analítica y evolución.
+    expect(training.compareDocumentPosition(analyticsRow)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
+    expect(plan.compareDocumentPosition(analyticsRow)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(analyticsRow.compareDocumentPosition(evolution)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );

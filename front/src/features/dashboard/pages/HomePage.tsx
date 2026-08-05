@@ -86,22 +86,40 @@ export function HomePage() {
 
         {dashboard.isSuccess && (
           <>
-            {/* En escritorio entrenamiento y Plan comparten la primera fila;
-                volumen y RM recientes la segunda; la evolución ocupa el
-                ancho inferior (ticket 07). En móvil todas son filas de una
-                sola columna en el mismo orden. */}
-            <section className={styles.topRow} aria-label="Entrenamiento y Plan">
-              <TrainingBlock
-                training={dashboard.data.training}
-                isStarting={startMutation.isPending}
-                startError={startMutation.isError}
-                onStartFree={() => startMutation.mutate({ origin: "libre" })}
-                onStartPlan={(planId, trainingId) =>
-                  startMutation.mutate({ origin: "plan", planId, trainingId })
-                }
-              />
+            {/* Una Sesión en curso es la acción prioritaria de Inicio y queda
+                justo debajo de la cabecera. Cuando no la hay, el bloque
+                ofrece iniciar el próximo Entrenamiento junto al Plan activo. */}
+            {dashboard.data.training.kind === "continuar" && (
+              <div className={styles.priorityBlock}>
+                <TrainingBlock
+                  training={dashboard.data.training}
+                  isStarting={startMutation.isPending}
+                  startError={startMutation.isError}
+                  onStartFree={() => startMutation.mutate({ origin: "libre" })}
+                  onStartPlan={(planId, trainingId) =>
+                    startMutation.mutate({ origin: "plan", planId, trainingId })
+                  }
+                />
+              </div>
+            )}
+            <div
+              className={
+                dashboard.data.training.kind === "continuar" ? styles.planRow : styles.topRow
+              }
+            >
+              {dashboard.data.training.kind !== "continuar" && (
+                <TrainingBlock
+                  training={dashboard.data.training}
+                  isStarting={startMutation.isPending}
+                  startError={startMutation.isError}
+                  onStartFree={() => startMutation.mutate({ origin: "libre" })}
+                  onStartPlan={(planId, trainingId) =>
+                    startMutation.mutate({ origin: "plan", planId, trainingId })
+                  }
+                />
+              )}
               <ActivePlanBlock plan={dashboard.data.activePlan} />
-            </section>
+            </div>
             <section className={styles.analyticsRow} aria-label="Volumen y RM recientes">
               <WeeklyVolumeBlock volume={dashboard.data.weeklyVolume} />
               <RecentMaxesBlock recordedMaxes={dashboard.data.recentRecordedMaxes} />

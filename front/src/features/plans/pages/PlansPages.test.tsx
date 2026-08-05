@@ -360,10 +360,19 @@ describe("listado de Planes", () => {
     await user.type(screen.getByLabelText("Nombre del Plan"), "Ciclo base");
     await user.click(screen.getByRole("button", { name: "Añadir entrenamiento" }));
 
+    const week = screen.getByRole("article", { name: "Semana 1" });
+    const weekToggle = within(week).getByRole("button", { name: /Semana 1/ });
+    expect(weekToggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(weekToggle);
+    expect(screen.queryByLabelText("Rutina")).not.toBeInTheDocument();
+    await user.click(weekToggle);
+    expect(screen.getByLabelText("Rutina")).toBeInTheDocument();
+
     // el Entrenamiento nuevo usa una Rutina disponible
     await user.selectOptions(screen.getByLabelText("Rutina"), routine.id);
     expect(screen.getByText("Personalizar solo este día")).toBeInTheDocument();
     expect(screen.getByText(/Press de banca con barra/)).toBeInTheDocument();
+    expect(screen.getByText("1×10 · 60 kg")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Crear Plan" }));
 
