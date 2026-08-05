@@ -125,8 +125,11 @@ type SessionOriginRow = {
  * origen «plan», el nombre del Plan y, cuando el Entrenamiento planificado
  * usa una Rutina (referencia viva), también el nombre de la Rutina —el
  * nombre principal sigue la misma regla que el Inicio. Una referencia que ya
- * no se resuelve conserva el genérico de su Origen y las Sesiones libres no
- * tienen Plan ni Rutina.
+ * no se resuelve conserva el genérico de su Origen (un Entrenamiento
+ * planificado eliminado por una edición del Plan libera la referencia con
+ * ON DELETE SET NULL y la Sesión conserva su Origen «plan» y su Fecha
+ * prevista como hecho histórico) y las Sesiones libres no tienen Plan ni
+ * Rutina.
  */
 async function sessionOriginInfos(
   database: AppDatabase,
@@ -199,8 +202,13 @@ async function sessionOriginInfos(
         planName: null,
         routineName,
       });
-    } else if (row.origin === "plan" && row.planTrainingId !== null) {
-      const training = planTrainings.get(row.planTrainingId);
+    } else if (row.origin === "plan") {
+      // El Entrenamiento planificado de origen puede haber desaparecido (una
+      // edición del Plan lo eliminó y la clave foránea liberó la referencia):
+      // la Sesión conserva su Origen y su Fecha prevista y presenta el
+      // genérico del Origen, nunca la de una Sesión libre.
+      const training =
+        row.planTrainingId === null ? undefined : planTrainings.get(row.planTrainingId);
       const planName = training?.planName ?? null;
       const routineName =
         training?.routineId !== null && training?.routineId !== undefined

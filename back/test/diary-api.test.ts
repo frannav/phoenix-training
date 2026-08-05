@@ -346,6 +346,55 @@ async function activatePlan(
   return ((await response.json()) as { plan: PlanDocument }).plan;
 }
 
+/** Entrada de sustitución de un Plan (PUT /plans/:planId) a partir de su documento. */
+function planReplacementInput(plan: PlanDocument): {
+  name: string;
+  weeks: Array<{
+    id: string;
+    trainings: Array<{
+      id: string;
+      day: number;
+      source: "rutina" | "especifico";
+      routineId: string | null;
+      specific: Array<{
+        id: string;
+        exerciseId: string;
+        series: Array<{ id: string; carga: number | null; repeticiones: number | null; duracion: number | null }>;
+      }>;
+    }>;
+  }>;
+} {
+  return {
+    name: plan.name,
+    weeks: plan.weeks.map((week) => ({
+      id: week.id,
+      trainings: week.trainings.map((training) => ({
+        id: training.id,
+        day: training.day,
+        source: training.source,
+        routineId: training.routineId,
+        specific:
+          training.source === "especifico"
+            ? (training.content as Array<{
+                id: string;
+                exerciseId: string;
+                series: Array<{ id: string; carga: number | null; repeticiones: number | null; duracion: number | null }>;
+              }>).map((entry) => ({
+                id: entry.id,
+                exerciseId: entry.exerciseId,
+                series: entry.series.map((series) => ({
+                  id: series.id,
+                  carga: series.carga,
+                  repeticiones: series.repeticiones,
+                  duracion: series.duracion,
+                })),
+              }))
+            : [],
+      })),
+    })),
+  };
+}
+
 async function startSessionFromPlan(
   context: TestContext,
   cookie: string,
@@ -819,6 +868,77 @@ describe("detalle de un día", () => {
     expect(directBody.sessions[0]!.title).toBe("Día de empuje");
     expect(directBody.sessions[0]!.planName).toBeNull();
     expect(directBody.sessions[0]!.routineName).toBe("Día de empuje");
+  });
+
+  test("una Sesión cuyo Entrenamiento planificado desapareció conserva el Origen Plan sin clasificarse como Libre", async () => {
+    const sentadilla = (
+      await createExercise(context!, cookie, { name: "Sentadilla", recordingMode: "fuerza_con_carga" })
+    ).id;
+    const routine = await createRoutine(context!, cookie, {
+      name: "Día de empuje",
+      exercises: [{ exerciseId: sentadilla, series: [{ carga: 60, repeticiones: 10 }] }],
+    });
+    const draft = await createPlan(
+      context!,
+      cookie,
+      planPayload([
+        {
+          trainings: [
+            { day: 0, source: "rutina", routineId: routine.id },
+            { day: 3, source: "especifico", specific: [{ exerciseId: sentadilla, series: [{ carga: 70, repeticiones: 8 }] }] },
+          ],
+        },
+      ]),
+    );
+    const plan = await activatePlan(context!, cookie, draft.id, draft.revision, "2025-03-10");
+    const trainings = plan.weeks
+      .flatMap((week) => week.trainings)
+      .sort((a, b) => (a.plannedDate ?? "").localeCompare(b.plannedDate ?? ""));
+    const removedTraining = trainings[0]!;
+
+    // Flujo existente: una Sesión activa originada en el Entrenamiento del
+    // lunes y una edición del Plan que elimina ese Entrenamiento pendiente.
+    // La clave foránea libera la referencia (ON DELETE SET NULL) y la Sesión
+    // conserva su Origen «plan» y su Fecha prevista como hecho histórico.
+    const session = await startSessionFromPlan(context!, cookie, plan.id, removedTraining.id);
+    const input = planReplacementInput(plan);
+    const edited = await context!.app.request(`/api/plans/${plan.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: origin },
+      body: JSON.stringify({
+        ...input,
+        revision: plan.revision,
+        weeks: input.weeks.map((week) => ({
+          ...week,
+          trainings: week.trainings.filter((training) => training.id !== removedTraining.id),
+        })),
+      }),
+    });
+    expect(edited.status).toBe(200);
+
+    const orphaned = await completeAndFinalizeSession(context!, cookie, session);
+    const performed = await setPerformedDate(context!, cookie, orphaned, "2025-03-10");
+
+    // El detalle conserva el Origen Plan: nunca lo presenta como Sesión libre.
+    const day = await getDiaryDay(context!, cookie, "?date=2025-03-10");
+    expect(day.status).toBe(200);
+    const dayBody = (await day.json()) as DiaryDayResponse;
+    expect(dayBody.sessions).toHaveLength(1);
+    const diarySession = dayBody.sessions[0]!;
+    expect(diarySession.id).toBe(performed.id);
+    expect(diarySession.origin).toBe("plan");
+    expect(diarySession.title).toBe("Sesión del Plan");
+    expect(diarySession.planName).toBeNull();
+    expect(diarySession.routineName).toBeNull();
+    expect(diarySession.plannedDate).toBe("2025-03-10");
+
+    // El calendario mensual presenta el mismo Origen, sin clasificarla Libre.
+    const month = await getDiaryMonth(context!, cookie, "?year=2025&month=3");
+    const monthBody = (await month.json()) as MonthlyDiaryResponse;
+    const calendar = monthBody.days
+      .flatMap((entry) => entry.sessions)
+      .find((entry) => entry.id === performed.id);
+    expect(calendar).toEqual({ id: performed.id, title: "Sesión del Plan" });
   });
 
   test("un día sin Sesiones expresa su estado vacío", async () => {
