@@ -14,9 +14,9 @@
     "start": "bun run --cwd back start",
     "db:generate": "bun run --cwd back db:generate",
     "db:migrate": "bun run --cwd back db:migrate",
+    "db:seed": "bun run --cwd back db:seed",
     "db:load": "bun run --cwd back db:load",
     "typecheck": "bun run --filter '*' typecheck",
     "test": "bun run --filter '*' test"
   }
 }
-
