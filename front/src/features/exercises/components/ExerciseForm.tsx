@@ -105,6 +105,7 @@ export function ExerciseForm({
           id={`${fieldPrefix}-nombre`}
           className={styles.input}
           type="text"
+          placeholder="Ej. Press de banca con barra"
           autoComplete="off"
           aria-invalid={errors.name ? true : undefined}
           aria-describedby={errors.name ? `${fieldPrefix}-nombre-error` : undefined}
@@ -120,6 +121,7 @@ export function ExerciseForm({
         <textarea
           id={`${fieldPrefix}-instrucciones`}
           className={styles.textarea}
+          placeholder="Describe cómo se ejecuta y qué debe registrar el Deportista."
           rows={4}
           aria-invalid={errors.instructions ? true : undefined}
           aria-describedby={
@@ -179,39 +181,47 @@ export function ExerciseForm({
         </datalist>
       </FormField>
 
-      <div className={styles.row}>
-        <FormField
-          label="Parte del cuerpo"
-          htmlFor={`${fieldPrefix}-cuerpo`}
-          error={errors.bodyPart?.message}
-        >
-          <input
-            id={`${fieldPrefix}-cuerpo`}
-            className={styles.input}
-            type="text"
-            autoComplete="off"
-            aria-invalid={errors.bodyPart ? true : undefined}
-            aria-describedby={errors.bodyPart ? `${fieldPrefix}-cuerpo-error` : undefined}
-            {...register("bodyPart")}
-          />
-        </FormField>
+      <details className={styles.optionalDetails}>
+        <summary>Metadatos opcionales</summary>
+        <p className={styles.optionalHint}>
+          Añádelos si ayudan a encontrar el Ejercicio después. No son necesarios para guardarlo.
+        </p>
+        <div className={styles.row}>
+          <FormField
+            label="Parte del cuerpo"
+            htmlFor={`${fieldPrefix}-cuerpo`}
+            error={errors.bodyPart?.message}
+          >
+            <input
+              id={`${fieldPrefix}-cuerpo`}
+              className={styles.input}
+              type="text"
+              placeholder="Ej. Pecho"
+              autoComplete="off"
+              aria-invalid={errors.bodyPart ? true : undefined}
+              aria-describedby={errors.bodyPart ? `${fieldPrefix}-cuerpo-error` : undefined}
+              {...register("bodyPart")}
+            />
+          </FormField>
 
-        <FormField
-          label="Equipamiento"
-          htmlFor={`${fieldPrefix}-equipo`}
-          error={errors.equipment?.message}
-        >
-          <input
-            id={`${fieldPrefix}-equipo`}
-            className={styles.input}
-            type="text"
-            autoComplete="off"
-            aria-invalid={errors.equipment ? true : undefined}
-            aria-describedby={errors.equipment ? `${fieldPrefix}-equipo-error` : undefined}
-            {...register("equipment")}
-          />
-        </FormField>
-      </div>
+          <FormField
+            label="Equipamiento"
+            htmlFor={`${fieldPrefix}-equipo`}
+            error={errors.equipment?.message}
+          >
+            <input
+              id={`${fieldPrefix}-equipo`}
+              className={styles.input}
+              type="text"
+              placeholder="Ej. Barra"
+              autoComplete="off"
+              aria-invalid={errors.equipment ? true : undefined}
+              aria-describedby={errors.equipment ? `${fieldPrefix}-equipo-error` : undefined}
+              {...register("equipment")}
+            />
+          </FormField>
+        </div>
+      </details>
 
       {serverError && (
         <p className={styles.formError} role="alert">

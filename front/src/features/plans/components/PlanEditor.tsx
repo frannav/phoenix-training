@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiRequestError } from "../../../shared/http/api-client";
 import { FormField } from "../../../shared/ui/FormField";
 import {
@@ -96,6 +96,10 @@ function nextKey(): string {
 
 function emptySeries(): EditorSeries {
   return { key: nextKey(), carga: "", repeticiones: "", duracion: "" };
+}
+
+function copySeries(series: EditorSeries): EditorSeries {
+  return { ...series, key: nextKey() };
 }
 
 function emptyWeek(): EditorWeek {
@@ -392,6 +396,7 @@ type ExercisePickerProps = {
 function ExercisePicker({ selectedExerciseIds, onPick, onClose }: ExercisePickerProps) {
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const exercisesQuery = useQuery({
     queryKey: ["exercises", "picker", { q }],
     queryFn: () => listExercises({ q }),
@@ -403,58 +408,87 @@ function ExercisePicker({ selectedExerciseIds, onPick, onClose }: ExercisePicker
     setQ(search.trim());
   };
 
-  return (
-    <div className={styles.pickerPanel} role="region" aria-label="Añadir Ejercicio al Entrenamiento">
-      <h4 className={styles.pickerHeading}>Añade los ejercicios de este día</h4>
-      <form className={styles.pickerSearch} onSubmit={applySearch} role="search">
-        <label className={styles.visuallyHidden} htmlFor="plan-picker-busqueda">
-          Buscar Ejercicios disponibles
-        </label>
-        <input
-          id="plan-picker-busqueda"
-          className={styles.pickerInput}
-          type="search"
-          placeholder="Buscar por nombre (p. ej. «press»)"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        <button className={styles.pickerButton} type="submit">
-          Buscar
-        </button>
-      </form>
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
-      {exercisesQuery.isPending && <p className={styles.pickerStatus}>Buscando Ejercicios…</p>}
-      {exercisesQuery.isError && (
-        <p className={styles.pickerStatus} role="alert">
-          No se pudieron cargar los Ejercicios disponibles.
-        </p>
-      )}
-      {exercisesQuery.isSuccess && exercisesQuery.data.items.length === 0 && (
-        <p className={styles.pickerStatus}>Sin Ejercicios disponibles con ese nombre.</p>
-      )}
-      {exercisesQuery.isSuccess && exercisesQuery.data.items.length > 0 && (
-        <ul className={styles.pickerList}>
-          {exercisesQuery.data.items.map((exercise) => (
-            <li key={exercise.id} className={styles.pickerItem}>
-              <span className={styles.pickerName}>{exercise.name}</span>
-              <span className={styles.pickerMeta}>
-                {recordingModeLabels[exercise.recordingMode]} · {exercise.category}
-              </span>
-              <button
-                className={styles.pickerAdd}
-                type="button"
-                disabled={selectedExerciseIds.includes(exercise.id)}
-                onClick={() => onPick(exercise)}
-              >
-                Añadir
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button className={styles.pickerClose} type="button" onClick={onClose}>
-        Cerrar selector
-      </button>
+  return (
+    <div
+      className={styles.pickerBackdrop}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className={styles.pickerPanel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="plan-picker-titulo"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onClose();
+        }}
+      >
+        <div className={styles.pickerHeader}>
+          <div>
+            <p className={styles.pickerKicker}>Añadir al Entrenamiento</p>
+            <h2 id="plan-picker-titulo">Busca un Ejercicio</h2>
+          </div>
+          <button className={styles.pickerCloseIcon} type="button" onClick={onClose} aria-label="Cerrar selector">
+            ×
+          </button>
+        </div>
+        <form className={styles.pickerSearch} onSubmit={applySearch} role="search">
+          <label className={styles.visuallyHidden} htmlFor="plan-picker-busqueda">
+            Buscar Ejercicios disponibles
+          </label>
+          <input
+            ref={searchInputRef}
+            id="plan-picker-busqueda"
+            className={styles.pickerInput}
+            type="search"
+            placeholder="Buscar por nombre (p. ej. «press»)"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <button className={styles.pickerButton} type="submit">
+            Buscar
+          </button>
+        </form>
+        <div className={styles.pickerResults}>
+          {exercisesQuery.isPending && <p className={styles.pickerStatus}>Buscando Ejercicios…</p>}
+          {exercisesQuery.isError && (
+            <p className={styles.pickerStatus} role="alert">
+              No se pudieron cargar los Ejercicios disponibles.
+            </p>
+          )}
+          {exercisesQuery.isSuccess && exercisesQuery.data.items.length === 0 && (
+            <p className={styles.pickerStatus}>Sin Ejercicios disponibles con ese nombre.</p>
+          )}
+          {exercisesQuery.isSuccess && exercisesQuery.data.items.length > 0 && (
+            <ul className={styles.pickerList}>
+              {exercisesQuery.data.items.map((exercise) => (
+                <li key={exercise.id} className={styles.pickerItem}>
+                  <div className={styles.pickerExerciseCopy}>
+                    <strong className={styles.pickerName}>{exercise.name}</strong>
+                    <span className={styles.pickerMeta}>
+                      {recordingModeLabels[exercise.recordingMode]} · {exercise.category}
+                    </span>
+                  </div>
+                  <button
+                    className={styles.pickerAdd}
+                    type="button"
+                    disabled={selectedExerciseIds.includes(exercise.id)}
+                    onClick={() => onPick(exercise)}
+                  >
+                    {selectedExerciseIds.includes(exercise.id) ? "Añadido" : "Añadir"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <p className={styles.pickerHint}>Pulsa Enter para buscar · Escape para cerrar</p>
+      </div>
     </div>
   );
 }
@@ -491,6 +525,7 @@ export function PlanEditor({
   const [weeks, setWeeks] = useState<EditorWeek[]>(() =>
     plan ? plan.weeks.map(toEditorWeek) : [emptyWeek()],
   );
+  const [activeWeekKey, setActiveWeekKey] = useState("");
   const [errors, setErrors] = useState<EditorErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [staleRevision, setStaleRevision] = useState(false);
@@ -503,6 +538,7 @@ export function PlanEditor({
   const isEdit = plan !== undefined && plan !== null;
   const prefix = isEdit ? `plan-${plan!.id}` : "plan-nuevo";
   const isActive = plan?.status === "activo";
+  const selectedWeekKey = activeWeekKey || weeks[0]?.key || "";
 
   const routinesQuery = useQuery({
     queryKey: ["routines"],
@@ -510,18 +546,6 @@ export function PlanEditor({
     retry: false,
   });
   const availableRoutines = (routinesQuery.data?.items ?? []).filter((routine) => !routine.archived);
-
-  const selectedExerciseIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const week of weeks) {
-      for (const training of week.trainings) {
-        for (const entry of training.specific) {
-          ids.add(entry.exerciseId);
-        }
-      }
-    }
-    return [...ids];
-  }, [weeks]);
 
   const updateTraining = (key: string, update: (training: EditorTraining) => EditorTraining) => {
     setWeeks((previous) =>
@@ -537,11 +561,17 @@ export function PlanEditor({
   const addWeek = () => {
     const newWeek = emptyWeek();
     setWeeks((previous) => [...previous, newWeek]);
+    setActiveWeekKey(newWeek.key);
     setOpenWeeks((previous) => new Set(previous).add(newWeek.key));
     setErrors({});
   };
 
   const toggleWeek = (weekKey: string) => {
+    if (activeWeekKey !== weekKey) {
+      setActiveWeekKey(weekKey);
+      setOpenWeeks(new Set([weekKey]));
+      return;
+    }
     setOpenWeeks((previous) => {
       const next = new Set(previous);
       if (next.has(weekKey)) {
@@ -554,12 +584,16 @@ export function PlanEditor({
   };
 
   const removeWeek = (weekKey: string) => {
-    setWeeks((previous) => {
-      if (previous.length <= 1) {
-        return previous;
-      }
-      return previous.filter((week) => week.key !== weekKey);
-    });
+    if (weeks.length <= 1) return;
+    const removedIndex = weeks.findIndex((week) => week.key === weekKey);
+    const remaining = weeks.filter((week) => week.key !== weekKey);
+    setWeeks(remaining);
+    if (selectedWeekKey === weekKey) {
+      const nextActiveKey = remaining[Math.min(removedIndex, remaining.length - 1)]?.key ?? "";
+      setActiveWeekKey(nextActiveKey);
+      setOpenWeeks(nextActiveKey === "" ? new Set() : new Set([nextActiveKey]));
+      return;
+    }
     setOpenWeeks((previous) => {
       const next = new Set(previous);
       next.delete(weekKey);
@@ -579,6 +613,7 @@ export function PlanEditor({
   };
 
   const addTraining = (weekKey: string) => {
+    setActiveWeekKey(weekKey);
     setWeeks((previous) =>
       previous.map((week) => {
         if (week.key !== weekKey) {
@@ -733,7 +768,7 @@ export function PlanEditor({
   const addSeries = (trainingKey: string, exerciseKey: string) => {
     updateSpecificExercise(trainingKey, exerciseKey, (entry) => ({
       ...entry,
-      series: [...entry.series, emptySeries()],
+      series: [...entry.series, copySeries(entry.series.at(-1) ?? emptySeries())],
     }));
   };
 
@@ -849,6 +884,51 @@ export function PlanEditor({
           </p>
         )}
 
+        <div className={styles.planBuilder}>
+          <aside className={styles.weekRail} aria-label="Semanas del Plan">
+            <div className={styles.weekRailHeading}>
+              <div>
+                <p className={styles.weekRailKicker}>Paso 1 de 2</p>
+                <h3>Semanas</h3>
+              </div>
+              <span className={styles.weekRailCount}>{weeks.length}</span>
+            </div>
+            <ol className={styles.weekList}>
+              {weeks.map((week, weekIndex) => {
+                const trainingCountLabel =
+                  week.trainings.length === 0
+                    ? "Sin entrenamientos"
+                    : `${week.trainings.length} entrenamiento${week.trainings.length === 1 ? "" : "s"}`;
+                const isSelected = week.key === selectedWeekKey;
+                return (
+                  <li key={week.key} className={styles.weekListItem}>
+                    <button
+                      type="button"
+                      className={isSelected ? styles.weekSelectActive : styles.weekSelect}
+                      aria-current={isSelected ? "step" : undefined}
+                      onClick={() => {
+                        setActiveWeekKey(week.key);
+                        setOpenWeeks(new Set([week.key]));
+                      }}
+                    >
+                      <span className={styles.weekListNumber}>{weekIndex + 1}</span>
+                      <span className={styles.weekListCopy}>
+                        <strong>Semana {weekIndex + 1}</strong>
+                        <small>{trainingCountLabel}</small>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+            {!isActive && (
+              <button type="button" className={styles.addWeek} onClick={addWeek}>
+                <span aria-hidden="true">＋ </span>Añadir semana
+              </button>
+            )}
+          </aside>
+
+          <div className={styles.weekWorkspace}>
         {weeks.map((week, weekIndex) => {
           const isWeekOpen = openWeeks.has(week.key);
           const weekPanelId = `${prefix}-week-${week.key}`;
@@ -858,7 +938,13 @@ export function PlanEditor({
               : `${week.trainings.length} entrenamiento${week.trainings.length === 1 ? "" : "s"}`;
 
           return (
-          <article key={week.key} className={styles.weekCard} aria-label={`Semana ${weekIndex + 1}`}>
+          <article
+            key={week.key}
+            className={styles.weekCard}
+            data-active={week.key === selectedWeekKey}
+            aria-hidden={week.key === selectedWeekKey ? undefined : true}
+            aria-label={`Semana ${weekIndex + 1}`}
+          >
             <div className={styles.weekHeader}>
               <button
                 type="button"
@@ -1312,7 +1398,7 @@ export function PlanEditor({
 
                       {pickerTraining === training.key && (
                         <ExercisePicker
-                          selectedExerciseIds={selectedExerciseIds}
+                          selectedExerciseIds={training.specific.map((entry) => entry.exerciseId)}
                           onPick={(exercise) => addSpecificExercise(training.key, exercise)}
                           onClose={() => setPickerTraining(null)}
                         />
@@ -1337,12 +1423,8 @@ export function PlanEditor({
           </article>
           );
         })}
-
-        {!isActive && (
-          <button type="button" className={styles.addWeek} onClick={addWeek}>
-            Añadir semana
-          </button>
-        )}
+          </div>
+        </div>
       </section>
 
       {serverError && (

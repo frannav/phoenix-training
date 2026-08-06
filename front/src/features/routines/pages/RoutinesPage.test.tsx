@@ -312,7 +312,7 @@ describe("crear una Rutina", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Añadir ejercicio" }));
-    const picker = screen.getByRole("region", { name: "Añadir Ejercicio a la Rutina" });
+    const picker = screen.getByRole("dialog", { name: "Busca un Ejercicio" });
     const search = within(picker).getByRole("searchbox", {
       name: "Buscar Ejercicios disponibles",
     });
@@ -355,7 +355,7 @@ describe("crear una Rutina", () => {
 
     // añadir el primer Ejercicio desde el selector de disponibles
     await user.click(screen.getByRole("button", { name: "Añadir ejercicio" }));
-    const picker = screen.getByRole("region", { name: "Añadir Ejercicio a la Rutina" });
+    const picker = screen.getByRole("dialog", { name: "Busca un Ejercicio" });
     await user.click(within(picker).getAllByRole("button", { name: "Añadir" })[0]!);
     const pressCard = screen.getByRole("article", { name: "Press de banca con barra" });
     expect(pressCard).toBeInTheDocument();
@@ -364,12 +364,16 @@ describe("crear una Rutina", () => {
     await user.type(within(pressCard).getByLabelText("Carga (kg)"), "60");
     await user.type(within(pressCard).getByLabelText("Repeticiones"), "10");
     await user.click(within(pressCard).getByRole("button", { name: "Añadir serie" }));
+    expect(within(pressCard).getAllByLabelText("Carga (kg)")[1]).toHaveValue(60);
+    expect(within(pressCard).getAllByLabelText("Repeticiones")[1]).toHaveValue(10);
+    await user.clear(within(pressCard).getAllByLabelText("Carga (kg)")[1]!);
+    await user.clear(within(pressCard).getAllByLabelText("Repeticiones")[1]!);
     await user.type(within(pressCard).getAllByLabelText("Repeticiones")[1]!, "8");
 
     // añadir cardio continuo: una única Serie sin «Añadir serie»
     await user.click(screen.getByRole("button", { name: "Añadir ejercicio" }));
-    const pickerTwo = screen.getByRole("region", { name: "Añadir Ejercicio a la Rutina" });
-    await user.click(within(pickerTwo).getAllByRole("button", { name: "Añadir" })[1]!);
+    const pickerTwo = screen.getByRole("dialog", { name: "Busca un Ejercicio" });
+    await user.click(within(pickerTwo).getByRole("button", { name: "Añadir" }));
     const cardioCard = screen.getByRole("article", { name: "Sprints" });
     await user.type(within(cardioCard).getByLabelText("Duración (seg)"), "1800");
     expect(

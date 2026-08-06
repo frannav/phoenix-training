@@ -700,6 +700,20 @@ describe("resumen del Plan activo", () => {
     expect(week1Sunday.activePlan!.currentWeek).toBe(1);
     const week2 = await readState(context!, accountId, "2025-03-17");
     expect(week2.activePlan!.currentWeek).toBe(2);
+    expect(week2.activePlan!.currentWeekTrainings).toMatchObject([
+      {
+        day: 1,
+        name: "Día de empuje",
+        plannedDate: "2025-03-18",
+        status: "pendiente",
+      },
+      {
+        day: 4,
+        name: "Ciclo base",
+        plannedDate: "2025-03-21",
+        status: "pendiente",
+      },
+    ]);
     // antes de la primera semana: se muestra la primera
     const before = await readState(context!, accountId, "2025-03-01");
     expect(before.activePlan!.currentWeek).toBe(1);
@@ -718,6 +732,22 @@ describe("resumen del Plan activo", () => {
       order: 0,
       progress: { realizados: 0, omitidos: 0, pendientes: 2, total: 2, avance: 0, cumplimiento: 0, avanceRedondeado: 0, cumplimientoRedondeado: 0 },
     });
+    expect(state.activePlan!.currentWeekTrainings).toEqual([
+      {
+        id: trainingIds[0]!,
+        day: 0,
+        name: "Día de empuje",
+        plannedDate: "2025-03-10",
+        status: "pendiente",
+      },
+      {
+        id: trainingIds[1]!,
+        day: 3,
+        name: "Ciclo base",
+        plannedDate: "2025-03-13",
+        status: "pendiente",
+      },
+    ]);
     expect(state.activePlan!.progress).toEqual({
       realizados: 0,
       omitidos: 0,

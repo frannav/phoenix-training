@@ -68,13 +68,159 @@
 }
 
 .planCard,
-.freeSessionCard {
+.weeklyCard,
+.weeklyEmptyCard {
   display: grid;
   gap: 0.4rem;
   border: 1px solid var(--color-border);
   border-radius: 1.25rem;
   padding: 1.25rem;
   background: var(--color-surface-muted);
+}
+
+.weeklyCard {
+  gap: 1rem;
+}
+
+.weeklyHeader {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.weeklyEyebrow,
+.weeklyTitle,
+.weeklyEmptyTitle,
+.weeklyEmptyText {
+  margin: 0;
+}
+
+.weeklyEyebrow {
+  color: var(--color-ink-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.weeklyTitle,
+.weeklyEmptyTitle {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.weeklyDetail,
+.weeklyAction {
+  flex: 0 0 auto;
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.weeklyEmptyCard {
+  gap: 0.55rem;
+}
+
+.weeklyEmptyText {
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+}
+
+.weeklyAction {
+  justify-self: start;
+  margin-top: 0.25rem;
+}
+
+.weekGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.day {
+  display: grid;
+  min-width: 0;
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.dayLabel {
+  color: var(--color-ink-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.dayTraining,
+.restDay {
+  display: grid;
+  min-height: 3.5rem;
+  align-content: start;
+  justify-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  padding: 0.45rem 0.2rem;
+  background: var(--color-surface);
+}
+
+.dayTraining {
+  border-color: var(--color-accent-soft);
+}
+
+.dayTrainingrealizado {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.dayTrainingomitido {
+  opacity: 0.65;
+  text-decoration: line-through;
+}
+
+.dayStatus {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.dayTrainingrealizado .dayStatus {
+  background: var(--color-success);
+}
+
+.dayTrainingomitido .dayStatus {
+  background: var(--color-danger);
+}
+
+.dayName {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.15;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.restDay {
+  place-items: center;
+  color: var(--color-ink-muted);
+  font-weight: 700;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .planEyebrow {
@@ -99,17 +245,6 @@
 
 .planMeta strong {
   color: var(--color-ink);
-}
-
-.freeSessionTitle {
-  margin: 0;
-  font-weight: 800;
-}
-
-.freeSessionText {
-  margin: 0;
-  color: var(--color-ink-muted);
-  font-size: 0.9rem;
 }
 
 .startButton {

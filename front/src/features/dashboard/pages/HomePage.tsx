@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiRequestError } from "../../../shared/http/api-client";
 import { PageIntro } from "../../../shared/ui/PageIntro";
@@ -10,14 +9,13 @@ import {
 } from "../../sessions/api/sessions-api";
 import { dashboardQueryKeyFor, getDashboard } from "../api/dashboard-api";
 import { ActivePlanBlock } from "../components/ActivePlanBlock";
-import { EvolutionBlock } from "../components/EvolutionBlock";
 import { RecentMaxesBlock } from "../components/RecentMaxesBlock";
 import { TrainingBlock } from "../components/TrainingBlock";
 import { WeeklyVolumeBlock } from "../components/WeeklyVolumeBlock";
 import styles from "./HomePage.module.css";
 
 /**
- * Inicio: el recorrido vertical de los cinco bloques acordados (spec
+ * Inicio: el recorrido vertical de los cuatro bloques acordados (spec
  * «Inicio, navegación y presentación adaptable») consumiendo el contrato de
  * `GET /api/dashboard` (ticket 33). La página es la única dueña de la lectura
  * única y de las acciones de iniciar Sesión; los bloques presentan datos ya
@@ -26,13 +24,9 @@ import styles from "./HomePage.module.css";
 export function HomePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
-
   const dashboard = useQuery({
-    // El Ejercicio elegido del bloque «Evolución» viaja en la consulta de la
-    // lectura única; mientras se refresca se conserva la lectura anterior.
-    queryKey: dashboardQueryKeyFor(selectedExerciseId),
-    queryFn: () => getDashboard(selectedExerciseId ?? undefined),
+    queryKey: dashboardQueryKeyFor(null),
+    queryFn: () => getDashboard(),
     retry: false,
     placeholderData: (previousData) => previousData,
   });
@@ -93,9 +87,9 @@ export function HomePage() {
               <div className={styles.priorityBlock}>
                 <TrainingBlock
                   training={dashboard.data.training}
+                  activePlan={dashboard.data.activePlan}
                   isStarting={startMutation.isPending}
                   startError={startMutation.isError}
-                  onStartFree={() => startMutation.mutate({ origin: "libre" })}
                   onStartPlan={(planId, trainingId) =>
                     startMutation.mutate({ origin: "plan", planId, trainingId })
                   }
@@ -110,9 +104,9 @@ export function HomePage() {
               {dashboard.data.training.kind !== "continuar" && (
                 <TrainingBlock
                   training={dashboard.data.training}
+                  activePlan={dashboard.data.activePlan}
                   isStarting={startMutation.isPending}
                   startError={startMutation.isError}
-                  onStartFree={() => startMutation.mutate({ origin: "libre" })}
                   onStartPlan={(planId, trainingId) =>
                     startMutation.mutate({ origin: "plan", planId, trainingId })
                   }
@@ -124,11 +118,6 @@ export function HomePage() {
               <WeeklyVolumeBlock volume={dashboard.data.weeklyVolume} />
               <RecentMaxesBlock recordedMaxes={dashboard.data.recentRecordedMaxes} />
             </section>
-            <EvolutionBlock
-              options={dashboard.data.evolution.options}
-              current={dashboard.data.evolution.current}
-              onSelectExercise={setSelectedExerciseId}
-            />
           </>
         )}
       </div>

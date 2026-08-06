@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiRequestError } from "../../../shared/http/api-client";
 import { FormField } from "../../../shared/ui/FormField";
 import {
@@ -65,6 +65,10 @@ function nextKey(): string {
 
 function emptySeries(): EditorSeries {
   return { key: nextKey(), carga: "", repeticiones: "", duracion: "" };
+}
+
+function copySeries(series: EditorSeries): EditorSeries {
+  return { ...series, key: nextKey() };
 }
 
 function toEditorSeries(series: RoutineItem["exercises"][number]["series"][number]): EditorSeries {
@@ -224,6 +228,7 @@ type ExercisePickerProps = {
 function ExercisePicker({ selectedExerciseIds, onPick, onClose }: ExercisePickerProps) {
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const exercisesQuery = useQuery({
     queryKey: ["exercises", "picker", { q }],
     queryFn: () => listExercises({ q }),
@@ -234,65 +239,98 @@ function ExercisePicker({ selectedExerciseIds, onPick, onClose }: ExercisePicker
     setQ(search.trim());
   };
 
-  return (
-    <div className={styles.pickerPanel} role="region" aria-label="Añadir Ejercicio a la Rutina">
-      <div className={styles.pickerSearch} role="search">
-        <label className={styles.visuallyHidden} htmlFor="rutina-picker-busqueda">
-          Buscar Ejercicios disponibles
-        </label>
-        <input
-          id="rutina-picker-busqueda"
-          className={styles.pickerInput}
-          type="search"
-          placeholder="Buscar por nombre (p. ej. «press»)"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              applySearch();
-            }
-          }}
-        />
-        <button className={styles.pickerButton} type="button" onClick={applySearch}>
-          Buscar
-        </button>
-      </div>
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
-      {exercisesQuery.isPending && (
-        <p className={styles.pickerStatus}>Buscando Ejercicios…</p>
-      )}
-      {exercisesQuery.isError && (
-        <p className={styles.pickerStatus} role="alert">
-          No se pudieron cargar los Ejercicios disponibles.
-        </p>
-      )}
-      {exercisesQuery.isSuccess && exercisesQuery.data.items.length === 0 && (
-        <p className={styles.pickerStatus}>Sin Ejercicios disponibles con ese nombre.</p>
-      )}
-      {exercisesQuery.isSuccess && exercisesQuery.data.items.length > 0 && (
-        <ul className={styles.pickerList}>
-          {exercisesQuery.data.items.map((exercise) => (
-            <li key={exercise.id} className={styles.pickerItem}>
-              <span className={styles.pickerName}>{exercise.name}</span>
-              <span className={styles.pickerMeta}>
-                {recordingModeLabels[exercise.recordingMode]} · {exercise.category}
-              </span>
-              <button
-                className={styles.pickerAdd}
-                type="button"
-                disabled={selectedExerciseIds.includes(exercise.id)}
-                onClick={() => onPick(exercise)}
-              >
-                Añadir
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button className={styles.pickerClose} type="button" onClick={onClose}>
-        Cerrar selector
-      </button>
+  return (
+    <div
+      className={styles.pickerBackdrop}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className={styles.pickerPanel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rutina-picker-titulo"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onClose();
+        }}
+      >
+        <div className={styles.pickerHeader}>
+          <div>
+            <p className={styles.pickerKicker}>Añadir a la Rutina</p>
+            <h2 id="rutina-picker-titulo">Busca un Ejercicio</h2>
+          </div>
+          <button className={styles.pickerCloseIcon} type="button" onClick={onClose} aria-label="Cerrar selector">
+            ×
+          </button>
+        </div>
+
+        <div className={styles.pickerSearch} role="search">
+          <label className={styles.visuallyHidden} htmlFor="rutina-picker-busqueda">
+            Buscar Ejercicios disponibles
+          </label>
+          <input
+            ref={searchInputRef}
+            id="rutina-picker-busqueda"
+            className={styles.pickerInput}
+            type="search"
+            placeholder="Buscar por nombre (p. ej. «press»)"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                applySearch();
+              }
+            }}
+          />
+          <button className={styles.pickerButton} type="button" onClick={applySearch}>
+            Buscar
+          </button>
+        </div>
+
+        <div className={styles.pickerResults}>
+          {exercisesQuery.isPending && (
+            <p className={styles.pickerStatus}>Buscando Ejercicios…</p>
+          )}
+          {exercisesQuery.isError && (
+            <p className={styles.pickerStatus} role="alert">
+              No se pudieron cargar los Ejercicios disponibles.
+            </p>
+          )}
+          {exercisesQuery.isSuccess && exercisesQuery.data.items.length === 0 && (
+            <p className={styles.pickerStatus}>Sin Ejercicios disponibles con ese nombre.</p>
+          )}
+          {exercisesQuery.isSuccess && exercisesQuery.data.items.length > 0 && (
+            <ul className={styles.pickerList}>
+              {exercisesQuery.data.items.map((exercise) => (
+                <li key={exercise.id} className={styles.pickerItem}>
+                  <div className={styles.pickerExerciseCopy}>
+                    <strong className={styles.pickerName}>{exercise.name}</strong>
+                    <span className={styles.pickerMeta}>
+                      {recordingModeLabels[exercise.recordingMode]} · {exercise.category}
+                    </span>
+                  </div>
+                  <button
+                    className={styles.pickerAdd}
+                    type="button"
+                    disabled={selectedExerciseIds.includes(exercise.id)}
+                    onClick={() => onPick(exercise)}
+                  >
+                    {selectedExerciseIds.includes(exercise.id) ? "Añadido" : "Añadir"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <p className={styles.pickerHint}>Pulsa Enter para buscar · Escape para cerrar</p>
+      </div>
     </div>
   );
 }
@@ -317,6 +355,7 @@ export function RoutineEditor({
   const [exercises, setExercises] = useState<EditorExercise[]>(() =>
     (routine?.exercises ?? []).map(toEditorExercise),
   );
+  const [activeExerciseKey, setActiveExerciseKey] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [errors, setErrors] = useState<EditorErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -330,6 +369,21 @@ export function RoutineEditor({
     [exercises],
   );
 
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPickerOpen(true);
+      }
+      if (pickerOpen && event.key === "Escape") {
+        event.preventDefault();
+        setPickerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [pickerOpen]);
+
   const addExercise = (exercise: ExerciseItem) => {
     const entry: EditorExercise = {
       key: nextKey(),
@@ -338,12 +392,20 @@ export function RoutineEditor({
       series: [emptySeries()],
     };
     setExercises((previous) => [...previous, entry]);
+    setActiveExerciseKey(entry.key);
     setPickerOpen(false);
     setErrors({});
   };
 
   const removeExercise = (key: string) => {
-    setExercises((previous) => previous.filter((entry) => entry.key !== key));
+    const removedIndex = exercises.findIndex((entry) => entry.key === key);
+    const remaining = exercises.filter((entry) => entry.key !== key);
+    setExercises(remaining);
+    if (activeExerciseKey === key) {
+      setActiveExerciseKey(
+        remaining[Math.min(removedIndex, remaining.length - 1)]?.key ?? "",
+      );
+    }
     setErrors({});
   };
 
@@ -368,7 +430,10 @@ export function RoutineEditor({
   };
 
   const addSeries = (key: string) => {
-    updateExercise(key, (entry) => ({ ...entry, series: [...entry.series, emptySeries()] }));
+    updateExercise(key, (entry) => ({
+      ...entry,
+      series: [...entry.series, copySeries(entry.series.at(-1) ?? emptySeries())],
+    }));
   };
 
   const removeSeries = (key: string, seriesKey: string) => {
@@ -431,6 +496,12 @@ export function RoutineEditor({
     }
   };
 
+  const activeExerciseIndex = Math.max(
+    0,
+    exercises.findIndex((entry) => entry.key === activeExerciseKey),
+  );
+  const activeExercise = exercises[activeExerciseIndex];
+
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
       <FormField
@@ -460,159 +531,209 @@ export function RoutineEditor({
         </p>
       )}
 
-      <section className={styles.exercisesSection} aria-labelledby={`${prefix}-ejercicios-titulo`}>
-        <h2 id={`${prefix}-ejercicios-titulo`} className={styles.sectionHeading}>
-          Ejercicios de la Rutina
-        </h2>
+      <section className={styles.editorShell} aria-labelledby={`${prefix}-ejercicios-titulo`}>
+        <aside className={styles.exerciseRail}>
+          <div className={styles.railHeading}>
+            <div>
+              <p className={styles.railKicker}>Paso 1 de 2</p>
+              <h2 id={`${prefix}-ejercicios-titulo`}>Ejercicios</h2>
+            </div>
+            <span className={styles.railCount}>{exercises.length}</span>
+          </div>
 
-        {exercises.length === 0 && (
-          <p className={styles.emptyExercises}>
-            Todavía no has añadido Ejercicios. Usa «Añadir ejercicio» para empezar.
-          </p>
-        )}
+          {exercises.length === 0 && (
+            <p className={styles.emptyExercises}>
+              Aún no hay Ejercicios. Añade el primero para empezar.
+            </p>
+          )}
 
-        {exercises.map((entry, index) => {
-          const mode = entry.exercise?.recordingMode as RecordingMode | undefined;
-          const isCardio = mode === "cardio_continuo";
-          const seriesError = fieldError(errors, `exercises[${index}].series`);
-          return (
-            <article key={entry.key} className={styles.exerciseCard} aria-label={entry.exercise?.name ?? "Ejercicio sin elegir"}>
-              <div className={styles.exerciseHeader}>
-                <div className={styles.exerciseIdentity}>
-                  <h3 className={styles.exerciseName}>
-                    {entry.exercise?.name ?? "Elige un Ejercicio"}
-                  </h3>
-                  {mode && (
-                    <p className={styles.exerciseMeta}>{recordingModeLabels[mode]}</p>
-                  )}
-                </div>
-                <div className={styles.exerciseOrder}>
+          <ol className={styles.exerciseList}>
+            {exercises.map((entry, index) => {
+              const exerciseName = entry.exercise?.name ?? "Ejercicio sin elegir";
+              const isActive = entry.key === activeExercise?.key;
+              const hasError = Boolean(
+                fieldError(errors, `exercises[${index}].exerciseId`) ||
+                  fieldError(errors, `exercises[${index}].series`),
+              );
+              return (
+                <li key={entry.key} className={styles.exerciseListItem}>
                   <button
                     type="button"
-                    aria-label={`Subir ${entry.exercise?.name ?? "el Ejercicio"}`}
-                    disabled={index === 0}
-                    onClick={() => moveExercise(entry.key, -1)}
+                    className={isActive ? styles.exerciseSelectActive : styles.exerciseSelect}
+                    aria-current={isActive ? "step" : undefined}
+                    onClick={() => setActiveExerciseKey(entry.key)}
                   >
-                    ↑
+                    <span className={styles.exerciseListNumber}>{index + 1}</span>
+                    <span className={styles.exerciseListCopy}>
+                      <strong>{exerciseName}</strong>
+                      <small>
+                        {entry.series.length} {entry.series.length === 1 ? "serie" : "series"}
+                        {hasError && " · revisar"}
+                      </small>
+                    </span>
                   </button>
-                  <span className={styles.orderBadge}>{index + 1}</span>
+                  <div className={styles.railOrder}>
+                    <button
+                      type="button"
+                      aria-label={`Subir ${exerciseName}`}
+                      disabled={index === 0}
+                      onClick={() => moveExercise(entry.key, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Bajar ${exerciseName}`}
+                      disabled={index === exercises.length - 1}
+                      onClick={() => moveExercise(entry.key, 1)}
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+
+          {pickerOpen && (
+            <ExercisePicker
+              selectedExerciseIds={selectedExerciseIds}
+              onPick={addExercise}
+              onClose={() => setPickerOpen(false)}
+            />
+          )}
+          {!pickerOpen && (
+            <button
+              type="button"
+              className={styles.addExercise}
+              onClick={() => setPickerOpen(true)}
+            >
+              <span aria-hidden="true">＋ </span>Añadir ejercicio
+            </button>
+          )}
+        </aside>
+
+        <div className={styles.exerciseWorkspace}>
+          {!activeExercise && (
+            <div className={styles.workspaceEmpty}>
+              <p className={styles.railKicker}>Paso 2 de 2</p>
+              <h2>Empieza añadiendo un Ejercicio</h2>
+              <p>Después podrás definir sus Series previstas aquí.</p>
+            </div>
+          )}
+
+          {activeExercise && (() => {
+            const mode = activeExercise.exercise?.recordingMode as RecordingMode | undefined;
+            const isCardio = mode === "cardio_continuo";
+            const seriesError = fieldError(errors, `exercises[${activeExerciseIndex}].series`);
+            return (
+              <article
+                className={styles.focusCard}
+                aria-label={activeExercise.exercise?.name ?? "Ejercicio sin elegir"}
+              >
+                <header className={styles.focusHeader}>
+                  <div>
+                    <p className={styles.railKicker}>
+                      Paso 2 de 2 · Ejercicio {activeExerciseIndex + 1} de {exercises.length}
+                    </p>
+                    <h2>{activeExercise.exercise?.name ?? "Elige un Ejercicio"}</h2>
+                    {mode && <p>{recordingModeLabels[mode]}</p>}
+                  </div>
                   <button
                     type="button"
-                    aria-label={`Bajar ${entry.exercise?.name ?? "el Ejercicio"}`}
-                    disabled={index === exercises.length - 1}
-                    onClick={() => moveExercise(entry.key, 1)}
+                    className={styles.removeExercise}
+                    aria-label={`Quitar ${activeExercise.exercise?.name ?? "el Ejercicio"} de la Rutina`}
+                    onClick={() => removeExercise(activeExercise.key)}
                   >
-                    ↓
+                    Quitar ejercicio
                   </button>
-                </div>
-              </div>
+                </header>
 
-              {fieldError(errors, `exercises[${index}].exerciseId`) && (
-                <p className={styles.fieldError} role="alert">
-                  {fieldError(errors, `exercises[${index}].exerciseId`)}
-                </p>
-              )}
-
-              <div className={styles.seriesBlock}>
-                <h4 className={styles.seriesHeading}>
-                  Series previstas
-                  {isCardio && <span className={styles.cardioNote}> · cardio continuo: una Serie</span>}
-                </h4>
-                {seriesError && (
+                {fieldError(errors, `exercises[${activeExerciseIndex}].exerciseId`) && (
                   <p className={styles.fieldError} role="alert">
-                    {seriesError}
+                    {fieldError(errors, `exercises[${activeExerciseIndex}].exerciseId`)}
                   </p>
                 )}
-                <ol className={styles.seriesList}>
-                  {entry.series.map((series, seriesIndex) => (
-                    <li key={series.key} className={styles.seriesRow}>
-                      <span className={styles.seriesNumber}>Serie {seriesIndex + 1}</span>
-                      {(mode ? allowedTargets[mode as RoutineRecordingMode] : []).map((target) => (
-                        <label key={target} className={styles.seriesTarget}>
-                          <span className={styles.seriesTargetLabel}>{targetLabels[target]}</span>
-                          <input
-                            className={styles.input}
-                            type="number"
-                            inputMode="decimal"
-                            step={target === "carga" ? "0.01" : "1"}
-                            min={target === "carga" ? 0 : 1}
-                            value={series[target]}
-                            aria-invalid={fieldError(errors, `exercises[${index}].series[${seriesIndex}].${target}`) ? true : undefined}
-                            aria-describedby={
-                              fieldError(errors, `exercises[${index}].series[${seriesIndex}].${target}`)
-                                ? `${prefix}-serie-${index}-${seriesIndex}-${target}-error`
-                                : undefined
-                            }
-                            onChange={(event) =>
-                              updateSeries(entry.key, series.key, (current) => ({
-                                ...current,
-                                [target]: event.target.value,
-                              }))
-                            }
-                          />
-                          {fieldError(errors, `exercises[${index}].series[${seriesIndex}].${target}`) && (
-                            <span
-                              id={`${prefix}-serie-${index}-${seriesIndex}-${target}-error`}
-                              className={styles.fieldError}
-                            >
-                              {fieldError(errors, `exercises[${index}].series[${seriesIndex}].${target}`)}
-                            </span>
-                          )}
-                        </label>
-                      ))}
+
+                <div className={styles.focusTip}>
+                  <strong>Cómo funciona:</strong> la primera Serie empieza vacía; cada nueva Serie copia los objetivos de la anterior.
+                </div>
+
+                <div className={styles.seriesBlock}>
+                  <div className={styles.focusSeriesHeading}>
+                    <div>
+                      <h3>Series previstas</h3>
+                      <p>{isCardio ? "El cardio continuo admite una única Serie." : "Ajusta solo lo que cambie entre Series."}</p>
+                    </div>
+                    {!isCardio && (
                       <button
                         type="button"
-                        className={styles.removeSeries}
-                        aria-label={`Quitar la Serie ${seriesIndex + 1} de ${entry.exercise?.name ?? "este Ejercicio"}`}
-                        disabled={entry.series.length <= 1 || isCardio}
-                        onClick={() => removeSeries(entry.key, series.key)}
+                        className={styles.addSeries}
+                        onClick={() => addSeries(activeExercise.key)}
                       >
-                        Quitar serie
+                        <span aria-hidden="true">＋ </span>Añadir serie
                       </button>
-                    </li>
-                  ))}
-                </ol>
-                {!isCardio && (
-                  <button
-                    type="button"
-                    className={styles.addSeries}
-                    onClick={() => addSeries(entry.key)}
-                  >
-                    Añadir serie
-                  </button>
-                )}
-              </div>
-
-              <div className={styles.exerciseActions}>
-                <button
-                  type="button"
-                  className={styles.removeExercise}
-                  aria-label={`Quitar ${entry.exercise?.name ?? "el Ejercicio"} de la Rutina`}
-                  onClick={() => removeExercise(entry.key)}
-                >
-                  Quitar Ejercicio
-                </button>
-              </div>
-            </article>
-          );
-        })}
-
-        {pickerOpen && (
-          <ExercisePicker
-            selectedExerciseIds={selectedExerciseIds}
-            onPick={addExercise}
-            onClose={() => setPickerOpen(false)}
-          />
-        )}
-        {!pickerOpen && (
-          <button
-            type="button"
-            className={styles.addExercise}
-            onClick={() => setPickerOpen(true)}
-          >
-            Añadir ejercicio
-          </button>
-        )}
+                    )}
+                  </div>
+                  {seriesError && (
+                    <p className={styles.fieldError} role="alert">
+                      {seriesError}
+                    </p>
+                  )}
+                  <ol className={styles.focusSeriesList}>
+                    {activeExercise.series.map((series, seriesIndex) => (
+                      <li key={series.key} className={styles.focusSeriesRow}>
+                        <span className={styles.seriesNumber}>Serie {seriesIndex + 1}</span>
+                        {(mode ? allowedTargets[mode as RoutineRecordingMode] : []).map((target) => (
+                          <label key={target} className={styles.seriesTarget}>
+                            <span className={styles.seriesTargetLabel}>{targetLabels[target]}</span>
+                            <input
+                              className={styles.input}
+                              type="number"
+                              inputMode="decimal"
+                              step={target === "carga" ? "0.01" : "1"}
+                              min={target === "carga" ? 0 : 1}
+                              value={series[target]}
+                              aria-invalid={fieldError(errors, `exercises[${activeExerciseIndex}].series[${seriesIndex}].${target}`) ? true : undefined}
+                              aria-describedby={
+                                fieldError(errors, `exercises[${activeExerciseIndex}].series[${seriesIndex}].${target}`)
+                                  ? `${prefix}-serie-${activeExerciseIndex}-${seriesIndex}-${target}-error`
+                                  : undefined
+                              }
+                              onChange={(event) =>
+                                updateSeries(activeExercise.key, series.key, (current) => ({
+                                  ...current,
+                                  [target]: event.target.value,
+                                }))
+                              }
+                            />
+                            {fieldError(errors, `exercises[${activeExerciseIndex}].series[${seriesIndex}].${target}`) && (
+                              <span
+                                id={`${prefix}-serie-${activeExerciseIndex}-${seriesIndex}-${target}-error`}
+                                className={styles.fieldError}
+                              >
+                                {fieldError(errors, `exercises[${activeExerciseIndex}].series[${seriesIndex}].${target}`)}
+                              </span>
+                            )}
+                          </label>
+                        ))}
+                        <button
+                          type="button"
+                          className={styles.removeSeries}
+                          aria-label={`Quitar la Serie ${seriesIndex + 1} de ${activeExercise.exercise?.name ?? "este Ejercicio"}`}
+                          disabled={activeExercise.series.length <= 1 || isCardio}
+                          onClick={() => removeSeries(activeExercise.key, series.key)}
+                        >
+                          Quitar serie
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </article>
+            );
+          })()}
+        </div>
       </section>
 
       {serverError && (

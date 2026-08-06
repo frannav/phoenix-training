@@ -102,11 +102,21 @@ export type PlanWeekSummary = {
   progress: PlanProgress;
 };
 
+/** Entrenamiento planificado de la semana que se está mostrando en Inicio. */
+export type PlanWeekTrainingSummary = {
+  id: string;
+  day: number;
+  name: string;
+  plannedDate: string | null;
+  status: "pendiente" | "realizado" | "omitido";
+};
+
 /**
  * Resumen del Plan activo para el bloque «Plan activo» de Inicio: nombre,
  * semana actual, y el progreso —realizados, omitidos, avance y cumplimiento—
- * por semana y para el Plan completo. Se lee el estado vigente en cada
- * consulta, sin cachés ni tablas derivadas.
+ * por semana y para el Plan completo. También incluye el contenido de la
+ * semana actual para la mini vista semanal de Inicio. Se lee el estado
+ * vigente en cada consulta, sin cachés ni tablas derivadas.
  */
 export type ActivePlanSummary = {
   id: string;
@@ -116,6 +126,7 @@ export type ActivePlanSummary = {
   /** Semana actual (1-based) en la que cae la fecha consultada, acotada al calendario del Plan. */
   currentWeek: number;
   weeks: PlanWeekSummary[];
+  currentWeekTrainings: PlanWeekTrainingSummary[];
   progress: PlanProgress;
 };
 
@@ -342,16 +353,55 @@ async function activePlanSummary(
     };
   });
 
+  const currentWeek = currentWeekNumber(planRow.startDate, today, weekRows.length);
+  const currentWeekRow = weekRows[currentWeek - 1];
+  const currentWeekTrainings = currentWeekRow
+    ? await Promise.all(
+        (trainingsByWeekId.get(currentWeekRow.id) ?? [])
+          .sort((left, right) => left.day - right.day || left.id.localeCompare(right.id))
+          .map(async (training) => ({
+            id: training.id,
+            day: training.day,
+            name: await planTrainingName(database, { planRow, training }),
+            plannedDate: training.plannedDate,
+            status: trainingStatus(training.status),
+          })),
+      )
+    : [];
+
   const whole = countTrainingStatuses(trainingRows);
 
   return {
     id: planRow.id,
     name: planRow.name,
     startDate: planRow.startDate,
-    currentWeek: currentWeekNumber(planRow.startDate, today, weekRows.length),
+    currentWeek,
     weeks,
+    currentWeekTrainings,
     progress: planProgress(whole.realizados, whole.omitidos, whole.pendientes),
   };
+}
+
+/** Nombre visible de un Entrenamiento: Rutina viva o nombre del Plan. */
+async function planTrainingName(
+  database: AppDatabase,
+  {
+    planRow,
+    training,
+  }: { planRow: typeof plan.$inferSelect; training: PlanTrainingRow },
+): Promise<string> {
+  if (training.source === "rutina" && training.routineId) {
+    return (await routineName(database, training.routineId)) ?? planRow.name;
+  }
+  return planRow.name;
+}
+
+/** Estado persistido que puede presentar la mini vista semanal. */
+function trainingStatus(value: string | null): PlanWeekTrainingSummary["status"] {
+  if (value === "realizado" || value === "omitido") {
+    return value;
+  }
+  return "pendiente";
 }
 
 /**

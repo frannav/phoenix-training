@@ -1,29 +1,40 @@
+@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap");
+
 :root {
   color-scheme: light;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #192018;
-  background: #f4f5f0;
+  font-family: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  color: #000000;
+  background: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
-  --color-ink: #192018;
-  --color-ink-muted: #687064;
-  --color-olive-600: #607052;
-  --color-olive-700: #50604c;
+  --color-ink: #000000;
+  --color-ink-muted: #71717a;
+  --color-olive-600: #71717a;
+  --color-olive-700: #000000;
   --color-surface: #ffffff;
-  --color-surface-muted: #f1f4ed;
-  --color-border: #d9ddd3;
-  --color-success: #28633c;
-  --color-success-dark: #31503a;
-  --color-success-soft: #e5ecdf;
-  --color-accent-soft: #72a567;
-  --color-accent: #44683c;
-  --color-accent-strong: #2f5230;
+  --color-surface-muted: #f4f4f5;
+  --color-surface-raised: #ffffff;
+  --color-surface-container: #fafafa;
+  --color-border: #d4d4d8;
+  --color-success: #22c55e;
+  --color-success-dark: #166534;
+  --color-success-soft: #dcfce7;
+  --color-accent-soft: #e4e4e7;
+  --color-accent: #000000;
+  --color-accent-strong: #000000;
   --color-on-accent: #ffffff;
-  --color-danger: #b3261e;
-  --color-sidebar-muted: #92a08e;
-  --color-sidebar-link: #cbd4c7;
-  --color-sidebar-active: #2d392c;
+  --color-danger: #ef4444;
+  --color-danger-dark: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-warning: #eab308;
+  --color-info-soft: #e0f2fe;
+  --color-info-dark: #0369a1;
+  --color-sidebar-muted: #71717a;
+  --color-sidebar-link: #52525b;
+  --color-sidebar-active: #e4e4e7;
+  --pixel-shadow: 6px 6px 0 var(--color-ink);
+  --pixel-shadow-sm: 3px 3px 0 var(--color-ink);
 }
 
 * {
@@ -33,9 +44,80 @@
 body {
   margin: 0;
   min-width: 320px;
+  min-height: 100vh;
+  background: var(--color-surface);
 }
 
 button,
-a {
+a,
+input,
+select,
+textarea {
   font: inherit;
+}
+
+button,
+a,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input,
+select,
+textarea {
+  border-radius: 0 !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--color-warning);
+  outline-offset: 3px;
+}
+
+/* La referencia trabaja con una gramática de paneles rectangulares. Mantener
+   la regla global evita que un módulo nuevo vuelva a introducir tarjetas
+   redondeadas por accidente. */
+[class] {
+  border-radius: 0 !important;
+}
+
+/* Los módulos existentes comparten nombres CSS Modules como card, panel e
+   item. Esta capa los lleva al mismo tratamiento de panel negro que el editor
+   de Planes, sin tener que duplicar el token en cada pantalla. */
+[class*="_card_"],
+[class*="Card_"],
+[class*="_panel_"],
+[class*="Panel_"],
+[class*="_item_"],
+[class*="Item_"],
+[class*="_emptyState_"] {
+  border: 2px solid var(--color-ink) !important;
+  box-shadow: var(--pixel-shadow-sm) !important;
+}
+
+[class*="activeSessionCard_"] {
+  border-width: 4px !important;
+  background: var(--color-surface) !important;
+}
+
+h1,
+h2 {
+  font-family: "Courier New", Courier, monospace;
+  letter-spacing: -0.04em;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
 }

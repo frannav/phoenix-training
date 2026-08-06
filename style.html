@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PHOENIX TRAINING - History</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        surface: "#ffffff",
+                        "surface-variant": "#f4f4f5",
+                        "surface-container": "#fafafa",
+                        "surface-bright": "#ffffff",
+                        primary: "#000000",
+                        "primary-container": "#e4e4e7",
+                        "on-primary-container": "#000000",
+                        "on-surface-variant": "#71717a",
+                        tertiary: "#ef4444",
+                        success: "#22c55e",
+                        warning: "#eab308",
+                        rankS: "#eab308",
+                        rankA: "#3b82f6",
+                        rankB: "#22c55e",
+                    },
+                    borderRadius: {
+                        DEFAULT: "0px",
+                        lg: "0px",
+                        xl: "0px",
+                        full: "0px"
+                    },
+                    fontFamily: {
+                        headline: ["Public Sans", "sans-serif"],
+                        display: ["Public Sans", "sans-serif"],
+                        body: ["Public Sans", "sans-serif"],
+                        label: ["Public Sans", "sans-serif"],
+                        pixel: ['"Courier New"', 'Courier', 'monospace']
+                    },
+                    spacing: {
+                        "gutter": "1rem",
+                        "margin-mobile": "1rem",
+                        "margin-desktop": "2rem"
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Public Sans', sans-serif; }
+        .pixel-border {
+            box-shadow: 
+                -4px 0 0 0 black,
+                4px 0 0 0 black,
+                0 -4px 0 0 black,
+                0 4px 0 0 black;
+            border: 2px solid black;
+        }
+        .pixel-font { font-family: 'Courier New', Courier, monospace; font-weight: 700; letter-spacing: -0.5px; }
+        .pixel-shadow { box-shadow: 6px 6px 0px 0px rgba(0,0,0,1); }
+        .pixel-shadow-sm { box-shadow: 3px 3px 0px 0px rgba(0,0,0,1); }
+    </style>
+</head>
+<body class="bg-surface text-primary min-h-screen flex flex-col md:flex-row">
+<!-- Shared TopAppBar (Mobile) -->
+<header class="flex justify-between items-center w-full px-margin-mobile py-4 z-50 md:hidden bg-surface border-b-4 border-surface-variant shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sticky top-0">
+<div class="font-headline font-extrabold text-lg text-primary uppercase tracking-widest">
+            PHOENIX TRAINING
+        </div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-primary hover:text-tertiary transition-colors cursor-pointer">account_tree</span>
+<span class="material-symbols-outlined text-primary hover:text-tertiary transition-colors cursor-pointer">electric_bolt</span>
+<span class="material-symbols-outlined text-primary hover:text-tertiary transition-colors cursor-pointer">favorite</span>
+</div>
+</header>
+<!-- Shared SideNavBar (Desktop) -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-full p-gutter z-40 w-64 border-r-4 border-surface-variant bg-surface-container shadow-[4px_0px_0px_0px_rgba(0,0,0,1)]">
+<div class="mb-8 p-4 border-b-4 border-surface-variant flex items-center gap-4">
+<img alt="Player 1 Avatar" class="w-12 h-12 pixel-border bg-white" data-alt="A small, pixel-art style portrait avatar of a determined athlete or pilot character in 8-bit aesthetic. Black and white lines with sharp contrast." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmq9gNTXMPUlou3IvG1rPniroyA6-gsYWOn8zHQ5x8cVKWQ37WXjbShLnprvF8ccIYEx2plpKo-jzhWUFSIyO5W0ndZuuQVop8kZMRpoVKruJyZotWI1_yxgHzNV21R8yRV9X7qaiUcDkCq0WvVry0JLjl4dmjoLiQfasolv41Rmn758qv6OdK0iOiZGsmapsBUyZRT-lok3tsdpxRixZCyhpa6Oz84caZsVovrbJoUCRyS4i_Yg"/>
+<div>
+<div class="font-pixel text-lg">PLAYER 1</div>
+<div class="font-pixel text-xs text-on-surface-variant">LEVEL 42 PILOT</div>
+</div>
+</div>
+<div class="flex flex-col gap-2 flex-grow">
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-bright hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="font-label font-bold text-sm tracking-wider">DASHBOARD</span>
+</a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-bright hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="font-label font-bold text-sm tracking-wider">PLANS</span>
+</a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-bright hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">fitness_center</span>
+<span class="font-label font-bold text-sm tracking-wider">ROUTINES</span>
+</a>
+<a class="flex items-center gap-3 p-3 bg-primary-container text-on-primary-container border-2 border-primary shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-1" href="#">
+<span class="material-symbols-outlined font-bold">history</span>
+<span class="font-label font-bold text-sm tracking-wider">HISTORY</span>
+</a>
+</div>
+<button class="w-full py-3 mb-6 bg-primary text-white font-pixel font-bold text-sm uppercase tracking-widest hover:bg-tertiary transition-colors pixel-shadow">
+            START MISSION
+        </button>
+<div class="mt-auto border-t-4 border-surface-variant pt-4 flex flex-col gap-2">
+<a class="flex items-center gap-3 p-2 text-on-surface-variant hover:bg-surface-bright hover:text-primary transition-colors text-sm font-label font-bold" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+                SETTINGS
+            </a>
+<a class="flex items-center gap-3 p-2 text-on-surface-variant hover:bg-surface-bright hover:text-primary transition-colors text-sm font-label font-bold" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">logout</span>
+                LOGOUT
+            </a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto w-full max-w-7xl mx-auto">
+<header class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h1 class="font-pixel text-4xl md:text-5xl lg:text-6xl text-primary mb-2 uppercase border-b-8 border-primary inline-block pr-4">Pixel History</h1>
+<p class="font-headline text-on-surface-variant font-medium tracking-wide">ACHIEVEMENT ROOM &amp; HIGH SCORES</p>
+</div>
+<div class="flex gap-2">
+<div class="px-4 py-2 border-2 border-primary bg-primary-container font-pixel font-bold flex items-center gap-2 pixel-shadow-sm">
+<span class="material-symbols-outlined text-warning" style="font-variation-settings: 'FILL' 1;">stars</span>
+                    SCORE: 9,420
+                </div>
+</div>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Left Column: Clear Records (Vertical Feed) -->
+<div class="lg:col-span-7 space-y-6">
+<h2 class="font-pixel text-2xl border-l-8 border-primary pl-4 uppercase mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined">flag</span>
+                    Stage Clears
+                </h2>
+<!-- Record Card S Rank -->
+<div class="border-4 border-primary bg-white p-5 pixel-shadow relative overflow-hidden group hover:border-rankS transition-colors">
+<div class="absolute top-0 right-0 bg-rankS text-white px-3 py-1 font-pixel font-bold border-b-4 border-l-4 border-primary text-xl">
+                        RANK: S
+                    </div>
+<div class="flex items-start gap-4 mt-4">
+<div class="w-16 h-16 border-2 border-primary bg-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-4xl text-primary">sprint</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline font-extrabold text-xl uppercase tracking-tight mb-1 group-hover:text-rankS transition-colors">Sector 7 Sprint</h3>
+<p class="font-pixel text-xs text-on-surface-variant mb-3">STAGE: UPPER BODY BURNOUT • 45 MIN</p>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">XP Gained</div>
+<div class="font-pixel text-lg font-bold text-primary">+450 XP</div>
+</div>
+<div>
+<div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Date</div>
+<div class="font-pixel text-lg font-bold text-primary">OCT 24</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Record Card A Rank -->
+<div class="border-4 border-primary bg-white p-5 pixel-shadow relative overflow-hidden group hover:border-rankA transition-colors">
+<div class="absolute top-0 right-0 bg-rankA text-white px-3 py-1 font-pixel font-bold border-b-4 border-l-4 border-primary text-xl">
+                        RANK: A
+                    </div>
+<div class="flex items-start gap-4 mt-4">
+<div class="w-16 h-16 border-2 border-primary bg-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-4xl text-primary">fitness_center</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline font-extrabold text-xl uppercase tracking-tight mb-1 group-hover:text-rankA transition-colors">Core Reactor</h3>
+<p class="font-pixel text-xs text-on-surface-variant mb-3">STAGE: STRENGTH GAINS • 60 MIN</p>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">XP Gained</div>
+<div class="font-pixel text-lg font-bold text-primary">+600 XP</div>
+</div>
+<div>
+<div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Date</div>
+<div class="font-pixel text-lg font-bold text-primary">OCT 22</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Record Card B Rank -->
+<div class="border-4 border-primary bg-surface-container p-5 relative overflow-hidden group opacity-80">
+<div class="absolute top-0 right-0 bg-rankB text-primary px-3 py-1 font-pixel font-bold border-b-4 border-l-4 border-primary text-xl">
+                        RANK: B
+                    </div>
+<div class="flex items-start gap-4 mt-4">
+<div class="w-16 h-16 border-2 border-primary bg-white flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-4xl text-on-surface-variant">directions_run</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline font-extrabold text-xl uppercase tracking-tight mb-1 text-on-surface-variant">Recovery Walk</h3>
+<p class="font-pixel text-xs text-on-surface-variant mb-3">STAGE: ACTIVE REST • 30 MIN</p>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">XP Gained</div>
+<div class="font-pixel text-lg font-bold text-on-surface-variant">+150 XP</div>
+</div>
+<div>
+<div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Date</div>
+<div class="font-pixel text-lg font-bold text-on-surface-variant">OCT 20</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Analytics & Calendar -->
+<div class="lg:col-span-5 space-y-8">
+<!-- Performance Chart -->
+<div>
+<h2 class="font-pixel text-xl border-l-8 border-primary pl-4 uppercase mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined">monitoring</span>
+                        Volume Matrix
+                    </h2>
+<div class="border-4 border-primary bg-white p-4 pixel-shadow">
+<div class="h-48 w-full border-2 border-primary bg-surface-container relative p-2 flex items-end gap-1">
+<!-- Mock Pixel Chart Bars -->
+<div class="flex-1 bg-primary h-[20%] group relative"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-primary text-white font-pixel text-xs p-1">10k</div></div>
+<div class="flex-1 bg-primary h-[40%] group relative"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-primary text-white font-pixel text-xs p-1">20k</div></div>
+<div class="flex-1 bg-primary h-[35%] group relative"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-primary text-white font-pixel text-xs p-1">18k</div></div>
+<div class="flex-1 bg-primary h-[60%] group relative"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-primary text-white font-pixel text-xs p-1">30k</div></div>
+<div class="flex-1 bg-primary h-[85%] group relative"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-primary text-white font-pixel text-xs p-1">42k</div></div>
+<div class="flex-1 bg-tertiary h-[95%] border-2 border-primary group relative"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-tertiary text-white font-pixel text-xs p-1">48k</div></div>
+<div class="flex-1 bg-primary h-[50%] group relative"><div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-primary text-white font-pixel text-xs p-1">25k</div></div>
+<!-- Grid lines mock -->
+<div class="absolute inset-0 border-t-2 border-dashed border-surface-variant pointer-events-none top-1/4"></div>
+<div class="absolute inset-0 border-t-2 border-dashed border-surface-variant pointer-events-none top-2/4"></div>
+<div class="absolute inset-0 border-t-2 border-dashed border-surface-variant pointer-events-none top-3/4"></div>
+</div>
+<div class="flex justify-between mt-2 font-pixel text-[10px] font-bold text-on-surface-variant">
+<span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span>
+</div>
+</div>
+</div>
+<!-- Mission Calendar -->
+<div>
+<h2 class="font-pixel text-xl border-l-8 border-primary pl-4 uppercase mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined">calendar_month</span>
+                        Mission Log
+                    </h2>
+<div class="border-4 border-primary bg-white p-4 pixel-shadow">
+<div class="flex justify-between items-center mb-4 border-b-2 border-primary pb-2">
+<span class="material-symbols-outlined cursor-pointer hover:text-tertiary">arrow_left</span>
+<span class="font-pixel font-bold text-lg uppercase">OCTOBER</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-tertiary">arrow_right</span>
+</div>
+<div class="grid grid-cols-7 gap-1 text-center font-pixel text-xs font-bold mb-2 text-on-surface-variant">
+<div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+</div>
+<div class="grid grid-cols-7 gap-1 text-center font-pixel text-sm font-bold">
+<!-- Empty slots -->
+<div class="p-2 text-surface-variant">29</div>
+<div class="p-2 text-surface-variant">30</div>
+<!-- Days -->
+<div class="p-2 border-2 border-transparent">1</div>
+<div class="p-2 border-2 border-primary bg-surface-container relative">
+                                2
+                                <span class="material-symbols-outlined absolute inset-0 m-auto text-tertiary opacity-80" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div class="p-2 border-2 border-transparent">3</div>
+<div class="p-2 border-2 border-primary bg-surface-container relative">
+                                4
+                                <span class="material-symbols-outlined absolute inset-0 m-auto text-tertiary opacity-80" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div class="p-2 border-2 border-transparent">5</div>
+<div class="p-2 border-2 border-transparent">6</div>
+<div class="p-2 border-2 border-transparent">7</div>
+<div class="p-2 border-2 border-transparent">8</div>
+<div class="p-2 border-2 border-primary bg-surface-container relative">
+                                9
+                                <span class="material-symbols-outlined absolute inset-0 m-auto text-tertiary opacity-80" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div class="p-2 border-2 border-transparent">10</div>
+<div class="p-2 border-2 border-transparent">11</div>
+<div class="p-2 border-2 border-transparent">12</div>
+<div class="p-2 border-2 border-transparent">13</div>
+<div class="p-2 border-2 border-primary bg-surface-container relative">
+                                14
+                                <span class="material-symbols-outlined absolute inset-0 m-auto text-tertiary opacity-80" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div class="p-2 border-2 border-transparent">15</div>
+<div class="p-2 border-2 border-transparent">16</div>
+<div class="p-2 border-2 border-transparent">17</div>
+<div class="p-2 border-2 border-transparent">18</div>
+<div class="p-2 border-2 border-transparent">19</div>
+<div class="p-2 border-2 border-primary bg-surface-container relative">
+                                20
+                                <span class="material-symbols-outlined absolute inset-0 m-auto text-tertiary opacity-80" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div class="p-2 border-2 border-transparent">21</div>
+<div class="p-2 border-2 border-primary bg-surface-container relative">
+                                22
+                                <span class="material-symbols-outlined absolute inset-0 m-auto text-tertiary opacity-80" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div class="p-2 border-2 border-transparent">23</div>
+<div class="p-2 border-2 border-primary bg-primary text-white relative animate-pulse">
+                                24
+                                <span class="material-symbols-outlined absolute inset-0 m-auto text-tertiary drop-shadow-md" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div class="p-2 border-2 border-transparent">25</div>
+<div class="p-2 border-2 border-transparent">26</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

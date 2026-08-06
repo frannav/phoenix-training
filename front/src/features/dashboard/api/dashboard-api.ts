@@ -48,6 +48,15 @@ export type PlanWeekSummary = {
   progress: PlanProgress;
 };
 
+/** Entrenamiento planificado de la semana actual del Plan activo. */
+export type PlanWeekTrainingSummary = {
+  id: string;
+  day: number;
+  name: string;
+  plannedDate: string | null;
+  status: "pendiente" | "realizado" | "omitido";
+};
+
 /** Resumen del Plan activo para el bloque «Plan activo» de Inicio. */
 export type ActivePlanSummary = {
   id: string;
@@ -55,6 +64,7 @@ export type ActivePlanSummary = {
   startDate: string;
   currentWeek: number;
   weeks: PlanWeekSummary[];
+  currentWeekTrainings: PlanWeekTrainingSummary[];
   progress: PlanProgress;
 };
 

@@ -62,8 +62,21 @@ export function AppShell() {
 
   return (
     <div className={styles.appShell}>
+      <header className={styles.mobileHeader}>
+        <div>
+          <span className={styles.mobileKicker}>FIELD LOG / 01</span>
+          <strong className={styles.mobileBrand}>Phoenix Training</strong>
+        </div>
+        <span className={styles.mobileSignal} aria-label="Sistema operativo">
+          ● LIVE
+        </span>
+      </header>
       <aside className={styles.desktopSidebar}>
-        <strong className={styles.brand}>Phoenix Training</strong>
+        <div className={styles.brandBlock}>
+          <span className={styles.brandKicker}>FIELD LOG / 01</span>
+          <strong className={styles.brand}>Phoenix Training</strong>
+          <span className={styles.brandCaption}>Control room for your training</span>
+        </div>
         <nav className={styles.desktopNavigation} aria-label="Navegación de escritorio">
           {desktopGroups.map((group) => (
             <section key={group.label}>
