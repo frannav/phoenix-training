@@ -25,9 +25,9 @@ const metricLabels: Record<EvolutionMetric, { label: string; unit: string }> = {
 // Colores del tema (global.css) aplicados a las gráficas: se usan valores
 // literales en los atributos de presentación de SVG, donde `var()` no es
 // fiable entre navegadores.
-const COLOR_SUCCESS = "#28633c";
-const COLOR_BORDER = "#d9ddd3";
-const COLOR_INK_MUTED = "#687064";
+const COLOR_SUCCESS = "#22c55e";
+const COLOR_BORDER = "#d4d4d8";
+const COLOR_INK_MUTED = "#71717a";
 
 function sortByName(options: EvolutionOption[]): EvolutionOption[] {
   return [...options].sort((a, b) => a.name.localeCompare(b.name, "es"));

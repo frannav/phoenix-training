@@ -1,13 +1,13 @@
 import { Link } from "react-router-dom";
 import { formatDomainDate } from "../../../shared/format";
-import type { TrainingAction } from "../api/dashboard-api";
+import type { ActivePlanSummary, TrainingAction } from "../api/dashboard-api";
 import styles from "./TrainingBlock.module.css";
 
 type TrainingBlockProps = {
   training: TrainingAction;
+  activePlan: ActivePlanSummary | null;
   isStarting: boolean;
   startError: boolean;
-  onStartFree: () => void;
   onStartPlan: (planId: string, trainingId: string) => void;
 };
 
@@ -19,18 +19,78 @@ function sessionProgressLabel(progress: { completadas: number; total: number }):
   return `${progress.completadas} de ${progress.total} series completadas`;
 }
 
+const weekDays = ["L", "M", "X", "J", "V", "S", "D"];
+
+function trainingStatusLabel(status: "pendiente" | "realizado" | "omitido"): string {
+  if (status === "realizado") return "Realizado";
+  if (status === "omitido") return "Omitido";
+  return "Pendiente";
+}
+
+function WeeklyPlanCard({ plan }: { plan: ActivePlanSummary | null }) {
+  if (!plan) {
+    return (
+      <div className={styles.weeklyEmptyCard}>
+        <p className={styles.weeklyEmptyTitle}>Sin Plan activo</p>
+        <p className={styles.weeklyEmptyText}>Activa un Plan para ver tu semana aquí.</p>
+        <Link className={styles.weeklyAction} to="/planes">
+          Ir a Planes
+        </Link>
+      </div>
+    );
+  }
+
+  const trainingByDay = new Map(plan.currentWeekTrainings.map((item) => [item.day, item]));
+
+  return (
+    <div className={styles.weeklyCard}>
+      <div className={styles.weeklyHeader}>
+        <div>
+          <p className={styles.weeklyEyebrow}>{plan.name}</p>
+          <p className={styles.weeklyTitle}>Semana {plan.currentWeek}</p>
+        </div>
+        <Link className={styles.weeklyDetail} to={`/planes/${plan.id}`}>
+          Ver Plan
+        </Link>
+      </div>
+      <div className={styles.weekGrid} role="list" aria-label={`Semana ${plan.currentWeek}`}>
+        {weekDays.map((day, index) => {
+          const training = trainingByDay.get(index);
+          return (
+            <div className={styles.day} key={day} role="listitem">
+              <span className={styles.dayLabel}>{day}</span>
+              {training ? (
+                <span
+                  className={`${styles.dayTraining} ${styles[`dayTraining${training.status}`]}`}
+                  title={`${training.name}: ${trainingStatusLabel(training.status)}`}
+                >
+                  <span className={styles.dayStatus} aria-hidden="true" />
+                  <span className={styles.dayName}>{training.name}</span>
+                  <span className={styles.srOnly}>{trainingStatusLabel(training.status)}</span>
+                </span>
+              ) : (
+                <span className={styles.restDay}>—</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Primer bloque de Inicio (spec «Inicio, navegación y presentación
  * adaptable»): continuar la Sesión activa, iniciar el próximo Entrenamiento
- * planificado pendiente o, si tampoco existe, iniciar una Sesión libre. El
+ * planificado pendiente o mostrar la semana actual del Plan activo. El
  * contrato llega agregado por la API; el bloque solo presenta la acción y
  * delega el inicio a la página.
  */
 export function TrainingBlock({
   training,
+  activePlan,
   isStarting,
   startError,
-  onStartFree,
   onStartPlan,
 }: TrainingBlockProps) {
   if (training.kind === "continuar") {
@@ -91,27 +151,9 @@ export function TrainingBlock({
   return (
     <section className={styles.card} aria-labelledby="entrenamiento-actual">
       <h2 className={styles.title} id="entrenamiento-actual">
-        Entrenamiento actual
+        Semana actual
       </h2>
-      <div className={styles.freeSessionCard}>
-        <p className={styles.freeSessionTitle}>Sesión libre</p>
-        <p className={styles.freeSessionText}>
-          Empieza a registrar sin Rutina ni Plan previo.
-        </p>
-        <button
-          className={styles.startButton}
-          type="button"
-          onClick={onStartFree}
-          disabled={isStarting}
-        >
-          {isStarting ? "Iniciando…" : "Iniciar Sesión libre"}
-        </button>
-        {startError && (
-          <p className={styles.startError} role="alert">
-            No se pudo iniciar la Sesión. Inténtalo de nuevo.
-          </p>
-        )}
-      </div>
+      <WeeklyPlanCard plan={activePlan} />
     </section>
   );
 }

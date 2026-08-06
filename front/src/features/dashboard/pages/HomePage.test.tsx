@@ -7,8 +7,6 @@ import type { SessionDocument } from "../../sessions/api/sessions-api";
 import type {
   ActivePlanSummary,
   DashboardResponse,
-  EvolutionOption,
-  ExerciseEvolution,
 } from "../api/dashboard-api";
 import type { RecordedMax } from "../../exercises/api/exercises-api";
 import { App } from "../../../app/App";
@@ -105,6 +103,22 @@ const activePlanFixture: ActivePlanSummary = {
       },
     },
   ],
+  currentWeekTrainings: [
+    {
+      id: "training-lunes",
+      day: 0,
+      name: "Día de empuje",
+      plannedDate: "2025-03-10",
+      status: "realizado",
+    },
+    {
+      id: "training-jueves",
+      day: 3,
+      name: "Día de tirón",
+      plannedDate: "2025-03-13",
+      status: "pendiente",
+    },
+  ],
   progress: {
     realizados: 1,
     omitidos: 1,
@@ -161,55 +175,9 @@ const recentMaxesFixture: RecordedMax[] = [
   },
 ];
 
-/** Evolución de dos Ejercicios con su métrica propia para los tests del quinto bloque. */
-const sentadillaEvolution: ExerciseEvolution = {
-  exerciseId: "sentadilla-id",
-  name: "Sentadilla",
-  recordingMode: "fuerza_con_carga",
-  metric: "carga_maxima",
-  points: [
-    { sessionId: "s1", date: "2025-01-06", value: 95, rpeMedio: 8, intensidadRelativaMax: 95 },
-    { sessionId: "s2", date: "2025-01-13", value: 100, rpeMedio: 8.5, intensidadRelativaMax: 100 },
-    { sessionId: "s3", date: "2025-01-20", value: 110, rpeMedio: 8, intensidadRelativaMax: 110 },
-    { sessionId: "s4", date: "2025-01-27", value: 115, rpeMedio: 8.5, intensidadRelativaMax: 115 },
-    { sessionId: "s5", date: "2025-02-03", value: 120, rpeMedio: 9, intensidadRelativaMax: 120 },
-  ],
-};
-
-const dominadaEvolution: ExerciseEvolution = {
-  exerciseId: "dominada-id",
-  name: "Dominada",
-  recordingMode: "repeticiones_sin_carga",
-  metric: "repeticiones_totales",
-  points: [
-    { sessionId: "s6", date: "2025-02-10", value: 40, rpeMedio: null, intensidadRelativaMax: null },
-    { sessionId: "s7", date: "2025-02-17", value: 46, rpeMedio: null, intensidadRelativaMax: null },
-  ],
-};
-
-/** Dashboard con evolución: el `current` responde a la consulta `?exerciseId=`. */
-function evolutionDashboard(exerciseId: string | null): DashboardResponse {
-  const options: EvolutionOption[] = [
-    {
-      id: sentadillaEvolution.exerciseId,
-      name: "Sentadilla",
-      recordingMode: "fuerza_con_carga",
-      metric: "carga_maxima",
-    },
-    {
-      id: dominadaEvolution.exerciseId,
-      name: "Dominada",
-      recordingMode: "repeticiones_sin_carga",
-      metric: "repeticiones_totales",
-    },
-  ];
-  const current =
-    exerciseId === dominadaEvolution.exerciseId ? dominadaEvolution : sentadillaEvolution;
-  return { ...emptyDashboard, evolution: { options, current } };
-}
-
-/** Dashboard completo con los cinco bloques con datos para la presentación responsive. */
+/** Dashboard completo con los cuatro bloques con datos para la presentación responsive. */
 const fullDashboard: DashboardResponse = {
+  ...emptyDashboard,
   training: {
     kind: "continuar",
     sessionId: "sesion-existente",
@@ -219,17 +187,6 @@ const fullDashboard: DashboardResponse = {
   activePlan: activePlanFixture,
   weeklyVolume: volumeFixture,
   recentRecordedMaxes: recentMaxesFixture,
-  evolution: {
-    options: [
-      {
-        id: sentadillaEvolution.exerciseId,
-        name: "Sentadilla",
-        recordingMode: "fuerza_con_carga",
-        metric: "carga_maxima",
-      },
-    ],
-    current: sentadillaEvolution,
-  },
 };
 
 type StubOptions = {
@@ -291,26 +248,15 @@ describe("primer bloque de Inicio: entrenamiento actual", () => {
     vi.unstubAllGlobals();
   });
 
-  test("ofrece Iniciar Sesión libre cuando no hay Sesión activa ni Entrenamiento pendiente y abre la nueva Sesión", async () => {
-    const postBodies: unknown[] = [];
-    stubHome({
-      dashboard: emptyDashboard,
-      start: { status: 201, body: { session: emptySession } },
-      onStart: (body) => postBodies.push(body),
-    });
-    const user = userEvent.setup();
+  test("muestra la mini vista semanal en lugar de iniciar una Sesión libre", async () => {
+    stubHome({ dashboard: { ...emptyDashboard, activePlan: activePlanFixture } });
     render(<App />);
 
-    const startButton = await screen.findByRole("button", {
-      name: "Iniciar Sesión libre",
-    });
-    await user.click(startButton);
-
-    await waitFor(() =>
-      expect(window.location.pathname).toBe("/sesion/sesion-nueva"),
-    );
-    expect(postBodies).toEqual([{ origin: "libre" }]);
-    expect(await screen.findByRole("heading", { name: "Sesión activa" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Semana actual" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Semana 1" })).toBeInTheDocument();
+    expect(screen.getByText("Día de empuje")).toBeInTheDocument();
+    expect(screen.getByText("Día de tirón")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Iniciar Sesión libre" })).not.toBeInTheDocument();
   });
 
   test("prioriza Continuar cuando existe una Sesión activa", async () => {
@@ -336,39 +282,6 @@ describe("primer bloque de Inicio: entrenamiento actual", () => {
       screen.queryByRole("button", { name: "Iniciar Sesión libre" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Iniciar" })).not.toBeInTheDocument();
-  });
-
-  test("un segundo inicio con conflicto abre la Sesión existente", async () => {
-    let conflicted = false;
-    stubHome({
-      dashboard: emptyDashboard,
-      active: () => (conflicted ? existingSession : null),
-      start: {
-        status: 409,
-        body: {
-          error: {
-            code: "ACTIVE_SESSION_EXISTS",
-            message: "Ya tienes una Sesión activa.",
-            sessionId: existingSession.id,
-          },
-        },
-      },
-      onStart: () => {
-        conflicted = true;
-      },
-    });
-    const user = userEvent.setup();
-    render(<App />);
-
-    const startButton = await screen.findByRole("button", {
-      name: "Iniciar Sesión libre",
-    });
-    await user.click(startButton);
-
-    await waitFor(() =>
-      expect(window.location.pathname).toBe("/sesion/sesion-existente"),
-    );
-    expect(await screen.findByRole("heading", { name: "Sesión activa" })).toBeInTheDocument();
   });
 
   test("ofrece Iniciar para el próximo Entrenamiento planificado pendiente y lo inicia", async () => {
@@ -424,26 +337,26 @@ describe("segundo bloque de Inicio: Plan activo", () => {
     });
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Plan activo" })).toBeInTheDocument();
-    expect(screen.getByText("Ciclo base")).toBeInTheDocument();
-    expect(screen.getByText("Semana 1 de 2")).toBeInTheDocument();
-    expect(screen.getByText("1 realizado · 1 omitido · 2 pendientes")).toBeInTheDocument();
+    const planRegion = await screen.findByRole("region", { name: "Plan activo" });
+    expect(within(planRegion).getByText("Ciclo base")).toBeInTheDocument();
+    expect(within(planRegion).getByText("Semana 1 de 2")).toBeInTheDocument();
+    expect(within(planRegion).getByText("1 realizado · 1 omitido · 2 pendientes")).toBeInTheDocument();
     expect(
-      screen.getByText(
+      within(planRegion).getByText(
         "El progreso cuenta entrenamientos realizados u omitidos. El cumplimiento solo cuenta los realizados.",
       ),
     ).toBeInTheDocument();
 
-    const entrenamientosConResultado = screen.getByRole("progressbar", {
+    const entrenamientosConResultado = within(planRegion).getByRole("progressbar", {
       name: "Entrenamientos con resultado: 50 % · Realizadas u omitidas",
     });
     expect(entrenamientosConResultado).toHaveAttribute("aria-valuenow", "50");
-    const entrenamientosRealizados = screen.getByRole("progressbar", {
+    const entrenamientosRealizados = within(planRegion).getByRole("progressbar", {
       name: "Entrenamientos realizados: 25 % · Completadas de las previstas",
     });
     expect(entrenamientosRealizados).toHaveAttribute("aria-valuenow", "25");
 
-    const detail = screen.getByRole("link", { name: /Ver Plan/ });
+    const detail = within(planRegion).getByRole("link", { name: /Ver Plan/ });
     expect(detail).toHaveAttribute("href", "/planes/plan-1");
   });
 
@@ -451,11 +364,11 @@ describe("segundo bloque de Inicio: Plan activo", () => {
     stubHome({ dashboard: emptyDashboard });
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Plan activo" })).toBeInTheDocument();
+    const planRegion = await screen.findByRole("region", { name: "Plan activo" });
     expect(
-      screen.getByText(/Aún no tienes un Plan activo/),
+      within(planRegion).getByText(/Aún no tienes un Plan activo/),
     ).toBeInTheDocument();
-    const action = screen.getByRole("link", { name: "Ir a Planes" });
+    const action = within(planRegion).getByRole("link", { name: "Ir a Planes" });
     expect(action).toHaveAttribute("href", "/planes");
   });
 });
@@ -547,113 +460,6 @@ describe("cuarto bloque de Inicio: RM recientes", () => {
   });
 });
 
-describe("quinto bloque de Inicio: evolución de un Ejercicio", () => {
-  beforeEach(() => {
-    window.history.replaceState({}, "", "/");
-    vi.unstubAllGlobals();
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.unstubAllGlobals();
-  });
-
-  test("permite elegir un Ejercicio y muestra la serie temporal de su métrica", async () => {
-    const requested: (string | null)[] = [];
-    stubHome({
-      dashboard: (exerciseId) => {
-        requested.push(exerciseId);
-        return evolutionDashboard(exerciseId);
-      },
-    });
-    const user = userEvent.setup();
-    render(<App />);
-
-    expect(await screen.findByRole("heading", { name: "Evolución" })).toBeInTheDocument();
-
-    const select = screen.getByRole("combobox", { name: /Elegir Ejercicio/ });
-    expect(within(select).getByRole("option", { name: "Sentadilla" })).toBeInTheDocument();
-    expect(within(select).getByRole("option", { name: "Dominada" })).toBeInTheDocument();
-    expect(select).toHaveValue(sentadillaEvolution.exerciseId);
-
-    expect(screen.getByText("Carga máxima")).toBeInTheDocument();
-    expect(screen.getByText("kg")).toBeInTheDocument();
-    expect(
-      screen.getByRole("img", {
-        name: /Evolución de Sentadilla.*95 kg el 06\/01\/2025.*120 kg el 03\/02\/2025/,
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        (_, element) =>
-          element?.tagName === "P" &&
-          element?.textContent === "Último valor: 120 kg · 5 Sesiones",
-      ),
-    ).toBeInTheDocument();
-
-    await user.selectOptions(select, dominadaEvolution.exerciseId);
-
-    expect(
-      await screen.findByRole("img", { name: /Evolución de Dominada/ }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Repeticiones totales")).toBeInTheDocument();
-    expect(screen.getByText("rep")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        (_, element) =>
-          element?.tagName === "P" &&
-          element?.textContent === "Último valor: 46 rep · 2 Sesiones",
-      ),
-    ).toBeInTheDocument();
-    expect(requested).toContain(dominadaEvolution.exerciseId);
-  });
-
-  test("el cardio continuo informa que no dispone de analítica sin dibujar gráfica", async () => {
-    stubHome({
-      dashboard: {
-        ...emptyDashboard,
-        evolution: {
-          options: [
-            {
-              id: "cinta-id",
-              name: "Cinta",
-              recordingMode: "cardio_continuo",
-              metric: null,
-            },
-          ],
-          current: {
-            exerciseId: "cinta-id",
-            name: "Cinta",
-            recordingMode: "cardio_continuo",
-            metric: null,
-            points: [],
-          },
-        },
-      },
-    });
-    render(<App />);
-
-    expect(await screen.findByRole("heading", { name: "Evolución" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("combobox", { name: /Elegir Ejercicio/ }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/no dispone de analítica/)).toBeInTheDocument();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
-  });
-
-  test("sin opciones no dibuja gráfica y ofrece estado vacío con acción", async () => {
-    stubHome({ dashboard: emptyDashboard });
-    render(<App />);
-
-    expect(await screen.findByRole("heading", { name: "Evolución" })).toBeInTheDocument();
-    expect(screen.getByText(/Aún no hay evolución/)).toBeInTheDocument();
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
-    const action = screen.getByRole("link", { name: "Ir al Historial" });
-    expect(action).toHaveAttribute("href", "/historial");
-  });
-});
-
 describe("presentación responsive de Inicio", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/");
@@ -683,19 +489,12 @@ describe("presentación responsive de Inicio", () => {
       within(analyticsRow).getByRole("region", { name: "RM recientes" }),
     ).toBeInTheDocument();
 
-    const evolution = screen.getByRole("region", { name: "Evolución" });
-    expect(training).not.toContainElement(evolution);
-    expect(plan).not.toContainElement(evolution);
-    expect(analyticsRow).not.toContainElement(evolution);
-
     // El recorrido vertical conserva el orden acordado: Sesión prioritaria,
-    // Plan activo, analítica y evolución.
+    // Plan activo y analítica.
     expect(training.compareDocumentPosition(analyticsRow)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(plan.compareDocumentPosition(analyticsRow)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(analyticsRow.compareDocumentPosition(evolution)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    expect(screen.queryByRole("region", { name: "Evolución" })).not.toBeInTheDocument();
   });
 });

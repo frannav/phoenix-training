@@ -632,6 +632,22 @@ describe("composición completa y forma estable", () => {
             },
           },
         ],
+        currentWeekTrainings: [
+          {
+            id: trainingIds[0]!,
+            day: 0,
+            name: "Día de empuje",
+            plannedDate: "2025-03-10",
+            status: "pendiente",
+          },
+          {
+            id: trainingIds[1]!,
+            day: 3,
+            name: "Ciclo base",
+            plannedDate: "2025-03-13",
+            status: "pendiente",
+          },
+        ],
         progress: {
           realizados: 0,
           omitidos: 0,
