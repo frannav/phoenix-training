@@ -1,16 +1,16 @@
 .root {
   display: grid;
   gap: 0.65rem;
-  margin-bottom: 2rem;
-  border-bottom: 4px solid var(--color-ink);
-  padding-bottom: 1.25rem;
+  margin-bottom: 2.5rem;
+  border-bottom: 4px solid #000;
+  padding-bottom: 1.5rem;
 }
 
 .eyebrow {
   margin: 0;
-  color: var(--color-olive-600);
-  font-family: "Courier New", Courier, monospace;
-  font-size: 0.75rem;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -20,16 +20,18 @@
   margin: 0;
   max-width: 48rem;
   font-family: "Courier New", Courier, monospace;
-  font-size: clamp(2rem, 8vw, 4rem);
-  line-height: 0.98;
-  letter-spacing: -0.07em;
+  font-family: var(--font-display);
+  font-size: clamp(2.3rem, 6vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.06em;
   text-transform: uppercase;
 }
 
 .description {
-  max-width: 42rem;
+  max-width: 46rem;
   margin: 0.25rem 0 0;
-  color: var(--color-ink-muted);
+  color: var(--color-secondary, var(--color-ink-muted));
+  font-size: 0.9rem;
   font-size: 1rem;
   line-height: 1.55;
 }

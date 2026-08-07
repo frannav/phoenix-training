@@ -1,26 +1,27 @@
-@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Public+Sans:wght@400;500;600;700;800&display=swap");
 
 :root {
   color-scheme: light;
   font-family: "Public Sans", ui-sans-serif, system-ui, sans-serif;
-  color: #000000;
-  background: #ffffff;
+  color: #1b1b1b;
+  background: #f9f9f9;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
-  --color-ink: #000000;
-  --color-ink-muted: #71717a;
-  --color-olive-600: #71717a;
+  --color-ink: #1b1b1b;
+  --color-ink-muted: #5d5e66;
+  --color-olive-600: #5d5e66;
   --color-olive-700: #000000;
   --color-surface: #ffffff;
+  --color-surface-bright: #f9f9f9;
   --color-surface-muted: #f4f4f5;
   --color-surface-raised: #ffffff;
-  --color-surface-container: #fafafa;
+  --color-surface-container: #eeeeee;
   --color-border: #d4d4d8;
   --color-success: #22c55e;
   --color-success-dark: #166534;
   --color-success-soft: #dcfce7;
-  --color-accent-soft: #e4e4e7;
+  --color-accent-soft: #e3e1ec;
   --color-accent: #000000;
   --color-accent-strong: #000000;
   --color-on-accent: #ffffff;
@@ -30,11 +31,16 @@
   --color-warning: #eab308;
   --color-info-soft: #e0f2fe;
   --color-info-dark: #0369a1;
-  --color-sidebar-muted: #71717a;
-  --color-sidebar-link: #52525b;
+  --color-sidebar-muted: #848484;
+  --color-sidebar-link: #5d5e66;
   --color-sidebar-active: #e4e4e7;
-  --pixel-shadow: 6px 6px 0 var(--color-ink);
-  --pixel-shadow-sm: 3px 3px 0 var(--color-ink);
+  --color-grid-line: #e2e2e2;
+  --font-display: "Courier Prime", "Courier New", monospace;
+  --shadow-hard-sm: 2px 2px 0 #000;
+  --shadow-hard-md: 4px 4px 0 #000;
+  --shadow-hard-lg: 6px 6px 0 #000;
+  --pixel-shadow: var(--shadow-hard-lg);
+  --pixel-shadow-sm: var(--shadow-hard-sm);
 }
 
 * {
@@ -45,7 +51,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: var(--color-surface);
+  background: var(--color-surface-bright, #f9f9f9);
 }
 
 button,
@@ -112,9 +118,31 @@ textarea:focus-visible {
 }
 
 h1,
-h2 {
-  font-family: "Courier New", Courier, monospace;
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
   letter-spacing: -0.04em;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  overflow-wrap: anywhere;
+}
+
+button,
+a {
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+button:active,
+a:active {
+  transform: translate(2px, 2px);
+  box-shadow: none !important;
 }
 
 ::selection {

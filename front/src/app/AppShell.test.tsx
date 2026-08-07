@@ -118,7 +118,7 @@ describe("acceso persistente a la Sesión activa", () => {
     await user.click(within(access).getByRole("link", { name: "Continuar" }));
 
     expect(window.location.pathname).toBe("/sesion/sesion-activa");
-    expect(await screen.findByRole("heading", { name: "Sesión activa" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sesión libre" })).toBeInTheDocument();
   });
 
   test("sin Sesión activa no muestra el acceso persistente", async () => {

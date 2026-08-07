@@ -9,6 +9,7 @@ import {
 } from "../../exercises/api/exercises-api";
 import {
   activeSessionQueryKey,
+  countSeriesByStatus,
   deleteSession,
   finalizeSession,
   getSession,
@@ -32,7 +33,7 @@ import {
   validateCompletion,
   type SeriesDraft,
 } from "../series-draft";
-import { SeriesRow } from "../components/SeriesRow";
+import { SeriesRow, SeriesTableHeader } from "../components/SeriesRow";
 import styles from "./ActiveSessionPage.module.css";
 
 type SaveState = "saved" | "saving" | "error";
@@ -597,6 +598,16 @@ export function ActiveSessionPage() {
   const loading = sessionQuery.isPending && session === null;
   const failed =
     (sessionQuery.isError || (sessionQuery.isSuccess && session === null)) && !loading;
+  const seriesProgress = session
+    ? countSeriesByStatus(session.exercises.flatMap((occurrence) => occurrence.series))
+    : { completada: 0, omitida: 0, pendiente: 0 };
+  const totalSeries =
+    seriesProgress.completada + seriesProgress.omitida + seriesProgress.pendiente;
+  const progressPercent =
+    totalSeries === 0
+      ? 0
+      : Math.round(((seriesProgress.completada + seriesProgress.omitida) / totalSeries) * 100);
+  const sessionName = session ? sessionTitle(session) : "Sesión libre";
 
   return (
     <div className={styles.page}>
@@ -605,32 +616,38 @@ export function ActiveSessionPage() {
           <Link className={styles.backLink} to="/">
             ← Volver a Inicio
           </Link>
-          <div className={styles.saveStateGroup}>
-            <span className={styles.saveState} role="status" data-state={saveState}>
-              <span aria-hidden="true" className={styles.saveStateIcon}>
-                {saveState === "saving" ? "⟳" : saveState === "error" ? "⚠" : "✓"}
+          <div className={styles.headerMeta}>
+            <div className={styles.saveStateGroup}>
+              <span className={styles.saveState} role="status" data-state={saveState}>
+                <span aria-hidden="true" className={styles.saveStateIcon}>
+                  {saveState === "saving" ? "⟳" : saveState === "error" ? "⚠" : "✓"}
+                </span>
+                {saveState === "saving"
+                  ? "Guardando…"
+                  : saveState === "error"
+                    ? "Error al guardar"
+                    : "Guardado"}
               </span>
-              {saveState === "saving"
-                ? "Guardando…"
-                : saveState === "error"
-                  ? "Error al guardar"
-                  : "Guardado"}
-            </span>
-            {saveState === "error" && retryTarget && (
-              <button
-                className={styles.retryButton}
-                type="button"
-                onClick={retrySave}
-              >
-                Reintentar
-              </button>
+              {saveState === "error" && retryTarget && (
+                <button
+                  className={styles.retryButton}
+                  type="button"
+                  onClick={retrySave}
+                >
+                  Reintentar
+                </button>
+              )}
+            </div>
+            {session && session.origin !== "libre" && (
+              <span className={styles.planLabel}>
+                {session.origin === "plan" ? "Plan" : "Rutina"}
+              </span>
             )}
           </div>
         </div>
-        <h1 className={styles.title}>
-          {session?.status === "finalizada" ? "Sesión finalizada" : "Sesión activa"}
+        <h1 className={styles.title} aria-label={sessionName}>
+          {sessionName}
         </h1>
-        <p className={styles.origin}>{session ? sessionTitle(session) : "Sesión libre"}</p>
       </header>
 
       <main className={styles.content}>
@@ -650,7 +667,7 @@ export function ActiveSessionPage() {
           <section className={styles.finalized} aria-labelledby="resumen-finalizado-titulo">
             <h2 id="resumen-finalizado-titulo">Resumen de la Sesión</h2>
             <p className={styles.finalizedDate}>{session.datePerformed}</p>
-            <p className={styles.summary} role="status">
+            <p className={`${styles.summary} ${styles.visuallyHidden}`} role="status">
               {sessionSeriesSummary(session)}
             </p>
             <ul className={styles.finalizedList} aria-label="Ejercicios finalizados">
@@ -659,7 +676,7 @@ export function ActiveSessionPage() {
                   <span className={styles.exerciseName}>
                     {occurrence.exercise.name}
                   </span>
-                  <span className={styles.exerciseMeta}>
+                  <span className={`${styles.exerciseMeta} ${styles.visuallyHidden}`}>
                     {occurrenceProgressLabel(occurrence)}
                   </span>
                 </li>
@@ -676,12 +693,23 @@ export function ActiveSessionPage() {
 
         {!loading && !failed && session && session.status === "activa" && (
           <>
-            <p className={styles.progress} role="status">
-              {sessionProgressLabel(session)}
-            </p>
+            <section className={styles.progressPanel} aria-label="Progreso de la Sesión">
+              <div className={styles.progressHeader}>
+                <span>Progreso</span>
+                <strong aria-live="polite">
+                  {seriesProgress.completada + seriesProgress.omitida}/{totalSeries} Series
+                </strong>
+              </div>
+              <div className={styles.progressTrack} aria-hidden="true">
+                <span style={{ width: `${progressPercent}%` }} />
+              </div>
+              <p className={styles.visuallyHidden} role="status">
+                {sessionProgressLabel(session)}
+              </p>
+            </section>
 
             {session.exercises.length > 0 && (
-              <p className={styles.summary} role="status">
+              <p className={styles.visuallyHidden} role="status">
                 {sessionSeriesSummary(session)}
               </p>
             )}
@@ -765,6 +793,7 @@ export function ActiveSessionPage() {
                       className={styles.exerciseButton}
                       type="button"
                       aria-expanded={expandedIds.includes(occurrence.id)}
+                      aria-controls={`exercise-details-${occurrence.id}`}
                       title={
                         expandedIds.includes(occurrence.id)
                           ? "Contraer Ejercicio"
@@ -772,14 +801,19 @@ export function ActiveSessionPage() {
                       }
                       onClick={() => toggleExercise(occurrence.id)}
                     >
-                      <span className={styles.exerciseName}>
-                        {occurrence.exercise.name}
-                      </span>
-                      <span className={styles.exerciseMeta}>
-                        {occurrence.exercise.provenance === "personalizado"
-                          ? "Personalizado"
-                          : "Catálogo"}{" "}
-                        · {recordingModeLabels[occurrence.exercise.recordingMode]}
+                      <span className={styles.exerciseIdentity}>
+                        <span className={styles.exerciseNumber} aria-hidden="true">
+                          {String(occurrence.sortOrder + 1).padStart(2, "0")}
+                        </span>
+                        <span className={styles.exerciseCopy}>
+                          <span className={styles.exerciseName}>
+                            {occurrence.exercise.name}
+                          </span>
+                          <span className={`${styles.exerciseMeta} ${styles.visuallyHidden}`}>
+                            {occurrence.series.filter((series) => series.status === "pendiente").length}{" "}
+                            Series pendientes
+                          </span>
+                        </span>
                       </span>
                       <span
                         className={styles.exerciseToggleIcon}
@@ -787,13 +821,13 @@ export function ActiveSessionPage() {
                         data-expanded={expandedIds.includes(occurrence.id)}
                       />
                     </button>
-                    {expandedIds.includes(occurrence.id) && (
-                      <div
-                        className={styles.exerciseDetails}
-                        id={`exercise-details-${occurrence.id}`}
-                      >
+                    <div
+                      className={styles.exerciseDetails}
+                      id={`exercise-details-${occurrence.id}`}
+                      hidden={!expandedIds.includes(occurrence.id)}
+                    >
                         <div className={styles.exerciseDetailsHeader}>
-                          <span className={styles.exerciseProgress}>
+                          <span className={`${styles.exerciseProgress} ${styles.visuallyHidden}`}>
                             {occurrenceProgressLabel(occurrence)}
                           </span>
                           <span className={styles.exerciseDetailsActions}>
@@ -827,6 +861,8 @@ export function ActiveSessionPage() {
                             Aún no hay Series. Añade la primera para empezar a registrar.
                           </p>
                         ) : (
+                          <>
+                          <SeriesTableHeader mode={occurrence.exercise.recordingMode} />
                           <ul
                             className={styles.seriesList}
                             aria-label={`Series de ${occurrence.exercise.name}`}
@@ -885,34 +921,44 @@ export function ActiveSessionPage() {
                               </li>
                             ))}
                           </ul>
+                          </>
                         )}
 
-                        {occurrence.exercise.recordingMode !== "cardio_continuo" && (
-                          <button
-                            className={styles.addSeriesButton}
-                            type="button"
-                            onClick={() => addSeries(occurrence)}
-                            disabled={saveState === "saving"}
-                          >
-                            Añadir serie
-                          </button>
-                        )}
+                        <div className={styles.exerciseActions}>
+                          {occurrence.series.some((series) => series.status === "pendiente") && (
+                            <button
+                              className={styles.omitExerciseButton}
+                              type="button"
+                              onClick={() => {
+                                const pendingSeries = occurrence.series.find(
+                                  (series) => series.status === "pendiente",
+                                );
+                                if (pendingSeries) {
+                                  omitSeries(occurrence, pendingSeries);
+                                }
+                              }}
+                              disabled={saveState === "saving"}
+                            >
+                              Omitir
+                            </button>
+                          )}
+                          {occurrence.exercise.recordingMode !== "cardio_continuo" && (
+                            <button
+                              className={styles.addSeriesButton}
+                              type="button"
+                              onClick={() => addSeries(occurrence)}
+                              disabled={saveState === "saving"}
+                            >
+                              Añadir serie
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
                   </li>
                 ))}
               </ul>
             )}
 
-            {!pickerOpen && session.exercises.length > 0 && (
-              <button
-                className={styles.addExercise}
-                type="button"
-                onClick={() => setPickerOpen(true)}
-              >
-                Añadir ejercicio
-              </button>
-            )}
           </>
         )}
 
@@ -924,14 +970,14 @@ export function ActiveSessionPage() {
       </main>
 
       {session && session.status === "activa" && (
-        <div className={styles.footer}>
+        <footer className={styles.footer} aria-label="Acciones de la Sesión">
           <button
-            className={styles.deleteSessionButton}
+            className={styles.footerAddExercise}
             type="button"
-            onClick={requestDeleteSession}
+            onClick={() => setPickerOpen(true)}
             disabled={saveState === "saving"}
           >
-            Eliminar sesión
+            <span aria-hidden="true">＋</span> Añadir ejercicio
           </button>
           <button
             className={styles.finalizeButton}
@@ -939,9 +985,19 @@ export function ActiveSessionPage() {
             onClick={requestFinalize}
             disabled={saveState === "saving" || !sessionHasCompletedSeries(session)}
           >
-            Finalizar
+            Finalizar sesión
           </button>
-        </div>
+          <div className={styles.footerSecondary}>
+            <button
+              className={styles.deleteSessionButton}
+              type="button"
+              onClick={requestDeleteSession}
+              disabled={saveState === "saving"}
+            >
+              Eliminar sesión
+            </button>
+          </div>
+        </footer>
       )}
 
       {confirmation && renderConfirmation()}

@@ -45,10 +45,10 @@
 
 .session {
   max-width: 46rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.9rem;
+  border: 2px solid #000;
   padding: 1rem 1.1rem;
   background: var(--color-surface);
+  box-shadow: var(--shadow-hard-md);
 }
 
 .sessionHeader {
@@ -61,14 +61,18 @@
 .sessionTitle {
   margin: 0;
   font-size: 1.1rem;
+  font-family: var(--font-display);
+  text-transform: uppercase;
 }
 
 .originBadge {
-  border-radius: 0.6rem;
+  border: 1px solid var(--color-border);
   padding: 0.15rem 0.5rem;
   font-size: 0.8rem;
   font-weight: 700;
   background: var(--color-surface-muted);
+  font-family: var(--font-display);
+  text-transform: uppercase;
   color: var(--color-ink-muted);
 }
 

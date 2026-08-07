@@ -73,15 +73,6 @@
   line-height: 1.15;
 }
 
-.origin {
-  margin: 0;
-  color: var(--color-olive-600);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
 .content {
   width: min(48rem, 100%);
   margin: 0 auto;
@@ -531,7 +522,512 @@
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Stitch mobile session reference: compact technical header, flat exercise
+   modules and controls that read like a paper training log. */
+.page {
+  min-height: 100vh;
+  background: var(--color-surface-bright);
+}
+
+.header {
+  border-bottom: 4px solid #000;
+  padding: 0.75rem 1rem 1rem;
+  background: var(--color-surface);
+}
+
+.backLink,
+.saveState,
+.title,
+.progress,
+.exerciseName,
+.exerciseMeta,
+.pickerTitle,
+.finalized h2 {
+  font-family: var(--font-display);
+}
+
+.backLink {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.saveState {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: #16803c;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin-top: 1rem;
+  font-size: 1.25rem;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+.content {
+  width: min(30rem, 100%);
+  padding: 1.5rem 1rem 7rem;
+}
+
+.progressPanel {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1.5rem;
+  border: 2px solid #000;
+  padding: 0.85rem;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.progressHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.progressTrack {
+  height: 0.75rem;
+  border: 2px solid #000;
+  background: var(--color-surface-container);
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  background: #000;
+}
+
+.progressPanel .progress {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.summary {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 0.65rem 0;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.exerciseList {
+  gap: 0.75rem;
+}
+
+.exerciseItem {
+  border: 2px solid #000;
+  border-radius: 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.exerciseButton {
+  padding: 0.85rem;
+}
+
+.exerciseName {
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.exerciseMeta {
+  color: var(--color-ink-muted);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.exerciseDetails {
+  border-top: 2px solid var(--color-ink);
+  padding: 0.75rem 0.85rem;
+  background: var(--color-surface-bright);
+}
+
+.picker {
+  border: 2px solid #000;
+  border-radius: 0;
+  padding: 0.85rem;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.pickerTitle {
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.searchInput,
+.pickerItem {
+  border: 2px solid #000;
+  border-radius: 0;
+}
+
+.searchButton,
+.addExercise,
+.finalizeButton,
+.homeLink {
+  border: 2px solid #000;
+  border-radius: 0;
+  background: #000;
+  color: #fff;
+  box-shadow: var(--shadow-hard-sm);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+}
+
+.addExercise {
+  border-style: solid;
+  padding: 0.85rem;
+}
+
+.footer {
+  border-top: 2px solid #000;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface-bright);
+}
+
+@media (min-width: 52rem) {
+  .page {
+    width: min(30rem, 100%);
+    margin: 0 auto;
+    border-right: 4px solid #000;
+    border-left: 4px solid #000;
+    box-shadow: var(--shadow-hard-lg);
+  }
+}
+
+/* Final mobile/desktop polish for the live-session canvas. Keep the page
+   narrow enough to feel like the reference on large screens while allowing
+   every control to remain usable at the 320px minimum viewport. */
+.header {
+  z-index: 10;
+}
+
+.headerTop {
+  align-items: flex-start;
+}
+
+.saveStateGroup {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.retryButton {
+  border: 2px solid #000;
+  border-radius: 0;
+  padding: 0.3rem 0.55rem;
+  background: #fff;
+  box-shadow: var(--shadow-hard-sm);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.saveState[data-state="saving"] {
+  color: var(--color-info-dark);
+}
+
+.saveState[data-state="error"] {
+  color: var(--color-danger-dark);
+}
+
+.exerciseIdentity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.exerciseNumber {
+  flex: 0 0 auto;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.exerciseCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.exerciseName,
+.exerciseMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exerciseDetailsActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.lastUsed {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.deleteExerciseButton,
+.searchButton,
+.pickerItem,
+.addSeriesButton,
+.addExercise,
+.deleteSessionButton,
+.finalizeButton,
+.homeLink {
+  border: 2px solid #000;
+  border-radius: 0;
+  box-shadow: var(--shadow-hard-sm);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+}
+
+.deleteExerciseButton {
+  padding: 0.35rem 0.55rem;
+  background: #fff;
+}
+
+.pickerItem {
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.pickerItem:active,
+.retryButton:active,
+.deleteExerciseButton:active,
+.addSeriesButton:active,
+.addExercise:active,
+.deleteSessionButton:active,
+.finalizeButton:active,
+.homeLink:active {
+  box-shadow: none;
+}
+
+.footer {
+  z-index: 20;
+  width: min(30rem, 100%);
+  border-top: 2px solid #000;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface-bright);
+}
+
+.deleteSessionButton,
+.finalizeButton {
+  min-height: 2.75rem;
+  padding: 0.7rem 0.75rem;
+  font-size: 0.68rem;
+}
+
+.deleteSessionButton {
+  background: #fff;
+  color: var(--color-danger-dark);
+}
+
+.finalizeButton {
+  background: #000;
+  color: #fff;
+}
+
+.dialogOverlay {
+  z-index: 30;
+}
+
+.dialog {
+  border: 2px solid #000;
+  border-radius: 0;
+  box-shadow: var(--shadow-hard-md);
+}
+
+.dialogDanger,
+.dialogCancel {
+  border-radius: 0;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+}
+
+@media (max-width: 22rem) {
+  .headerTop {
+    gap: 0.5rem;
+  }
+
+  .backLink {
+    font-size: 0.62rem;
+  }
+
+  .saveState {
+    font-size: 0.57rem;
+  }
+
+  .exerciseButton {
+    gap: 0.4rem;
+    padding-inline: 0.7rem;
+  }
+
+  .exerciseNumber {
+    font-size: 1rem;
+  }
+
+  .exerciseName {
+    font-size: 0.78rem;
+  }
+
+  .exerciseMeta {
+    font-size: 0.56rem;
+  }
+}
+
+@media (min-width: 52rem) {
+  .footer {
+    right: 0;
+    left: 0;
+    margin-right: auto;
+    margin-left: auto;
+  }
+}
+
+/* El footer sigue la jerarquía vertical de Stitch: primero añadir, después
+   finalizar y, en un nivel deliberadamente secundario, eliminar la sesión. */
+.footer {
+  display: grid;
+  gap: 0.55rem;
+  width: min(30rem, 100%);
+  padding: 0.75rem 1rem 0.65rem;
+  background: var(--color-surface-bright);
+}
+
+.footerAddExercise,
+.footer .finalizeButton {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 2px solid #000;
+  border-radius: 0;
+  padding: 0.7rem 0.75rem;
+  box-shadow: var(--shadow-hard-sm);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.footerAddExercise {
+  background: var(--color-surface);
+  color: #000;
+}
+
+.footer .finalizeButton {
+  background: #000;
+  color: #fff;
+}
+
+.footerSecondary {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.footer .deleteSessionButton {
+  border: 0;
+  border-radius: 0;
+  padding: 0.15rem 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-danger-dark);
+  font-family: var(--font-display);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+}
+
+.footerAddExercise:active,
+.footer .finalizeButton:active {
+  box-shadow: none;
+}
+
+.footerAddExercise:disabled,
+.footer .finalizeButton:disabled,
+.footer .deleteSessionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Ajustes finales de la composición móvil: el origen queda como bloque
+   auxiliar de cabecera y cada módulo reserva sus acciones en una sola línea. */
+.headerMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.planLabel {
+  color: var(--color-ink-muted);
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.exerciseActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.exerciseActions > button {
+  flex: 1;
+  min-height: 2.25rem;
+  border: 2px solid #000;
+  border-radius: 0;
+  padding: 0.55rem 0.7rem;
+  box-shadow: var(--shadow-hard-sm);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.omitExerciseButton {
+  border-color: var(--color-danger) !important;
+  background: var(--color-danger-soft);
+  color: var(--color-danger-dark);
+}
+
+.addSeriesButton::before {
+  content: "+ ";
+}
+
+@media (max-width: 22rem) {
+  .exerciseActions {
+    gap: 0.35rem;
+  }
+
+  .exerciseActions > button {
+    padding-inline: 0.4rem;
+    font-size: 0.58rem;
+  }
 }

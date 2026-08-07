@@ -31,31 +31,26 @@ function ProgressBar({
         aria-valuemin={0}
         aria-valuemax={100}
       >
-        <span className={styles.barFill} style={{ width: `${value}%` }} />
+        {Array.from({ length: 4 }, (_, index) => (
+          <span
+            className={`${styles.barSegment} ${
+              index < Math.round(value / 25) ? styles.barSegmentFilled : ""
+            }`}
+            key={index}
+            aria-hidden="true"
+          />
+        ))}
       </div>
     </div>
   );
 }
 
-function realizadoLabel(count: number): string {
-  return count === 1 ? "1 realizado" : `${count} realizados`;
-}
-
-function omitidoLabel(count: number): string {
-  return count === 1 ? "1 omitido" : `${count} omitidos`;
-}
-
-function pendienteLabel(count: number): string {
-  return count === 1 ? "1 pendiente" : `${count} pendientes`;
-}
-
 /**
  * Segundo bloque de Inicio: el resumen del Plan activo —nombre, semana
- * actual, realizados, omitidos y pendientes, además de dos métricas
- * explicadas— con su enlace al detalle. El progreso llega calculado por la API
- * (spec
- * «Métricas»); el bloque solo lo presenta. La ausencia de Plan activo se
- * explica y enlaza a Planes, donde puede crearse o activarse.
+ * actual y una métrica de entrenamientos realizados— con su enlace al detalle.
+ * El progreso llega calculado por la API (spec «Métricas»); el bloque solo lo
+ * presenta. La ausencia de Plan activo se explica y enlaza a Planes, donde
+ * puede crearse o activarse.
  */
 export function ActivePlanBlock({ plan }: ActivePlanBlockProps) {
   return (
@@ -79,26 +74,12 @@ export function ActivePlanBlock({ plan }: ActivePlanBlockProps) {
 
       {plan !== null && (
         <div className={styles.planCard}>
+          <p className={styles.planName}>{plan.name}</p>
           <p className={styles.planEyebrow}>
             Semana {plan.currentWeek} de {plan.weeks.length}
           </p>
-          <p className={styles.planName}>{plan.name}</p>
-          <p className={styles.planSummary}>
-            {realizadoLabel(plan.progress.realizados)} ·{" "}
-            {omitidoLabel(plan.progress.omitidos)} · {pendienteLabel(plan.progress.pendientes)}
-          </p>
-
-          <p className={styles.progressExplanation}>
-            El progreso cuenta entrenamientos realizados u omitidos. El cumplimiento solo
-            cuenta los realizados.
-          </p>
 
           <div className={styles.progressBars}>
-            <ProgressBar
-              label="Entrenamientos con resultado"
-              description="Realizadas u omitidas"
-              value={plan.progress.avanceRedondeado}
-            />
             <ProgressBar
               label="Entrenamientos realizados"
               description="Completadas de las previstas"

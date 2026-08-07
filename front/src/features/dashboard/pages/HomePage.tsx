@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ApiRequestError } from "../../../shared/http/api-client";
@@ -13,6 +14,35 @@ import { RecentMaxesBlock } from "../components/RecentMaxesBlock";
 import { TrainingBlock } from "../components/TrainingBlock";
 import { WeeklyVolumeBlock } from "../components/WeeklyVolumeBlock";
 import styles from "./HomePage.module.css";
+
+type ModuleIconName = "training" | "plan" | "volume";
+
+function ModuleIcon({ name }: { name: ModuleIconName }) {
+  if (name === "training") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="m13.4 2-8 11h6.1L10.6 22l8-11h-6.1L13.4 2Z" />
+      </svg>
+    );
+  }
+
+  if (name === "plan") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M5 3.5h14v17H5zM8 7h8M8 11h8M8 15h5" />
+      </svg>
+    );
+  }
+
+  if (name === "volume") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 20h16M7 17V9m5 8V5m5 12v-6" />
+      </svg>
+    );
+  }
+
+}
 
 /**
  * Inicio: el recorrido vertical de los cuatro bloques acordados (spec
@@ -60,11 +90,13 @@ export function HomePage() {
 
   return (
     <>
-      <PageIntro
-        eyebrow="Tu entrenamiento"
-        title="Inicio"
-        description="Todo preparado para decidir qué entrenar hoy."
-      />
+      <div className={styles.intro}>
+        <PageIntro
+          eyebrow="Tu entrenamiento"
+          title="Inicio"
+          description="Todo preparado para decidir qué entrenar hoy."
+        />
+      </div>
 
       <div className={styles.blocks}>
         {dashboard.isPending && <p className={styles.status}>Cargando tu Inicio…</p>}
@@ -84,16 +116,35 @@ export function HomePage() {
                 justo debajo de la cabecera. Cuando no la hay, el bloque
                 ofrece iniciar el próximo Entrenamiento junto al Plan activo. */}
             {dashboard.data.training.kind === "continuar" && (
-              <div className={styles.priorityBlock}>
-                <TrainingBlock
-                  training={dashboard.data.training}
-                  activePlan={dashboard.data.activePlan}
-                  isStarting={startMutation.isPending}
-                  startError={startMutation.isError}
-                  onStartPlan={(planId, trainingId) =>
-                    startMutation.mutate({ origin: "plan", planId, trainingId })
-                  }
-                />
+              <div
+                className={styles.priorityBlock}
+                style={
+                  {
+                    "--priority-progress": `${
+                      dashboard.data.training.progress.total > 0
+                        ? (dashboard.data.training.progress.completadas /
+                            dashboard.data.training.progress.total) *
+                          100
+                        : 0
+                    }%`,
+                  } as CSSProperties
+                }
+              >
+                <span className={styles.priorityCorner} aria-hidden="true" />
+                <div className={styles.moduleFrame}>
+                  <span className={`${styles.moduleIcon} ${styles.trainingIcon}`} aria-hidden="true">
+                    <ModuleIcon name="training" />
+                  </span>
+                  <TrainingBlock
+                    training={dashboard.data.training}
+                    activePlan={dashboard.data.activePlan}
+                    isStarting={startMutation.isPending}
+                    startError={startMutation.isError}
+                    onStartPlan={(planId, trainingId) =>
+                      startMutation.mutate({ origin: "plan", planId, trainingId })
+                    }
+                  />
+                </div>
               </div>
             )}
             <div
@@ -102,21 +153,38 @@ export function HomePage() {
               }
             >
               {dashboard.data.training.kind !== "continuar" && (
-                <TrainingBlock
-                  training={dashboard.data.training}
-                  activePlan={dashboard.data.activePlan}
-                  isStarting={startMutation.isPending}
-                  startError={startMutation.isError}
-                  onStartPlan={(planId, trainingId) =>
-                    startMutation.mutate({ origin: "plan", planId, trainingId })
-                  }
-                />
+                <div className={styles.moduleFrame}>
+                  <span className={`${styles.moduleIcon} ${styles.trainingIcon}`} aria-hidden="true">
+                    <ModuleIcon name="training" />
+                  </span>
+                  <TrainingBlock
+                    training={dashboard.data.training}
+                    activePlan={dashboard.data.activePlan}
+                    isStarting={startMutation.isPending}
+                    startError={startMutation.isError}
+                    onStartPlan={(planId, trainingId) =>
+                      startMutation.mutate({ origin: "plan", planId, trainingId })
+                    }
+                  />
+                </div>
               )}
-              <ActivePlanBlock plan={dashboard.data.activePlan} />
+              <div className={`${styles.moduleFrame} ${styles.planModule}`}>
+                <span className={`${styles.moduleIcon} ${styles.planIcon}`} aria-hidden="true">
+                  <ModuleIcon name="plan" />
+                </span>
+                <ActivePlanBlock plan={dashboard.data.activePlan} />
+              </div>
             </div>
             <section className={styles.analyticsRow} aria-label="Volumen y RM recientes">
-              <WeeklyVolumeBlock volume={dashboard.data.weeklyVolume} />
-              <RecentMaxesBlock recordedMaxes={dashboard.data.recentRecordedMaxes} />
+              <div className={styles.moduleFrame}>
+                <span className={`${styles.moduleIcon} ${styles.volumeIcon}`} aria-hidden="true">
+                  <ModuleIcon name="volume" />
+                </span>
+                <WeeklyVolumeBlock volume={dashboard.data.weeklyVolume} />
+              </div>
+              <div className={`${styles.moduleFrame} ${styles.maxesModule}`}>
+                <RecentMaxesBlock recordedMaxes={dashboard.data.recentRecordedMaxes} />
+              </div>
             </section>
           </>
         )}

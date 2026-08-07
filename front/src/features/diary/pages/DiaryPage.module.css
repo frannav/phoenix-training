@@ -15,15 +15,19 @@
   font-size: 1.25rem;
   flex: 1;
   text-align: center;
+  font-family: var(--font-display);
+  text-transform: uppercase;
 }
 
 .navButton,
 .todayButton {
-  border: 1px solid var(--color-border);
-  border-radius: 0.6rem;
+  border: 2px solid var(--color-ink);
   padding: 0.45rem 0.8rem;
   font-weight: 700;
   background: var(--color-surface);
+  box-shadow: var(--shadow-hard-sm);
+  font-family: var(--font-display);
+  text-transform: uppercase;
 }
 
 .todayButton {
@@ -48,8 +52,7 @@
 .trainingCell {
   height: 5.2rem;
   vertical-align: top;
-  border: 1px solid var(--color-border);
-  border-radius: 0.7rem;
+  border: 2px solid var(--color-border);
   background: var(--color-surface);
 }
 
@@ -59,8 +62,9 @@
 }
 
 .trainingCell {
-  border-color: var(--color-accent);
+  border-color: var(--color-ink);
   background: var(--color-success-soft);
+  box-shadow: var(--shadow-hard-sm);
 }
 
 .dayLink {

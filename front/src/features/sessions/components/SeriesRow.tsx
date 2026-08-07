@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { RecordingMode } from "../../exercises/api/exercises-api";
 import type { SessionSeriesDocument } from "../api/sessions-api";
 import {
@@ -27,16 +28,32 @@ type SeriesRowProps = {
   onDelete: () => void;
 };
 
+const tableLabels: Record<SeriesMagnitude, string> = {
+  carga: "CARGA",
+  repeticiones: "REPS",
+  duracion: "DURACIÓN",
+};
+
+/** Cabecera única del registro de Series dentro de cada bloque de Ejercicio. */
+export function SeriesTableHeader({ mode }: { mode: RecordingMode }) {
+  const fields = seriesFieldsPerMode[mode];
+  return (
+    <div className={styles.seriesHeader}>
+      <span>SER</span>
+      <span className={styles.seriesHeaderFields}>
+        {fields.map((field) => (
+          <span key={field}>{tableLabels[field]}</span>
+        ))}
+      </span>
+      <span>OK</span>
+    </div>
+  );
+}
+
 const statusLabels = {
   pendiente: "Pendiente",
   completada: "Completada",
   omitida: "Omitida",
-} as const;
-
-const statusIcons = {
-  pendiente: "○",
-  completada: "✓",
-  omitida: "⊘",
 } as const;
 
 /** Texto del resultado de una Serie completada según su Forma de registro. */
@@ -81,7 +98,7 @@ export function SeriesRow({
   const order = series.order + 1;
   const fields = seriesFieldsPerMode[mode];
 
-  // Campos de resultado de la Forma de registro más el RPE opcional: los
+  // Campos de resultado de la Forma de registro: los
   // muestran las Series pendientes y las omitidas (para restaurarlas como
   // completadas con un resultado completo). Los errores se asocian por Serie.
   const fieldsBlock = (
@@ -111,25 +128,61 @@ export function SeriesRow({
         );
       })}
 
-      <label className={styles.field}>
-        <span className={styles.fieldLabel}>RPE (1-10)</span>
-        <input
-          className={styles.fieldInput}
-          data-field="rpe"
-          inputMode="decimal"
-          value={draft.rpe}
-          onChange={(event) => onDraftChange("rpe", event.target.value)}
-          aria-invalid={errors.rpe !== undefined}
-          aria-describedby={errors.rpe !== undefined ? `${series.id}-rpe-error` : undefined}
-        />
-        {errors.rpe && (
-          <span id={`${series.id}-rpe-error`} className={styles.fieldError} role="alert">
-            <span aria-hidden="true">⚠ </span>
-            {errors.rpe}
-          </span>
-        )}
-      </label>
     </div>
+  );
+
+  const rpeBlock = (
+    <label className={styles.secondaryField}>
+      <span className={styles.fieldLabel}>RPE (1-10)</span>
+      <input
+        className={styles.fieldInput}
+        data-field="rpe"
+        inputMode="decimal"
+        value={draft.rpe}
+        onChange={(event) => onDraftChange("rpe", event.target.value)}
+        aria-invalid={errors.rpe !== undefined}
+        aria-describedby={errors.rpe !== undefined ? `${series.id}-rpe-error` : undefined}
+      />
+      {errors.rpe && (
+        <span id={`${series.id}-rpe-error`} className={styles.fieldError} role="alert">
+          <span aria-hidden="true">⚠ </span>
+          {errors.rpe}
+        </span>
+      )}
+    </label>
+  );
+
+  // Las Series completadas siguen mostrando sus magnitudes dentro de la
+  // misma cuadrícula que las pendientes. Los controles deshabilitados hacen
+  // evidente qué se registró sin convertir el resultado en texto suelto.
+  const completedFieldsBlock = (
+    <div className={styles.fields} data-readonly="true">
+      {fields.map((magnitude: SeriesMagnitude) => (
+        <label className={styles.field} key={magnitude}>
+          <span className={styles.fieldLabel}>{magnitudeLabels[magnitude]}</span>
+          <input
+            className={styles.fieldInput}
+            data-field={magnitude}
+            value={series.result[magnitude] ?? ""}
+            disabled
+            readOnly
+            aria-label={magnitudeLabels[magnitude]}
+          />
+        </label>
+      ))}
+    </div>
+  );
+
+  const seriesActions = (actions: ReactNode) => (
+    <details className={styles.secondaryActions}>
+      <summary className={styles.secondarySummary}>
+        <span>Acciones de Serie {order}</span>
+        <span className={styles.secondaryStatus} data-status={series.status}>
+          {statusLabels[series.status]}
+        </span>
+      </summary>
+      <div className={styles.secondaryContent}>{actions}</div>
+    </details>
   );
 
   if (series.status === "completada") {
@@ -140,44 +193,54 @@ export function SeriesRow({
         role="group"
         aria-label={`Serie ${order}`}
       >
-        <div className={styles.rowHeader}>
-          <span className={styles.seriesNumber}>Serie {order}</span>
-          <span className={styles.statusBadge} data-status="completada">
-            <span aria-hidden="true" className={styles.statusIcon}>
-              {statusIcons.completada}
-            </span>
-            {statusLabels.completada}
+        <div className={styles.seriesGrid}>
+          <span className={styles.seriesNumber} aria-hidden="true">
+            {order}
           </span>
+          <span className={styles.visuallyHidden}>Serie {order}</span>
+          {completedFieldsBlock}
+          <div className={styles.primaryAction}>
+            <button
+              className={styles.completeButton}
+              type="button"
+              aria-label="Completada"
+              disabled
+            >
+              <span aria-hidden="true">✓</span>
+            </button>
+          </div>
         </div>
         <p className={styles.result}>{resultText(series, mode)}</p>
-        <div className={styles.actions}>
-          <button
-            className={styles.omitButton}
-            type="button"
-            onClick={onOmitCompleted}
-            disabled={saving}
-          >
-            Omitir
-          </button>
-          <button
-            className={styles.pendingButton}
-            type="button"
-            onClick={onReturnToPending}
-            disabled={saving}
-          >
-            Volver a pendiente
-          </button>
-          {series.added && (
+        {seriesActions(
+          <div className={styles.actions}>
             <button
-              className={styles.deleteButton}
+              className={styles.omitButton}
               type="button"
-              onClick={onDelete}
+              onClick={onOmitCompleted}
               disabled={saving}
             >
-              Eliminar
+              Omitir
             </button>
-          )}
-        </div>
+            <button
+              className={styles.pendingButton}
+              type="button"
+              onClick={onReturnToPending}
+              disabled={saving}
+            >
+              Volver a pendiente
+            </button>
+            {series.added && (
+              <button
+                className={styles.deleteButton}
+                type="button"
+                onClick={onDelete}
+                disabled={saving}
+              >
+                Eliminar
+              </button>
+            )}
+          </div>,
+        )}
       </div>
     );
   }
@@ -190,41 +253,50 @@ export function SeriesRow({
         role="group"
         aria-label={`Serie ${order}`}
       >
-        <div className={styles.rowHeader}>
-          <span className={styles.seriesNumber}>Serie {order}</span>
-          <span className={styles.statusBadge} data-status="omitida">
-            <span aria-hidden="true" className={styles.statusIcon}>
-              {statusIcons.omitida}
-            </span>
-            {statusLabels.omitida}
-          </span>
-        </div>
-
         {/* Restaurar una Serie omitida como completada exige introducir a la
             vez un resultado completo: los campos lo permiten y el botón
             «Restaurar» completa con la validación atómica del resultado. */}
-        {fieldsBlock}
-
-        <div className={styles.actions}>
-          <button
-            className={styles.restoreButton}
-            type="button"
-            onClick={onRestore}
-            disabled={saving}
-          >
-            Restaurar
-          </button>
-          {series.added && (
+        <div className={styles.seriesGrid}>
+          <span className={styles.seriesNumber} aria-hidden="true">
+            {order}
+          </span>
+          <span className={styles.visuallyHidden}>Serie {order}</span>
+          {fieldsBlock}
+          <div className={styles.primaryAction}>
             <button
-              className={styles.deleteButton}
+              className={styles.restoreButton}
               type="button"
-              onClick={onDelete}
+              onClick={onRestore}
+              disabled={saving}
+              aria-label="Confirmar resultado restaurado"
+            >
+              <span aria-hidden="true">✓</span>
+            </button>
+          </div>
+        </div>
+        {seriesActions(
+          <div className={styles.actions}>
+            <button
+              className={styles.restoreButton}
+              type="button"
+              onClick={onRestore}
               disabled={saving}
             >
-              Eliminar
+              Restaurar
             </button>
-          )}
-        </div>
+            {series.added && (
+              <button
+                className={styles.deleteButton}
+                type="button"
+                onClick={onDelete}
+                disabled={saving}
+              >
+                Eliminar
+              </button>
+            )}
+          </div>,
+        )}
+        {rpeBlock}
       </div>
     );
   }
@@ -236,46 +308,47 @@ export function SeriesRow({
       role="group"
       aria-label={`Serie ${order}`}
     >
-      <div className={styles.rowHeader}>
-        <span className={styles.seriesNumber}>Serie {order}</span>
-        <span className={styles.statusBadge} data-status="pendiente">
-          <span aria-hidden="true" className={styles.statusIcon}>
-            {statusIcons.pendiente}
-          </span>
-          {statusLabels.pendiente}
+      <div className={styles.seriesGrid}>
+        <span className={styles.seriesNumber} aria-hidden="true">
+          {order}
         </span>
-      </div>
-
-      {fieldsBlock}
-
-      <div className={styles.actions}>
-        <button
-          className={styles.completeButton}
-          type="button"
-          onClick={onComplete}
-          disabled={saving}
-        >
-          Completar
-        </button>
-        <button
-          className={styles.omitButton}
-          type="button"
-          onClick={onOmit}
-          disabled={saving}
-        >
-          Omitir
-        </button>
-        {series.added && (
+        <span className={styles.visuallyHidden}>Serie {order}</span>
+        {fieldsBlock}
+        <div className={styles.primaryAction}>
           <button
-            className={styles.deleteButton}
+            className={styles.completeButton}
             type="button"
-            onClick={onDelete}
+            onClick={onComplete}
+            disabled={saving}
+            aria-label="Completar"
+          >
+            <span aria-hidden="true">✓</span>
+          </button>
+        </div>
+      </div>
+      {seriesActions(
+        <div className={styles.actions}>
+          <button
+            className={styles.omitButton}
+            type="button"
+            onClick={onOmit}
             disabled={saving}
           >
-            Eliminar
+            Omitir
           </button>
-        )}
-      </div>
+          {series.added && (
+            <button
+              className={styles.deleteButton}
+              type="button"
+              onClick={onDelete}
+              disabled={saving}
+            >
+              Eliminar
+            </button>
+          )}
+        </div>,
+      )}
+      {rpeBlock}
     </div>
   );
 }

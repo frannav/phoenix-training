@@ -156,3 +156,410 @@
   color: var(--color-ink);
   font-weight: 800;
 }
+
+.row {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 0.7rem 0;
+  background: var(--color-surface);
+}
+
+.row[data-status="completada"] {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.row[data-status="omitida"] {
+  background: var(--color-surface-muted);
+}
+
+.rowHeader {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.statusBadge {
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.statusBadge[data-status="completada"] {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+  color: #16803c;
+}
+
+.fieldInput {
+  border: 2px solid #000;
+  border-radius: 0;
+  padding: 0.55rem 0.6rem;
+  text-align: center;
+}
+
+.fieldLabel {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+}
+
+.actions {
+  flex-wrap: wrap;
+}
+
+.completeButton,
+.omitButton,
+.restoreButton,
+.pendingButton,
+.deleteButton {
+  border: 2px solid #000;
+  border-radius: 0;
+  padding: 0.55rem 0.75rem;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.completeButton {
+  background: #000;
+}
+
+.omitButton {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-dark);
+}
+
+.addSeriesButton {
+  border: 2px solid #000;
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+/* Tabla de registro inspirada en la referencia Stitch: cada Serie conserva
+   su estado y sus acciones, pero los valores viven en columnas estrechas y
+   comparables en lugar de una tarjeta vertical. */
+.row {
+  border-top: 1px solid var(--color-border);
+  padding: 0.45rem 0;
+  background: var(--color-surface);
+}
+
+.row[data-status="completada"] {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.row[data-status="omitida"] {
+  background: var(--color-surface-muted);
+}
+
+.rowHeader {
+  min-height: 1rem;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.seriesGrid {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) 2.5rem;
+  align-items: end;
+  gap: 0.35rem;
+}
+
+.seriesGrid .fields {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.primaryAction {
+  grid-column: 3;
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.primaryAction > button {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 0;
+}
+
+.seriesNumber {
+  font-size: 0.64rem;
+}
+
+.statusBadge {
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 0.08rem 0.3rem;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+}
+
+.statusBadge[data-status="completada"] {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+  color: #16803c;
+}
+
+.fields {
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.field {
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.fieldLabel {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-family: var(--font-display);
+  font-size: 0.52rem;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fieldInput {
+  height: 2rem;
+  min-width: 0;
+  border: 2px solid #000;
+  border-radius: 0;
+  padding: 0.25rem 0.3rem;
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.fields[data-readonly="true"] .fieldInput {
+  background: var(--color-surface-container-low);
+  color: var(--color-ink);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.completeButton,
+.omitButton,
+.restoreButton,
+.pendingButton,
+.deleteButton {
+  min-height: 2rem;
+  border: 2px solid #000;
+  border-radius: 0;
+  padding: 0.35rem 0.55rem;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+}
+
+.completeButton {
+  min-width: 2.5rem;
+  background: #000;
+  box-shadow: var(--shadow-hard-sm);
+  color: #fff;
+  font-size: 0;
+}
+
+.completeButton::before {
+  content: "✓";
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.completeButton:disabled {
+  background: var(--color-success);
+  color: #fff;
+  opacity: 1;
+}
+
+.omitButton {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-dark);
+}
+
+.restoreButton,
+.pendingButton,
+.deleteButton {
+  background: var(--color-surface);
+}
+
+.deleteButton {
+  color: var(--color-danger-dark);
+}
+
+.result {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 22rem) {
+  .fieldLabel {
+    font-size: 0.46rem;
+  }
+
+  .fieldInput {
+    height: 1.85rem;
+    font-size: 0.65rem;
+  }
+
+  .seriesGrid {
+    grid-template-columns: 1.7rem minmax(0, 1fr) 2.2rem;
+    gap: 0.25rem;
+  }
+
+  .completeButton,
+  .omitButton,
+  .restoreButton,
+  .pendingButton,
+  .deleteButton {
+    padding-inline: 0.4rem;
+  }
+}
+
+/* La cabecera vive una sola vez por bloque de Ejercicio; las filas solo
+   conservan los campos y el check, como en la hoja de registro de Stitch. */
+.seriesHeader {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) 2.5rem;
+  gap: 0.35rem;
+  align-items: end;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 0 0.35rem;
+  color: var(--color-ink-muted);
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.seriesHeaderFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.seriesHeader > :last-child {
+  text-align: center;
+}
+
+/* Estado y acciones quedan en un nivel secundario accesible. Se revelan al
+   enfocar cualquier control, sin competir visualmente con la tabla principal. */
+.secondaryActions {
+  margin-top: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.56rem;
+  text-transform: uppercase;
+}
+
+.secondarySummary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--color-ink-muted);
+  list-style: none;
+}
+
+.secondarySummary::-webkit-details-marker {
+  display: none;
+}
+
+.secondarySummary::after {
+  content: "＋";
+}
+
+.secondaryActions[open] .secondarySummary::after {
+  content: "−";
+}
+
+.secondaryStatus[data-status="completada"] {
+  color: var(--color-success-dark);
+}
+
+.secondaryStatus[data-status="omitida"] {
+  color: var(--color-ink-muted);
+}
+
+.secondaryContent {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.secondaryContent:focus-within {
+  position: static;
+  width: auto;
+  height: auto;
+  margin-top: 0.45rem;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+.secondaryActions[open] .secondaryContent {
+  position: static;
+  width: auto;
+  height: auto;
+  margin-top: 0.45rem;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+.secondaryField {
+  display: grid;
+  gap: 0.15rem;
+  max-width: 7rem;
+}
+
+/* La tabla conserva los nombres de campo para lectores de pantalla y
+   etiquetas de formulario, pero solo la cabecera muestra SER/CARGA/REPS/OK. */
+.fieldLabel,
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.secondaryField {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

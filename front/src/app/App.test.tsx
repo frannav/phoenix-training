@@ -41,7 +41,7 @@ describe("application navigation", () => {
     ["/historial/sesion-opaca", "Detalle de la Sesión"],
     ["/ejercicios", "Ejercicios"],
     ["/cuenta", "Cuenta"],
-    ["/sesion/sesion-opaca", "Sesión activa"],
+    ["/sesion/sesion-opaca", "Sesión libre"],
   ] as const;
 
   beforeEach(() => {

@@ -118,7 +118,7 @@ describe("pantalla de la Sesión activa", () => {
     renderPage();
 
     expect(
-      await screen.findByRole("heading", { name: "Sesión activa" }),
+      await screen.findByRole("heading", { name: "Sesión libre" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Sesión libre")).toBeInTheDocument();
     expect(screen.getByText("Guardado")).toBeInTheDocument();
@@ -1499,7 +1499,7 @@ describe("finalizar y eliminar la Sesión activa", () => {
     await userEvent.setup().click(
       await screen.findByRole("button", { name: /Flexiones/ }),
     );
-    expect(await screen.findByRole("button", { name: "Finalizar" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Finalizar sesión" })).toBeDisabled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -1540,7 +1540,7 @@ describe("finalizar y eliminar la Sesión activa", () => {
     await user.click(
       await screen.findByRole("button", { name: /Flexiones/ }),
     );
-    await user.click(screen.getByRole("button", { name: "Finalizar" }));
+    await user.click(screen.getByRole("button", { name: "Finalizar sesión" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Finalizar la Sesión" });
     expect(
@@ -1551,12 +1551,12 @@ describe("finalizar y eliminar la Sesión activa", () => {
     expect(postCalls).toBe(0);
 
     // confirmar finaliza y muestra el resumen sin Series pendientes
-    await user.click(screen.getByRole("button", { name: "Finalizar" }));
+    await user.click(screen.getByRole("button", { name: "Finalizar sesión" }));
     await user.click(
       within(await screen.findByRole("dialog", { name: "Finalizar la Sesión" })).getByRole("button", { name: "Finalizar" }),
     );
 
-    expect(await screen.findByRole("heading", { name: "Sesión finalizada" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sesión libre" })).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Resumen de la Sesión" }),
     ).toBeInTheDocument();
@@ -1567,7 +1567,7 @@ describe("finalizar y eliminar la Sesión activa", () => {
       screen.getByText("La Sesión quedó sin Series pendientes y ya no aparece como activa."),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Volver a Inicio" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Finalizar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Finalizar sesión" })).not.toBeInTheDocument();
   });
 
   test("Finalizar sin Series pendientes no pide confirmación", async () => {
@@ -1603,10 +1603,10 @@ describe("finalizar y eliminar la Sesión activa", () => {
     await user.click(
       await screen.findByRole("button", { name: /Flexiones/ }),
     );
-    await user.click(screen.getByRole("button", { name: "Finalizar" }));
+    await user.click(screen.getByRole("button", { name: "Finalizar sesión" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Sesión finalizada" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sesión libre" })).toBeInTheDocument();
     expect(postCalls).toBe(1);
   });
 
@@ -1681,12 +1681,12 @@ describe("finalizar y eliminar la Sesión activa", () => {
     await user.click(
       await screen.findByRole("button", { name: /Flexiones/ }),
     );
-    await user.click(screen.getByRole("button", { name: "Finalizar" }));
+    await user.click(screen.getByRole("button", { name: "Finalizar sesión" }));
 
     expect(
       await screen.findByText("La Sesión cambió en otra pestaña. Se cargó la versión vigente."),
     ).toBeInTheDocument();
     // la versión vigente sigue activa y se puede volver a intentar
-    expect(screen.getByRole("button", { name: "Finalizar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Finalizar sesión" })).toBeInTheDocument();
   });
 });

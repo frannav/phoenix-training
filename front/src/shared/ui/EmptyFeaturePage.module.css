@@ -4,11 +4,10 @@
   gap: 1rem;
   max-width: 42rem;
   margin-top: 2.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 1.25rem;
+  border: 2px solid #000;
   padding: 1.25rem;
   background: var(--color-surface);
-  box-shadow: 0 1rem 2.5rem rgba(37, 48, 31, 0.05);
+  box-shadow: var(--shadow-hard-md);
 }
 
 .icon {
@@ -17,10 +16,15 @@
   width: 2.4rem;
   height: 2.4rem;
   place-items: center;
-  border-radius: 50%;
+  border: 2px solid #000;
   background: var(--color-success-soft);
-  color: var(--color-success);
+  color: var(--color-ink);
   font-weight: 900;
+}
+
+.copy h2 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
 }
 
 .copy h2,
@@ -33,4 +37,3 @@
   color: var(--color-ink-muted);
   line-height: 1.5;
 }
-

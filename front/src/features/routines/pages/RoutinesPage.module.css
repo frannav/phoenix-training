@@ -269,3 +269,81 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Extend the Stitch brutalist system to the routine catalogue. */
+.management {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 58rem;
+  margin-top: -4.25rem;
+  margin-bottom: 3.5rem;
+}
+
+.newRoutine,
+.emptyAction,
+.startButton {
+  border: 2px solid #000;
+  padding: 0.7rem 1.1rem;
+  color: #fff;
+  background: #000;
+  box-shadow: var(--shadow-hard-sm);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.results,
+.archivedSection {
+  max-width: 58rem;
+}
+
+.sectionHeading {
+  border-left: 4px solid #000;
+  padding-left: 0.85rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  text-transform: uppercase;
+}
+
+.list,
+.archivedList {
+  gap: 1rem;
+}
+
+.item,
+.archivedItem {
+  border: 2px solid #000;
+  padding: 1rem 1.15rem;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hard-md);
+}
+
+.itemName,
+.archivedName {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+}
+
+.itemMeta,
+.archivedMeta {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+}
+
+.itemActions a,
+.itemActions button,
+.restoreButton {
+  border: 2px solid var(--color-ink);
+  padding: 0.45rem 0.7rem;
+  background: var(--color-surface);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+@media (max-width: 39.999rem) {
+  .management {
+    margin-top: -1rem;
+    margin-bottom: 2rem;
+  }
+}

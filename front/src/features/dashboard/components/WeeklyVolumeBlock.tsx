@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { Bar, BarChart, Cell, XAxis, YAxis } from "recharts";
 import { formatNumber } from "../../../shared/format";
 import type { WeeklyVolume } from "../api/dashboard-api";
 import styles from "./WeeklyVolumeBlock.module.css";
@@ -31,6 +30,7 @@ export function WeeklyVolumeBlock({ volume }: WeeklyVolumeBlockProps) {
     total: week.total,
     current: index === weeks.length - 1,
   }));
+  const maxTotal = Math.max(...chartData.map((entry) => entry.total), 1);
 
   // Alternativa textual completa de la gráfica: título, unidad y cada valor.
   const chartLabel =
@@ -71,32 +71,23 @@ export function WeeklyVolumeBlock({ volume }: WeeklyVolumeBlockProps) {
                 es la única vía de lectura (la barra actual se distingue
                 además por su etiqueta «Actual»). */}
             <div className={styles.chart} role="img" aria-label={chartLabel}>
-              <BarChart
-                width={520}
-                height={150}
-                data={chartData}
-                margin={{ top: 6, right: 6, bottom: 0, left: 6 }}
-              >
-                <XAxis
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={{ stroke: "var(--color-border)" }}
-                  tick={{ fontSize: 12, fill: "var(--color-ink-muted)" }}
-                />
-                <YAxis hide />
-                <Bar dataKey="total" radius={[6, 6, 0, 0]} isAnimationActive={false}>
-                  {chartData.map((entry) => (
-                    <Cell
-                      key={entry.label}
-                      style={{
-                        fill: entry.current
-                          ? "var(--color-success)"
-                          : "var(--color-accent-soft)",
-                      }}
+              <div className={styles.barPlot} aria-hidden="true">
+                {chartData.map((entry) => (
+                  <div className={styles.barColumn} key={entry.label}>
+                    <div
+                      className={`${styles.bar} ${entry.current ? styles.currentBar : ""}`}
+                      style={{ height: `${(entry.total / maxTotal) * 100}%` }}
                     />
-                  ))}
-                </Bar>
-              </BarChart>
+                  </div>
+                ))}
+              </div>
+              <div className={styles.chartLabels} aria-hidden="true">
+                {chartData.map((entry) => (
+                  <span className={entry.current ? styles.currentLabel : undefined} key={entry.label}>
+                    {entry.label}
+                  </span>
+                ))}
+              </div>
             </div>
           </figure>
         </div>

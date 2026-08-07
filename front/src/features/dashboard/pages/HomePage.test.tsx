@@ -316,7 +316,7 @@ describe("primer bloque de Inicio: entrenamiento actual", () => {
     expect(postBodies).toEqual([
       { origin: "plan", planId: "plan-1", trainingId: "training-1" },
     ]);
-    expect(await screen.findByRole("heading", { name: "Sesión activa" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sesión del Plan" })).toBeInTheDocument();
   });
 });
 
@@ -331,7 +331,7 @@ describe("segundo bloque de Inicio: Plan activo", () => {
     vi.unstubAllGlobals();
   });
 
-  test("muestra nombre, semana actual, realizados, omitidos y barras con enlace al detalle", async () => {
+  test("muestra nombre, semana actual y el progreso realizado con enlace al detalle", async () => {
     stubHome({
       dashboard: { ...emptyDashboard, activePlan: activePlanFixture },
     });
@@ -340,17 +340,18 @@ describe("segundo bloque de Inicio: Plan activo", () => {
     const planRegion = await screen.findByRole("region", { name: "Plan activo" });
     expect(within(planRegion).getByText("Ciclo base")).toBeInTheDocument();
     expect(within(planRegion).getByText("Semana 1 de 2")).toBeInTheDocument();
-    expect(within(planRegion).getByText("1 realizado · 1 omitido · 2 pendientes")).toBeInTheDocument();
+    expect(within(planRegion).queryByText("1 realizado · 1 omitido · 2 pendientes")).not.toBeInTheDocument();
     expect(
-      within(planRegion).getByText(
+      within(planRegion).queryByText(
         "El progreso cuenta entrenamientos realizados u omitidos. El cumplimiento solo cuenta los realizados.",
       ),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
 
-    const entrenamientosConResultado = within(planRegion).getByRole("progressbar", {
-      name: "Entrenamientos con resultado: 50 % · Realizadas u omitidas",
-    });
-    expect(entrenamientosConResultado).toHaveAttribute("aria-valuenow", "50");
+    expect(
+      within(planRegion).queryByRole("progressbar", {
+        name: "Entrenamientos con resultado: 50 % · Realizadas u omitidas",
+      }),
+    ).not.toBeInTheDocument();
     const entrenamientosRealizados = within(planRegion).getByRole("progressbar", {
       name: "Entrenamientos realizados: 25 % · Completadas de las previstas",
     });
