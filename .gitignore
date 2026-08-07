@@ -5,3 +5,5 @@ dist/
 *.sqlite-wal
 .DS_Store
 .orchestration
+_prompts
+stitch
